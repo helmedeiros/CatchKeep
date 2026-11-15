@@ -18,6 +18,7 @@ const (
 	codeInternal         = "INTERNAL"
 	codeNotFound         = "NOT_FOUND"
 	codeConflict         = "IMPORT_ALREADY_COMMITTED"
+	codeSetupRequired    = "SETUP_REQUIRED"
 	codeUnsupportedFile  = "UNSUPPORTED_FILE"
 	codePayloadTooLarge  = "PAYLOAD_TOO_LARGE"
 )
