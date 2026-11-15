@@ -2,9 +2,13 @@
 
 A Pokémon GO storage helper.
 
+## What you can do today
+
+- Give every trainer in the house their own PIN-protected profile, so collections never get mixed up.
+
 ## Status
 
-Early development — nothing usable yet. The plan is in [`spec/developer-spec.md`](spec/developer-spec.md).
+Early development. The plan is in [`spec/developer-spec.md`](spec/developer-spec.md).
 
 ## Development
 
