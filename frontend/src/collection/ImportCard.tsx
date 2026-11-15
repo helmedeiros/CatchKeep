@@ -1,8 +1,11 @@
 import { type ChangeEvent, useState } from "react";
 import { toast } from "sonner";
 import { alert, card, primaryButton, secondaryButton } from "../ui/styles";
+import { DuplicateReview } from "./DuplicateReview";
 import {
   type ImportPreview,
+  type MatchAnswer,
+  useAnswerMatches,
   useCommitImport,
   useStageImport,
 } from "./useCollection";
@@ -10,6 +13,7 @@ import {
 export function ImportCard({ hasPokemon }: { hasPokemon: boolean }) {
   const stage = useStageImport();
   const commit = useCommitImport();
+  const answer = useAnswerMatches();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
 
   const choose = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -23,7 +27,7 @@ export function ImportCard({ hasPokemon }: { hasPokemon: boolean }) {
     commit.mutate(p.id, {
       onSuccess: (done) => {
         setPreview(null);
-        toast.success(`Added ${done.newCount} Pokémon to your collection.`);
+        toast.success(doneMessage(done));
       },
     });
 
@@ -32,8 +36,15 @@ export function ImportCard({ hasPokemon }: { hasPokemon: boolean }) {
       <Preview
         preview={preview}
         onAdd={add}
+        onAnswer={(answers) =>
+          answer.mutate(
+            { importId: preview.id, answers },
+            { onSuccess: setPreview },
+          )
+        }
+        answerError={answer.isError ? answer.error.message : null}
         onCancel={() => setPreview(null)}
-        busy={commit.isPending}
+        busy={commit.isPending || answer.isPending}
       />
     );
   }
@@ -70,17 +81,40 @@ export function ImportCard({ hasPokemon }: { hasPokemon: boolean }) {
   );
 }
 
+function doneMessage({ newCount, updatedCount }: ImportPreview) {
+  if (updatedCount === 0)
+    return `Added ${newCount} Pokémon to your collection.`;
+  if (newCount === 0) return `Updated ${updatedCount} Pokémon.`;
+  return `Added ${newCount} and updated ${updatedCount} Pokémon.`;
+}
+
+function commitLabel({ newCount, updatedCount }: ImportPreview) {
+  if (updatedCount === 0) return `Add ${newCount} Pokémon`;
+  if (newCount === 0) return `Update ${updatedCount} Pokémon`;
+  return `Add ${newCount} and update ${updatedCount} Pokémon`;
+}
+
 function Preview({
   preview,
   onAdd,
+  onAnswer,
+  answerError,
   onCancel,
   busy,
 }: {
   preview: ImportPreview;
   onAdd: (p: ImportPreview) => void;
+  onAnswer: (answers: MatchAnswer[]) => void;
+  answerError: string | null;
   onCancel: () => void;
   busy: boolean;
 }) {
+  const [reviewing, setReviewing] = useState(false);
+  const pending = preview.possibleMatches.filter((m) => m.answer === "pending");
+  const exact = pending.filter((m) => m.exact && m.candidates.length === 1);
+  const current = reviewing ? pending[0] : undefined;
+  const nothingToDo = preview.newCount + preview.updatedCount === 0;
+
   return (
     <section
       aria-label="Import preview"
@@ -91,13 +125,71 @@ function Preview({
         <li>
           <strong>{preview.newCount}</strong> new
         </li>
+        {preview.updatedCount > 0 && (
+          <li>
+            <strong>{preview.updatedCount}</strong> will update Pokémon you
+            already have
+          </li>
+        )}
         {preview.possibleMatchCount > 0 && (
           <li>
             <strong>{preview.possibleMatchCount}</strong> may already be in your
-            collection. They are held back so nothing is counted twice.
+            collection. They are held back until you say whether they're the
+            same Pokémon, so nothing is counted twice.
           </li>
         )}
       </ul>
+      {current ? (
+        <DuplicateReview
+          key={current.row}
+          match={current}
+          remaining={pending.length}
+          busy={busy}
+          onAnswer={(a) => onAnswer([a])}
+          onStop={() => setReviewing(false)}
+        />
+      ) : (
+        pending.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {exact.length > 0 && (
+              <>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  {exact.length} match exactly one Pokémon you already have:
+                  same species, form, gender, IVs and catch date.
+                </p>
+                <button
+                  type="button"
+                  className={primaryButton}
+                  disabled={busy}
+                  onClick={() =>
+                    onAnswer(
+                      exact.map((m) => ({
+                        row: m.row,
+                        answer: "same",
+                        sameAs: m.candidates[0]?.pokemon.id ?? "",
+                      })),
+                    )
+                  }
+                >
+                  Update {exact.length} Pokémon you already have
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              className={secondaryButton}
+              onClick={() => setReviewing(true)}
+            >
+              Review one by one
+            </button>
+          </div>
+        )
+      )}
+      {answerError && (
+        <p role="alert" className={alert}>
+          {answerError}
+        </p>
+      )}
       {preview.invalidRows.length > 0 && (
         <details className="text-sm">
           <summary className="cursor-pointer">
@@ -121,10 +213,10 @@ function Preview({
       <button
         type="button"
         className={primaryButton}
-        disabled={busy || preview.newCount === 0}
+        disabled={busy || nothingToDo}
         onClick={() => onAdd(preview)}
       >
-        Add {preview.newCount} Pokémon
+        {nothingToDo ? "Nothing to add yet" : commitLabel(preview)}
       </button>
       <button type="button" className={secondaryButton} onClick={onCancel}>
         Cancel

@@ -7,28 +7,54 @@ interface Profile {
   pin: string;
 }
 
+type Schemas = components["schemas"];
+interface Row {
+  species: string;
+  cp: number;
+  lucky: boolean;
+}
+interface Stored extends Row {
+  id: string;
+}
+interface FakeImport {
+  rows: Row[];
+  status: "staged" | "committed";
+  answers: Map<number, Schemas["MatchAnswer"]>;
+  done?: { newCount: number; updatedCount: number; pending: number };
+}
+
+const toPokemon = (id: string, p: Row): Schemas["Pokemon"] => ({
+  id,
+  species: p.species,
+  form: "Normal",
+  cp: p.cp,
+  iv: { attack: 15, defense: 14, stamina: 13 },
+  attributes: {
+    shiny: "unknown",
+    lucky: p.lucky ? "yes" : "unknown",
+    shadow: "unknown",
+    purified: "unknown",
+    favorite: "unknown",
+    costume: "unknown",
+    background: "unknown",
+    dynamax: "unknown",
+    gigantamax: "unknown",
+  },
+});
+
 /**
  * An in-memory stand-in for the CatchKeep API that follows the contract
- * closely enough for component tests: profiles, PIN sign-in, session cookie.
+ * closely enough for component tests: profiles, PIN sign-in, session cookie,
+ * imports and the collection. A staged row "might be" every collected
+ * Pokémon of the same species; with one candidate it is an exact match.
  */
 export function createFakeApi(options: { lockAfter?: number } = {}) {
   const profiles: Profile[] = [];
   let signedIn: Profile | null = null;
   let failures = 0;
   let next = 0;
-  const collection: Array<{
-    id: string;
-    species: string;
-    cp: number;
-    lucky: boolean;
-  }> = [];
-  const imports = new Map<
-    string,
-    {
-      rows: Array<{ species: string; cp: number; lucky: boolean }>;
-      status: "staged" | "committed";
-    }
-  >();
+  const collection: Stored[] = [];
+  const imports = new Map<string, FakeImport>();
   const err = (status: number, code: string, message: string) =>
     jsonResponse(status, { error: { code, message, correlationId: "test" } });
 
@@ -115,43 +141,42 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
           "I",
           "R",
         );
-      imports.set(id, { rows, status: "staged" });
+      imports.set(id, { rows, status: "staged", answers: new Map() });
       return jsonResponse(201, preview(id));
     }
     const commit = path.match(/^\/imports\/([^/]+)\/commit$/);
     if (commit && req.method === "POST") {
       const imp = imports.get(commit[1] ?? "");
       if (!imp) return err(404, "NOT_FOUND", "import not found");
-      imp.status = "committed";
-      for (const r of imp.rows) {
+      const r = review(imp);
+      for (const row of r.add) {
         next += 1;
-        collection.push({ id: `P${next}`, ...r });
+        collection.push({ id: `P${next}`, ...row });
       }
+      for (const { target, row } of r.update) Object.assign(target, row);
+      imp.status = "committed";
+      imp.done = {
+        newCount: r.add.length,
+        updatedCount: r.update.length,
+        pending: r.pending,
+      };
       return jsonResponse(200, preview(commit[1] ?? ""));
+    }
+    const answer = path.match(/^\/imports\/([^/]+)\/answers$/);
+    if (answer && req.method === "POST") {
+      const imp = imports.get(answer[1] ?? "");
+      if (!imp) return err(404, "NOT_FOUND", "import not found");
+      for (const a of (body as Schemas["MatchAnswers"]).answers) {
+        imp.answers.set(a.row, a);
+      }
+      return jsonResponse(200, preview(answer[1] ?? ""));
     }
     if (path === "/collection") {
       if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
       const sorted = [...collection].sort((a, b) => b.cp - a.cp);
       return jsonResponse(200, {
         total: sorted.length,
-        pokemon: sorted.map((p) => ({
-          id: p.id,
-          species: p.species,
-          form: "Normal",
-          cp: p.cp,
-          iv: { attack: 15, defense: 14, stamina: 13 },
-          attributes: {
-            shiny: "unknown",
-            lucky: p.lucky ? "yes" : "unknown",
-            shadow: "unknown",
-            purified: "unknown",
-            favorite: "unknown",
-            costume: "unknown",
-            background: "unknown",
-            dynamax: "unknown",
-            gigantamax: "unknown",
-          },
-        })),
+        pokemon: sorted.map((p) => toPokemon(p.id, p)),
       });
     }
     if (path === "/me") {
@@ -165,17 +190,49 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
     return err(404, "NOT_FOUND", `no fake for ${req.method} ${path}`);
   };
 
-  function preview(id: string): components["schemas"]["ImportPreview"] {
+  function review(imp: FakeImport) {
+    const add: Row[] = [];
+    const update: Array<{ target: Stored; row: Row }> = [];
+    const matches: Schemas["PossibleMatch"][] = [];
+    imp.rows.forEach((row, i) => {
+      const line = i + 2;
+      const candidates = collection.filter((p) => p.species === row.species);
+      if (candidates.length === 0) {
+        add.push(row);
+        return;
+      }
+      const a = imp.answers.get(line);
+      const target = candidates.find((c) => c.id === a?.sameAs);
+      if (a?.answer === "different") add.push(row);
+      if (a?.answer === "same" && target) update.push({ target, row });
+      matches.push({
+        row: line,
+        incoming: toPokemon(`row-${line}`, row),
+        candidates: candidates.map((c) => ({
+          origin: "collection",
+          pokemon: toPokemon(c.id, c),
+        })),
+        exact: candidates.length === 1,
+        answer: a?.answer ?? "pending",
+        ...(a?.sameAs === undefined ? {} : { sameAs: a.sameAs }),
+      });
+    });
+    const pending = matches.filter((m) => m.answer === "pending").length;
+    return { add, update, matches, pending };
+  }
+
+  function preview(id: string): Schemas["ImportPreview"] {
     const imp = imports.get(id);
+    const r = imp && !imp.done ? review(imp) : null;
     return {
       id,
       status: imp?.status ?? "staged",
       source: "poke-genie",
       totalRows: imp?.rows.length ?? 0,
-      newCount: imp?.rows.length ?? 0,
-      updatedCount: 0,
-      possibleMatchCount: 0,
-      possibleMatches: [],
+      newCount: imp?.done?.newCount ?? r?.add.length ?? 0,
+      updatedCount: imp?.done?.updatedCount ?? r?.update.length ?? 0,
+      possibleMatchCount: imp?.done?.pending ?? r?.pending ?? 0,
+      possibleMatches: r?.matches ?? [],
       invalidRows: [],
       ignoredColumns: ["Dust"],
       unknownFields: [

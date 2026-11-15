@@ -43,3 +43,25 @@ export function useCommitImport() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: collectionKey }),
   });
 }
+
+export type PossibleMatch = components["schemas"]["PossibleMatch"];
+export type MatchAnswer = components["schemas"]["MatchAnswer"];
+
+export function useAnswerMatches() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async ({
+      importId,
+      answers,
+    }: {
+      importId: string;
+      answers: MatchAnswer[];
+    }) =>
+      unwrap(
+        await api.POST("/imports/{importId}/answers", {
+          params: { path: { importId } },
+          body: { answers },
+        }),
+      ),
+  });
+}
