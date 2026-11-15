@@ -4,7 +4,9 @@ A family web app, hosted on a MacBook and used from iPhone Safari on home Wi-Fi,
 
 ## Status
 
-Specification phase. Specifications live in `spec/`.
+Specification phase. See [`spec/`](spec/):
+
+- [`brainstorming-handoff.md`](spec/brainstorming-handoff.md) — product handoff from brainstorming.
 
 ## Development
 
