@@ -5,7 +5,8 @@ A Pokémon GO storage helper.
 ## What you can do today
 
 - Give each trainer their own PIN-protected profile, so collections never get mixed up.
-- Bring in your collection from a Poke Genie CSV export: see a preview first, then browse it strongest first. Pokémon that might already be there are held back instead of counted twice, and anything the export can't tell (shiny, costume, background, Dynamax) stays "unknown" instead of being assumed absent.
+- Bring in your collection from a Poke Genie CSV export: see a preview first, then browse it strongest first. Anything the export can't tell (shiny, costume, background, Dynamax) stays "unknown" instead of being assumed absent.
+- Keep it current by importing a newer export: Pokémon you already have are updated (new CP after a power-up, for example) instead of counted twice. CatchKeep never merges on its own. Exact matches are confirmed in one tap, and anything less certain is shown side by side for you to decide.
 
 ## Status
 
