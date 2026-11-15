@@ -607,36 +607,63 @@ Client checks `/health` on focus and before mutations. If unreachable: banner "C
 
 ## 11. V2 · Screenshot import
 
-| ID        | Requirement                                                                                                                                            |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| V2-SCR-01 | Batch upload of English storage-list, detail and appraisal screenshots from iPhone Safari.                                                             |
-| V2-SCR-02 | Screenshot-only onboarding and mixed CSV + screenshot imports.                                                                                         |
-| V2-SCR-03 | Multiple Pokémon per list screenshot.                                                                                                                  |
-| V2-SCR-04 | All processing local on the MacBook.                                                                                                                   |
-| V2-SCR-05 | Store confident observations; queue only uncertain readings for review. Trainer can correct manually or add another screenshot.                        |
-| V2-SCR-06 | A view that cannot display a feature cannot confirm its absence (per-view capability matrix below).                                                    |
-| V2-SCR-07 | Same unknown-field protection and duplicate confirmation as V1, including across overlapping screenshots and CSVs.                                     |
-| V2-SCR-08 | Trainer can pick an existing record and add an updated screenshot (evolution, power-up, move change); preview conflicting changes; keep the record ID. |
-| V2-SCR-09 | Cleanup action purges processed images while preserving extracted data; images tied to pending reviews are kept.                                       |
-| V2-SCR-10 | Supplied PNGs are the initial fixtures; add cases for every supported screen and protected feature.                                                    |
+| ID        | Requirement                                                                                                                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| V2-SCR-01 | Batch upload of English storage-list, detail and appraisal screenshots from iPhone Safari.                                                                   |
+| V2-SCR-02 | Screenshot-only onboarding and mixed CSV + screenshot imports.                                                                                               |
+| V2-SCR-03 | Multiple Pokémon per list screenshot.                                                                                                                        |
+| V2-SCR-04 | All processing local on the MacBook.                                                                                                                         |
+| V2-SCR-05 | Store confident observations; queue only uncertain readings for review. Trainer can correct manually or add another screenshot.                              |
+| V2-SCR-06 | A view that cannot display a feature cannot confirm its absence (per-view capability matrix below).                                                          |
+| V2-SCR-07 | Same unknown-field protection and duplicate confirmation as V1, including across overlapping screenshots and CSVs.                                           |
+| V2-SCR-08 | Trainer can pick an existing record and add an updated screenshot (evolution, power-up, move change); preview conflicting changes; keep the record ID.       |
+| V2-SCR-09 | Cleanup action purges processed images while preserving extracted data; images tied to pending reviews are kept.                                             |
+| V2-SCR-10 | Supplied sample captures (kept locally, not committed) are the initial fixtures; add cases for every supported screen and protected feature.                 |
+| V2-SCR-11 | Group captures of the same Pokémon (detail header, detail lower, appraisal) into one screenshot set; cross-check shared fields; disagreement goes to review. |
 
 **Pipeline:** upload → store (sha256 dedupe) → classify screen kind → OCR + layout parse per kind → per-field confidence → observations above threshold stored; below threshold → review queue → reconciliation as V1.
 
-**View capability matrix [Open — must be filled by validation before V2 ships]:**
+**Screen kinds** (from sample captures of one Pokémon, 15 Nov 2026):
 
-| Field              | List | Detail | Appraisal |
-| ------------------ | ---- | ------ | --------- |
-| species/name       | ?    | ?      | ?         |
-| CP                 | ?    | ?      | ?         |
-| IVs                | —    | —      | ?         |
-| shiny              | ?    | ?      | ?         |
-| costume / form     | ?    | ?      | ?         |
-| background         | ?    | ?      | ?         |
-| Dynamax/Gigantamax | ?    | ?      | ?         |
-| moves              | —    | ?      | —         |
-| in-game Favorite   | ?    | ?      | ?         |
+| Kind            | What it is                                                                                                                     | Notes                                                                                                  |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| Detail · header | Top of the Pokémon screen: CP, name, HP, weight/height with size badge, types, Favorite star, trainer resources, power-up cost | Trainer resources (stardust, candy, candy XL, mega energy) are trainer-wide, not per-Pokémon; ignored. |
+| Detail · lower  | Scrolled detail: moves, catch context (catch type, place, date, event, party), Poké Ball, Mega Evolve panel                    | A "NEW ATTACK" button means no second charged move is unlocked.                                        |
+| Appraisal       | Detail header with the appraisal overlay: three IV bars, star badge, "This X was caught on DATE around PLACE"                  | Team-leader art overlaps the header (types and resources partly hidden).                               |
+| Storage list    | Grid of many Pokémon                                                                                                           | Not yet sampled.                                                                                       |
 
-A field may only be set to a definite value (including `false`) from a view whose matrix cell is validated "establishes". Otherwise it stays unknown.
+Overlays seen in the samples (Catch Card banner, team-leader art) can hide fields. A hidden or partly hidden field is not read; it stays unknown.
+
+**View capability matrix [Preliminary — from one sample set; validate with a fixture corpus (§15.13) before V2 ships]:**
+
+Legend: **✓** shown in samples, both values readable · **+** shown only when true; absence not yet validated · **—** not shown · **?** not yet sampled.
+
+| Field                                                         | Detail · header                          | Detail · lower                                      | Appraisal                                | Storage list |
+| ------------------------------------------------------------- | ---------------------------------------- | --------------------------------------------------- | ---------------------------------------- | ------------ |
+| Name (may be a nickname)                                      | ✓                                        | —                                                   | ✓ (in caption)                           | ?            |
+| Species                                                       | via types + name + sprite, cross-checked | —                                                   | via caption                              | ?            |
+| CP                                                            | ✓                                        | —                                                   | ✓                                        | ?            |
+| HP (current / max)                                            | ✓                                        | —                                                   | ✓                                        | ?            |
+| IVs                                                           | —                                        | —                                                   | ✓ bars (each bar 0–15 in three segments) | —            |
+| Appraisal stars                                               | —                                        | —                                                   | ✓                                        | —            |
+| Weight, height, size class (XS/XL/XXL)                        | ✓                                        | —                                                   | partly hidden                            | ?            |
+| Types                                                         | ✓                                        | —                                                   | partly hidden                            | —            |
+| Level (from power-up cost)                                    | ✓                                        | —                                                   | —                                        | —            |
+| In-game Favorite                                              | ✓ (filled vs outline star)               | —                                                   | ✓                                        | ?            |
+| Fast move, charged moves                                      | —                                        | ✓ (second charged move absent ⇔ "NEW ATTACK" shown) | —                                        | —            |
+| Catch date                                                    | —                                        | ✓                                                   | ✓                                        | —            |
+| Catch type (wild, raid, hatched, traded, …), event, Poké Ball | —                                        | ✓                                                   | —                                        | —            |
+| Shiny                                                         | + (needs a shiny fixture)                | —                                                   | +                                        | ?            |
+| Costume                                                       | sprite only (needs fixtures)             | —                                                   | sprite only                              | ?            |
+| Background                                                    | full-screen backdrop (needs fixtures)    | —                                                   | ?                                        | ?            |
+| Lucky, shadow, purified                                       | + (needs fixtures)                       | —                                                   | +                                        | ?            |
+| Dynamax / Gigantamax                                          | + (needs fixtures)                       | —                                                   | +                                        | ?            |
+
+A field may only be set to a definite value (including `false`) from a view whose matrix cell is validated **✓**. A **+** cell can set `true` when the indicator is seen; it can set `false` only after fixtures show the indicator is always visible when present.
+
+**Privacy:** screenshots contain catch locations and other trainers' names. Party member names are never extracted or stored. Catch place is not stored **[Proposed]**; catch date is. Real screenshots are never committed: the fixture corpus lives in a git-ignored local directory, and committed tests use redacted or synthetic images.
+
+**Screenshot sets:** several captures of the same Pokémon (header, lower, appraisal) are grouped into one observation set (V2-SCR-11). Shared fields (CP, HP, name, catch date) must agree across the set; any disagreement sends the set to review.
 
 **Confidence thresholds:** per field, calibrated on fixtures so that accepted readings meet a target precision **[Proposed]** ≥ 99.5% for fields that affect keep decisions; everything else goes to review.
 
