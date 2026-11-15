@@ -84,4 +84,42 @@ describe("confirming what the export can't tell", () => {
       within(panel).queryByRole("button", { name: "Confirm" }),
     ).not.toBeInTheDocument();
   });
+  it("confirms every listed species after an explicit second step", async () => {
+    const user = await withCollection([
+      "1,Pidgey,,16,,120,30",
+      "2,Rattata,,19,,50,20",
+    ]);
+    const panel = screen.getByRole("region", {
+      name: "Confirm what the export can't tell",
+    });
+
+    await user.click(
+      within(panel).getByRole("button", { name: "Confirm all 2 species" }),
+    );
+    expect(panel).toHaveTextContent(
+      "None of your 2 Pokémon in these 2 species will be counted as shiny, costume, background, Dynamax or Gigantamax.",
+    );
+    await user.click(within(panel).getByRole("button", { name: "Not yet" }));
+    expect(
+      within(panel).getByRole("group", { name: "Pidgey" }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(panel).getByRole("button", { name: "Confirm all 2 species" }),
+    );
+    await user.click(
+      within(panel).getByRole("button", { name: "Yes, I checked them all" }),
+    );
+
+    expect(
+      await screen.findByText(
+        "Confirmed 2 Pokémon: no shiny, costume, background, Dynamax or Gigantamax.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      await within(panel).findByText(
+        "Nothing left to confirm for these features.",
+      ),
+    ).toBeInTheDocument();
+  });
 });
