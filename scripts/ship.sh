@@ -40,11 +40,9 @@ git push -q -u origin "$branch"
 url=$(gh pr create --title "$subject" --body "$body")
 echo "PR: $url"
 
-# Wait for checks to register, then watch them to completion.
-for _ in {1..30}; do gh pr checks "$url" >/dev/null 2>&1 && break; sleep 2; done
-gh pr checks "$url" --watch --fail-fast --interval 5 >/dev/null || die "CI failed on $url"
-# The watch can end before the aggregating required check exists, so wait
-# for "Quality gates" itself to pass.
+# Wait for the required "Quality gates" check, which aggregates every CI job
+# (and fails if any does). Polling it directly avoids `gh pr checks --watch`,
+# which can end before that check exists or hang after all checks finish.
 gate_state() {
   gh pr checks "$url" --json name,state --jq '.[] | select(.name == "Quality gates") | .state' 2>/dev/null
 }
