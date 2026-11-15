@@ -15,10 +15,12 @@ Requires Node.js 24 (`.nvmrc`).
 
 ```sh
 npm install   # also installs git hooks
-npm run check # formatting + markdown lint
+npm run check # formatting, markdown lint, shellcheck
 ```
 
 ### Workflow
+
+Ship each change with `scripts/ship.sh <branch> "<type(scope): subject>" "<PR description>"` after staging it. It refuses to start unless `main` is current and green, runs the local gates, opens the PR, waits for CI, squash-merges exactly the commit CI tested, and waits for `main` to be green again.
 
 - Small, focused commits following [Conventional Commits](https://www.conventionalcommits.org/).
 - All changes land on `main` through pull requests; `main` is protected.

@@ -10,8 +10,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint:md": "markdownlint-cli2",
-    "check": "npm run format:check && npm run lint:md",
-    "prepare": "husky"
+    "check": "npm run format:check && npm run lint:md && npm run lint:sh",
+    "prepare": "husky",
+    "lint:sh": "shellcheck scripts/*.sh && shellcheck -s sh .husky/pre-commit .husky/commit-msg"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
