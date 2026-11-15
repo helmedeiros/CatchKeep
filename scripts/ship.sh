@@ -43,6 +43,19 @@ echo "PR: $url"
 # Wait for checks to register, then watch them to completion.
 for _ in {1..30}; do gh pr checks "$url" >/dev/null 2>&1 && break; sleep 2; done
 gh pr checks "$url" --watch --fail-fast --interval 5 >/dev/null || die "CI failed on $url"
+# The watch can end before the aggregating required check exists, so wait
+# for "Quality gates" itself to pass.
+gate_state() {
+  gh pr checks "$url" --json name,state --jq '.[] | select(.name == "Quality gates") | .state' 2>/dev/null
+}
+for _ in {1..180}; do
+  case "$(gate_state)" in
+    SUCCESS) break ;;
+    FAILURE | CANCELLED | ERROR | TIMED_OUT | ACTION_REQUIRED) die "Quality gates failed on $url" ;;
+  esac
+  sleep 5
+done
+[[ $(gate_state) == SUCCESS ]] || die "timed out waiting for Quality gates on $url"
 
 gh pr merge "$url" --squash --delete-branch --match-head-commit "$head_sha" >/dev/null
 
