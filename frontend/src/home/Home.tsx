@@ -1,4 +1,5 @@
 import { CollectionView } from "../collection/CollectionView";
+import { ConfirmFeatures } from "../collection/ConfirmFeatures";
 import { ImportCard } from "../collection/ImportCard";
 import { useCollection } from "../collection/useCollection";
 import { useSignOut } from "../session/useSession";
@@ -27,6 +28,7 @@ export function Home({ displayName }: { displayName: string }) {
       {collection.isSuccess && (
         <>
           <ImportCard hasPokemon={pokemon.length > 0} />
+          <ConfirmFeatures pokemon={pokemon} />
           <CollectionView pokemon={pokemon} />
         </>
       )}

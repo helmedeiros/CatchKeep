@@ -65,3 +65,15 @@ export function useAnswerMatches() {
       ),
   });
 }
+
+export type ConfirmableFeature = components["schemas"]["ConfirmableFeature"];
+
+export function useConfirmAbsent() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: components["schemas"]["AbsenceConfirmation"]) =>
+      unwrap(await api.POST("/collection/confirmations", { body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: collectionKey }),
+  });
+}
