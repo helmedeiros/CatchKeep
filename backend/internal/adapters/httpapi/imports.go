@@ -98,6 +98,48 @@ func (s *server) CommitImport(ctx context.Context, req CommitImportRequestObject
 	return CommitImport200JSONResponse(toPreview(p)), nil
 }
 
+func (s *server) AnswerPossibleMatches(ctx context.Context, req AnswerPossibleMatchesRequestObject) (AnswerPossibleMatchesResponseObject, error) {
+	trainer, err := s.trainer(ctx)
+	if errors.Is(err, errNotSignedIn) {
+		return AnswerPossibleMatches401JSONResponse{unauthenticated()}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	answers := make([]domain.Resolution, 0, len(req.Body.Answers))
+	for _, a := range req.Body.Answers {
+		r, ok := toResolution(a)
+		if !ok {
+			return AnswerPossibleMatches422JSONResponse(errorBody(codeValidationFailed,
+				fmt.Sprintf("Row %d: answer \"same\" or \"different\", and name the candidate when it is the same.", a.Row))), nil
+		}
+		answers = append(answers, r)
+	}
+	p, err := s.services.Imports.Resolve(ctx, trainer, req.ImportId, answers)
+	switch {
+	case errors.Is(err, domain.ErrImportNotFound):
+		return AnswerPossibleMatches404JSONResponse(errorBody(codeNotFound, err.Error())), nil
+	case errors.Is(err, domain.ErrImportAlreadyCommitted):
+		return AnswerPossibleMatches409JSONResponse(errorBody(codeConflict, err.Error())), nil
+	case errors.Is(err, domain.ErrInvalidResolution):
+		return AnswerPossibleMatches422JSONResponse(errorBody(codeValidationFailed, err.Error())), nil
+	case err != nil:
+		return nil, err
+	}
+	return AnswerPossibleMatches200JSONResponse(toPreview(p)), nil
+}
+
+func toResolution(a MatchAnswer) (domain.Resolution, bool) {
+	switch {
+	case a.Answer == MatchAnswerAnswerDifferent:
+		return domain.Resolution{Line: a.Row}, true
+	case a.Answer == MatchAnswerAnswerSame && a.SameAs != nil && *a.SameAs != "":
+		return domain.Resolution{Line: a.Row, SameAs: *a.SameAs}, true
+	default:
+		return domain.Resolution{}, false
+	}
+}
+
 func (s *server) ListCollection(ctx context.Context, _ ListCollectionRequestObject) (ListCollectionResponseObject, error) {
 	trainer, err := s.trainer(ctx)
 	if errors.Is(err, errNotSignedIn) {
@@ -120,9 +162,13 @@ func (s *server) ListCollection(ctx context.Context, _ ListCollectionRequestObje
 func toPreview(p app.ImportPreview) ImportPreview {
 	out := ImportPreview{
 		Id: p.ID, Status: ImportPreviewStatus(p.Status), Source: ImportPreviewSource(p.Source),
-		TotalRows: p.TotalRows, NewCount: p.NewCount, PossibleMatchCount: p.PossibleMatchCount,
-		InvalidRows: make([]InvalidRow, 0, len(p.Problems)), IgnoredColumns: p.IgnoredColumns,
+		TotalRows: p.TotalRows, NewCount: p.NewCount, UpdatedCount: p.UpdatedCount, PossibleMatchCount: p.PossibleMatchCount,
+		PossibleMatches: make([]PossibleMatch, 0, len(p.Matches)),
+		InvalidRows:     make([]InvalidRow, 0, len(p.Problems)), IgnoredColumns: p.IgnoredColumns,
 		UnknownFields: make([]string, 0, len(p.UnknownFields)),
+	}
+	for _, m := range p.Matches {
+		out.PossibleMatches = append(out.PossibleMatches, toPossibleMatch(m))
 	}
 	if out.IgnoredColumns == nil {
 		out.IgnoredColumns = []string{}
@@ -132,6 +178,32 @@ func toPreview(p app.ImportPreview) ImportPreview {
 	}
 	for _, f := range p.UnknownFields {
 		out.UnknownFields = append(out.UnknownFields, string(f))
+	}
+	return out
+}
+
+func toPossibleMatch(m domain.PossibleMatch) PossibleMatch {
+	incoming := domain.Pokemon{ID: domain.PokemonID(domain.RowRef(m.Row.Line)), Observations: m.Row.Observations}
+	out := PossibleMatch{
+		Row: m.Row.Line, Incoming: toPokemon(incoming), Exact: m.Exact, Answer: PossibleMatchAnswerPending,
+		Candidates: make([]MatchCandidate, 0, len(m.Candidates)),
+	}
+	for _, c := range m.Candidates {
+		mc := MatchCandidate{Origin: MatchCandidateOriginCollection, Pokemon: toPokemon(c.Pokemon)}
+		mc.Pokemon.Id = c.Ref
+		if c.Line != 0 {
+			line := c.Line
+			mc.Origin, mc.Row = MatchCandidateOriginImport, &line
+		}
+		out.Candidates = append(out.Candidates, mc)
+	}
+	switch r := m.Resolution; {
+	case r == nil:
+	case r.SameAs == "":
+		out.Answer = PossibleMatchAnswerDifferent
+	default:
+		sameAs := r.SameAs
+		out.Answer, out.SameAs = PossibleMatchAnswerSame, &sameAs
 	}
 	return out
 }
