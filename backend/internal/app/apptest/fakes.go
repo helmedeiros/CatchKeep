@@ -248,3 +248,31 @@ func (s *CollectionStore) ListPokemon(_ context.Context, trainer domain.TrainerI
 	defer s.mu.Unlock()
 	return append([]domain.Pokemon(nil), s.pokemon[trainer]...), nil
 }
+
+// Setups is an in-memory ports.Setups.
+type Setups struct {
+	mu     sync.Mutex
+	setups map[domain.TrainerID]domain.Setup
+}
+
+// NewSetups returns an empty store.
+func NewSetups() *Setups { return &Setups{setups: map[domain.TrainerID]domain.Setup{}} }
+
+// GetSetup implements ports.Setups.
+func (s *Setups) GetSetup(_ context.Context, trainer domain.TrainerID) (domain.Setup, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	setup, ok := s.setups[trainer]
+	if !ok {
+		return domain.Setup{}, domain.ErrSetupNotFound
+	}
+	return setup, nil
+}
+
+// SaveSetup implements ports.Setups.
+func (s *Setups) SaveSetup(_ context.Context, trainer domain.TrainerID, setup domain.Setup) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.setups[trainer] = setup
+	return nil
+}

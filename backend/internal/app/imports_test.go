@@ -42,6 +42,7 @@ func (fakeParser) Parse(r io.Reader) (domain.ParsedExport, error) {
 type importsFixture struct {
 	imports    *app.Imports
 	collection *app.Collection
+	store      *apptest.CollectionStore
 }
 
 func newImportsFixture() importsFixture {
@@ -51,6 +52,7 @@ func newImportsFixture() importsFixture {
 	return importsFixture{
 		imports:    app.NewImports(fakeParser{}, store, store, ids, clock),
 		collection: app.NewCollection(store, store, clock),
+		store:      store,
 	}
 }
 
