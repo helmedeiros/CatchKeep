@@ -21,10 +21,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the profiles on this host, for the profile picker. */
+        get: operations["listProfiles"];
+        put?: never;
+        /** Create a trainer profile protected by a PIN. */
+        post: operations["createProfile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in to a profile with its PIN.
+         * @description On success sets the session cookie. Signing in while signed in to another profile replaces that session.
+         */
+        post: operations["signIn"];
+        /** Sign out of the current profile. */
+        delete: operations["signOut"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The profile the caller is signed in to. */
+        get: operations["getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description Stable profile identifier (ULID).
+         * @example 01JD2Z8Q4M8V7Y6X5W4T3S2R1P
+         */
+        ProfileId: string;
+        /** @example Ash */
+        DisplayName: string;
+        /**
+         * @description 4 to 8 digits.
+         * @example 2468
+         */
+        Pin: string;
+        ProfileSummary: {
+            id: components["schemas"]["ProfileId"];
+            displayName: components["schemas"]["DisplayName"];
+        };
+        NewProfile: {
+            displayName: components["schemas"]["DisplayName"];
+            pin: components["schemas"]["Pin"];
+        };
+        SignIn: {
+            profileId: components["schemas"]["ProfileId"];
+            pin: components["schemas"]["Pin"];
+        };
+        Me: {
+            id: components["schemas"]["ProfileId"];
+            displayName: components["schemas"]["DisplayName"];
+        };
         Health: {
             /** @enum {string} */
             status: "ok";
@@ -35,20 +119,21 @@ export interface components {
             version: string;
         };
         Error: {
-            error: {
-                /**
-                 * @description Stable machine-readable code (spec §10.2).
-                 * @example VALIDATION_FAILED
-                 */
-                code: string;
-                /** @description Human-readable explanation for the trainer. */
-                message: string;
-                details?: {
-                    [key: string]: unknown;
-                };
-                /** @description Identifier to find the request in host logs. */
-                correlationId: string;
+            error: components["schemas"]["ErrorDetail"];
+        };
+        ErrorDetail: {
+            /**
+             * @description Stable machine-readable code (spec §10.2).
+             * @example VALIDATION_FAILED
+             */
+            code: string;
+            /** @description Human-readable explanation for the trainer. */
+            message: string;
+            details?: {
+                [key: string]: unknown;
             };
+            /** @description Identifier to find the request in host logs. */
+            correlationId: string;
         };
     };
     responses: {
@@ -87,6 +172,126 @@ export interface operations {
                     "application/json": components["schemas"]["Health"];
                 };
             };
+            default: components["responses"]["Error"];
+        };
+    };
+    listProfiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All profiles, ordered by display name. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileSummary"][];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewProfile"];
+            };
+        };
+        responses: {
+            /** @description Profile created. The caller still has to sign in. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileSummary"];
+                };
+            };
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    signIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignIn"];
+            };
+        };
+        responses: {
+            /** @description Signed in. */
+            200: {
+                headers: {
+                    /** @description The session cookie (`ck_session`), HttpOnly and SameSite=Strict. */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            401: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    signOut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out; the session cookie is cleared. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The signed-in profile. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            401: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };
     };
