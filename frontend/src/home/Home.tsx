@@ -2,6 +2,7 @@ import { CollectionView } from "../collection/CollectionView";
 import { ConfirmFeatures } from "../collection/ConfirmFeatures";
 import { ImportCard } from "../collection/ImportCard";
 import { useCollection } from "../collection/useCollection";
+import { KeepCard } from "../keep/KeepCard";
 import { useSignOut } from "../session/useSession";
 import { alert, card, secondaryButton } from "../ui/styles";
 
@@ -29,6 +30,7 @@ export function Home({ displayName }: { displayName: string }) {
         <>
           <ImportCard hasPokemon={pokemon.length > 0} />
           <ConfirmFeatures pokemon={pokemon} />
+          {pokemon.length > 0 && <KeepCard />}
           <CollectionView pokemon={pokemon} />
         </>
       )}
