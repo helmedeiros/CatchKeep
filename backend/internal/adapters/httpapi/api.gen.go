@@ -577,10 +577,18 @@ type SignOutResponseObject interface {
 	VisitSignOutResponse(w http.ResponseWriter) error
 }
 
+type SignOut204ResponseHeaders struct {
+	SetCookie *string
+}
+
 type SignOut204Response struct {
+	Headers SignOut204ResponseHeaders
 }
 
 func (response SignOut204Response) VisitSignOutResponse(w http.ResponseWriter) error {
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	w.WriteHeader(204)
 	return nil
 }

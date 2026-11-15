@@ -155,3 +155,46 @@ func TestServe_CreatesTheDatabaseFolderOnFirstRun(t *testing.T) {
 		t.Fatalf("database file not created: %v", err)
 	}
 }
+
+func TestServe_CreatesAProfileAndSignsInAgainstTheRealDatabase(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	addrs := make(chan string, 1)
+	go func() {
+		_ = serve(ctx, serveConfig{addr: "127.0.0.1:0", dbPath: filepath.Join(t.TempDir(), "test.db")}, func(a string) { addrs <- a })
+	}()
+	base := "http://" + <-addrs + "/api/v1"
+
+	type result struct {
+		status  int
+		cookies []*http.Cookie
+		body    []byte
+	}
+	post := func(path, body string) result {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+path, strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		b, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return result{status: resp.StatusCode, cookies: resp.Cookies(), body: b}
+	}
+
+	created := post("/profiles", `{"displayName":"Ash","pin":"2468"}`)
+	var ash struct{ ID string }
+	if err := json.Unmarshal(created.body, &ash); err != nil || created.status != http.StatusCreated {
+		t.Fatalf("create profile: %d, %v", created.status, err)
+	}
+	signIn := post("/session", `{"profileId":"`+ash.ID+`","pin":"2468"}`)
+	if signIn.status != http.StatusOK || len(signIn.cookies) == 0 {
+		t.Fatalf("sign in: %d, cookies %v", signIn.status, signIn.cookies)
+	}
+}
