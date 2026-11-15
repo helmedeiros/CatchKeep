@@ -166,3 +166,50 @@ func NewSequentialTokens() *SequentialTokens { return &SequentialTokens{} }
 
 // NewToken implements ports.Tokens.
 func (g *SequentialTokens) NewToken() string { return "token-" + g.NewID() }
+
+// CollectionStore is an in-memory ports.ImportBatches and ports.CollectionReader.
+type CollectionStore struct {
+	mu      sync.Mutex
+	batches map[string]domain.ImportBatch
+	pokemon map[domain.TrainerID][]domain.Pokemon
+}
+
+// NewCollectionStore returns an empty store.
+func NewCollectionStore() *CollectionStore {
+	return &CollectionStore{batches: map[string]domain.ImportBatch{}, pokemon: map[domain.TrainerID][]domain.Pokemon{}}
+}
+
+// Save implements ports.ImportBatches.
+func (s *CollectionStore) Save(_ context.Context, b domain.ImportBatch) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.batches[b.ID] = b
+	return nil
+}
+
+// Get implements ports.ImportBatches.
+func (s *CollectionStore) Get(_ context.Context, trainer domain.TrainerID, id string) (domain.ImportBatch, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	b, ok := s.batches[id]
+	if !ok || b.TrainerID != trainer {
+		return domain.ImportBatch{}, domain.ErrImportNotFound
+	}
+	return b, nil
+}
+
+// Commit implements ports.ImportBatches.
+func (s *CollectionStore) Commit(_ context.Context, b domain.ImportBatch, add []domain.Pokemon) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.batches[b.ID] = b
+	s.pokemon[b.TrainerID] = append(s.pokemon[b.TrainerID], add...)
+	return nil
+}
+
+// ListPokemon implements ports.CollectionReader.
+func (s *CollectionStore) ListPokemon(_ context.Context, trainer domain.TrainerID) ([]domain.Pokemon, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]domain.Pokemon(nil), s.pokemon[trainer]...), nil
+}

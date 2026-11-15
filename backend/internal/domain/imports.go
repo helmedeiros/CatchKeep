@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // ErrUnrecognizedExport means an uploaded file is not a supported export.
 var ErrUnrecognizedExport = errors.New("this file is not a Poke Genie CSV export")
@@ -27,4 +30,31 @@ type ParsedExport struct {
 	IgnoredColumns []string
 	// UnknownFields are features this export can never establish.
 	UnknownFields []Field
+}
+
+// Errors returned by import use cases.
+var (
+	ErrImportNotFound         = errors.New("import not found")
+	ErrImportAlreadyCommitted = errors.New("import was already committed")
+)
+
+// ImportStatus is the lifecycle state of an import.
+type ImportStatus string
+
+// Import states.
+const (
+	ImportStaged    ImportStatus = "staged"
+	ImportCommitted ImportStatus = "committed"
+)
+
+// ImportBatch is one uploaded export, staged for review and later committed.
+type ImportBatch struct {
+	ID                 string
+	TrainerID          TrainerID
+	Status             ImportStatus
+	Parsed             ParsedExport
+	NewCount           int
+	PossibleMatchCount int
+	CreatedAt          time.Time
+	CommittedAt        time.Time
 }
