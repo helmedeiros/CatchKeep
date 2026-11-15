@@ -10,9 +10,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for HealthStatus.
@@ -28,6 +30,114 @@ func (e HealthStatus) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// Defines values for ImportPreviewSource.
+const (
+	PokeGenie ImportPreviewSource = "poke-genie"
+)
+
+// Valid indicates whether the value is a known member of the ImportPreviewSource enum.
+func (e ImportPreviewSource) Valid() bool {
+	switch e {
+	case PokeGenie:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImportPreviewStatus.
+const (
+	Committed ImportPreviewStatus = "committed"
+	Staged    ImportPreviewStatus = "staged"
+)
+
+// Valid indicates whether the value is a known member of the ImportPreviewStatus enum.
+func (e ImportPreviewStatus) Valid() bool {
+	switch e {
+	case Committed:
+		return true
+	case Staged:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PokemonGender.
+const (
+	Female PokemonGender = "female"
+	Male   PokemonGender = "male"
+)
+
+// Valid indicates whether the value is a known member of the PokemonGender enum.
+func (e PokemonGender) Valid() bool {
+	switch e {
+	case Female:
+		return true
+	case Male:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TriState.
+const (
+	No      TriState = "no"
+	Unknown TriState = "unknown"
+	Yes     TriState = "yes"
+)
+
+// Valid indicates whether the value is a known member of the TriState enum.
+func (e TriState) Valid() bool {
+	switch e {
+	case No:
+		return true
+	case Unknown:
+		return true
+	case Yes:
+		return true
+	default:
+		return false
+	}
+}
+
+// Attributes defines model for Attributes.
+type Attributes struct {
+	// Background Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
+	Background TriState `json:"background"`
+
+	// Costume Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
+	Costume TriState `json:"costume"`
+
+	// Dynamax Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
+	Dynamax TriState `json:"dynamax"`
+
+	// Favorite Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
+	Favorite TriState `json:"favorite"`
+
+	// Gigantamax Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
+	Gigantamax TriState `json:"gigantamax"`
+
+	// Lucky Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
+	Lucky TriState `json:"lucky"`
+
+	// Purified Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
+	Purified TriState `json:"purified"`
+
+	// Shadow Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
+	Shadow TriState `json:"shadow"`
+
+	// Shiny Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
+	Shiny TriState `json:"shiny"`
+}
+
+// Collection defines model for Collection.
+type Collection struct {
+	Pokemon []Pokemon `json:"pokemon"`
+	Total   int       `json:"total"`
 }
 
 // DisplayName Examples: Ash
@@ -66,6 +176,48 @@ type Health struct {
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// IVs defines model for IVs.
+type IVs struct {
+	Attack  int `json:"attack"`
+	Defense int `json:"defense"`
+	Stamina int `json:"stamina"`
+}
+
+// ImportPreview defines model for ImportPreview.
+type ImportPreview struct {
+	Id string `json:"id"`
+
+	// IgnoredColumns Columns this importer does not use.
+	IgnoredColumns []string     `json:"ignoredColumns"`
+	InvalidRows    []InvalidRow `json:"invalidRows"`
+
+	// NewCount Rows that will be added (or were added, once committed).
+	NewCount int `json:"newCount"`
+
+	// PossibleMatchCount Rows that might be Pokémon already in the collection; held for review.
+	PossibleMatchCount int                 `json:"possibleMatchCount"`
+	Source             ImportPreviewSource `json:"source"`
+	Status             ImportPreviewStatus `json:"status"`
+	TotalRows          int                 `json:"totalRows"`
+
+	// UnknownFields Features this export cannot establish; they stay unknown.
+	UnknownFields []string `json:"unknownFields"`
+}
+
+// ImportPreviewSource defines model for ImportPreview.Source.
+type ImportPreviewSource string
+
+// ImportPreviewStatus defines model for ImportPreview.Status.
+type ImportPreviewStatus string
+
+// InvalidRow defines model for InvalidRow.
+type InvalidRow struct {
+	Message string `json:"message"`
+
+	// Row 1-based line number in the file, counting the header.
+	Row int `json:"row"`
+}
+
 // Me defines model for Me.
 type Me struct {
 	// DisplayName Examples: Ash
@@ -92,6 +244,32 @@ type NewProfile struct {
 //
 // Examples: 2468
 type Pin = string
+
+// Pokemon defines model for Pokemon.
+type Pokemon struct {
+	Attributes Attributes          `json:"attributes"`
+	CatchDate  *openapi_types.Date `json:"catchDate,omitempty"`
+	Cp         *int                `json:"cp,omitempty"`
+	DexNumber  *int                `json:"dexNumber,omitempty"`
+
+	// Form Form name; "Normal" for the default form.
+	//
+	// Examples: Normal
+	Form   string         `json:"form"`
+	Gender *PokemonGender `json:"gender,omitempty"`
+	Hp     *int           `json:"hp,omitempty"`
+
+	// Id Stable record id (ULID).
+	Id    string   `json:"id"`
+	Iv    *IVs     `json:"iv,omitempty"`
+	Level *float32 `json:"level,omitempty"`
+
+	// Species Examples: Metagross
+	Species string `json:"species"`
+}
+
+// PokemonGender defines model for Pokemon.Gender.
+type PokemonGender string
 
 // ProfileId Stable profile identifier (ULID).
 //
@@ -122,6 +300,12 @@ type SignIn struct {
 	ProfileId ProfileId `json:"profileId"`
 }
 
+// TriState Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
+type TriState string
+
+// ImportId defines model for ImportId.
+type ImportId = string
+
 // CreateProfileJSONRequestBody defines body for CreateProfile for application/json ContentType.
 type CreateProfileJSONRequestBody = NewProfile
 
@@ -130,9 +314,21 @@ type SignInJSONRequestBody = SignIn
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListCollection Every active Pokémon of the signed-in trainer.
+	// (GET /collection)
+	ListCollection(w http.ResponseWriter, r *http.Request)
 	// GetHealth Report whether the API is up.
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
+	// StageImport Upload a Poke Genie CSV export and get a preview. Nothing changes until it is committed.
+	// (POST /imports)
+	StageImport(w http.ResponseWriter, r *http.Request)
+	// GetImport The preview of a staged or committed import.
+	// (GET /imports/{importId})
+	GetImport(w http.ResponseWriter, r *http.Request, importId ImportId)
+	// CommitImport Add the staged Pokémon to the collection.
+	// (POST /imports/{importId}/commit)
+	CommitImport(w http.ResponseWriter, r *http.Request, importId ImportId)
 	// GetMe The profile the caller is signed in to.
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -159,11 +355,91 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
+// ListCollection operation middleware
+func (siw *ServerInterfaceWrapper) ListCollection(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCollection(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealth(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StageImport operation middleware
+func (siw *ServerInterfaceWrapper) StageImport(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StageImport(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetImport operation middleware
+func (siw *ServerInterfaceWrapper) GetImport(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "importId" -------------
+	var importId ImportId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "importId", r.PathValue("importId"), &importId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "importId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetImport(w, r, importId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CommitImport operation middleware
+func (siw *ServerInterfaceWrapper) CommitImport(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "importId" -------------
+	var importId ImportId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "importId", r.PathValue("importId"), &importId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "importId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CommitImport(w, r, importId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -369,11 +645,67 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/session", wrapper.SignOut)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/session", wrapper.SignIn)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports", wrapper.StageImport)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/imports/{importId}", wrapper.GetImport)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{importId}/commit", wrapper.CommitImport)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/collection", wrapper.ListCollection)
 
 	return m
 }
 
 type ErrorJSONResponse Error
+
+type ListCollectionRequestObject struct {
+}
+
+type ListCollectionResponseObject interface {
+	VisitListCollectionResponse(w http.ResponseWriter) error
+}
+
+type ListCollection200JSONResponse Collection
+
+func (response ListCollection200JSONResponse) VisitListCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCollection401JSONResponse struct{ ErrorJSONResponse }
+
+func (response ListCollection401JSONResponse) VisitListCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCollectiondefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListCollectiondefaultJSONResponse) VisitListCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type GetHealthRequestObject struct {
 }
@@ -402,6 +734,235 @@ type GetHealthdefaultJSONResponse struct {
 }
 
 func (response GetHealthdefaultJSONResponse) VisitGetHealthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StageImportRequestObject struct {
+	Body io.Reader
+}
+
+type StageImportResponseObject interface {
+	VisitStageImportResponse(w http.ResponseWriter) error
+}
+
+type StageImport201JSONResponse ImportPreview
+
+func (response StageImport201JSONResponse) VisitStageImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StageImport401JSONResponse struct{ ErrorJSONResponse }
+
+func (response StageImport401JSONResponse) VisitStageImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StageImport413JSONResponse Error
+
+func (response StageImport413JSONResponse) VisitStageImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StageImport422JSONResponse Error
+
+func (response StageImport422JSONResponse) VisitStageImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StageImportdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response StageImportdefaultJSONResponse) VisitStageImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetImportRequestObject struct {
+	ImportId ImportId `json:"importId"`
+}
+
+type GetImportResponseObject interface {
+	VisitGetImportResponse(w http.ResponseWriter) error
+}
+
+type GetImport200JSONResponse ImportPreview
+
+func (response GetImport200JSONResponse) VisitGetImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetImport401JSONResponse struct{ ErrorJSONResponse }
+
+func (response GetImport401JSONResponse) VisitGetImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetImport404JSONResponse Error
+
+func (response GetImport404JSONResponse) VisitGetImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetImportdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetImportdefaultJSONResponse) VisitGetImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitImportRequestObject struct {
+	ImportId ImportId `json:"importId"`
+}
+
+type CommitImportResponseObject interface {
+	VisitCommitImportResponse(w http.ResponseWriter) error
+}
+
+type CommitImport200JSONResponse ImportPreview
+
+func (response CommitImport200JSONResponse) VisitCommitImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitImport401JSONResponse struct{ ErrorJSONResponse }
+
+func (response CommitImport401JSONResponse) VisitCommitImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitImport404JSONResponse Error
+
+func (response CommitImport404JSONResponse) VisitCommitImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitImport409JSONResponse Error
+
+func (response CommitImport409JSONResponse) VisitCommitImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitImportdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CommitImportdefaultJSONResponse) VisitCommitImportResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -717,9 +1278,21 @@ func (response SignIndefaultJSONResponse) VisitSignInResponse(w http.ResponseWri
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListCollection Every active Pokémon of the signed-in trainer.
+	// (GET /collection)
+	ListCollection(ctx context.Context, request ListCollectionRequestObject) (ListCollectionResponseObject, error)
 	// GetHealth Report whether the API is up.
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
+	// StageImport Upload a Poke Genie CSV export and get a preview. Nothing changes until it is committed.
+	// (POST /imports)
+	StageImport(ctx context.Context, request StageImportRequestObject) (StageImportResponseObject, error)
+	// GetImport The preview of a staged or committed import.
+	// (GET /imports/{importId})
+	GetImport(ctx context.Context, request GetImportRequestObject) (GetImportResponseObject, error)
+	// CommitImport Add the staged Pokémon to the collection.
+	// (POST /imports/{importId}/commit)
+	CommitImport(ctx context.Context, request CommitImportRequestObject) (CommitImportResponseObject, error)
 	// GetMe The profile the caller is signed in to.
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -776,6 +1349,30 @@ type strictHandler struct {
 	options     StrictHTTPServerOptions
 }
 
+// ListCollection operation middleware
+func (sh *strictHandler) ListCollection(w http.ResponseWriter, r *http.Request) {
+	var request ListCollectionRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCollection(ctx, request.(ListCollectionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCollection")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCollectionResponseObject); ok {
+		if err := validResponse.VisitListCollectionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetHealth operation middleware
 func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	var request GetHealthRequestObject
@@ -793,6 +1390,84 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetHealthResponseObject); ok {
 		if err := validResponse.VisitGetHealthResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StageImport operation middleware
+func (sh *strictHandler) StageImport(w http.ResponseWriter, r *http.Request) {
+	var request StageImportRequestObject
+
+	request.Body = r.Body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StageImport(ctx, request.(StageImportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StageImport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StageImportResponseObject); ok {
+		if err := validResponse.VisitStageImportResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetImport operation middleware
+func (sh *strictHandler) GetImport(w http.ResponseWriter, r *http.Request, importId ImportId) {
+	var request GetImportRequestObject
+
+	request.ImportId = importId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetImport(ctx, request.(GetImportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetImport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetImportResponseObject); ok {
+		if err := validResponse.VisitGetImportResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CommitImport operation middleware
+func (sh *strictHandler) CommitImport(w http.ResponseWriter, r *http.Request, importId ImportId) {
+	var request CommitImportRequestObject
+
+	request.ImportId = importId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CommitImport(ctx, request.(CommitImportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CommitImport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CommitImportResponseObject); ok {
+		if err := validResponse.VisitCommitImportResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
