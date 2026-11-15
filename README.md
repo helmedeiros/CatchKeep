@@ -4,7 +4,7 @@ A Pokémon GO storage helper.
 
 ## What you can do today
 
-- Give every trainer in the house their own PIN-protected profile, so collections never get mixed up.
+- Give each trainer their own PIN-protected profile, so collections never get mixed up.
 
 ## Status
 
