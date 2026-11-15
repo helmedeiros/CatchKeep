@@ -15,13 +15,15 @@ import (
 	"time"
 
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/httpapi"
+	"github.com/helmedeiros/catchkeep/backend/internal/adapters/web"
 	"github.com/helmedeiros/catchkeep/backend/internal/app"
 	"github.com/helmedeiros/catchkeep/backend/internal/buildinfo"
 )
 
 const usage = `usage:
   catchkeep version                print the build version
-  catchkeep serve [-addr host:port] serve the API`
+  catchkeep serve [-addr host:port] [-web-dir dir]
+                                   serve the API and, if set, the built frontend`
 
 const shutdownTimeout = 10 * time.Second
 
@@ -45,10 +47,11 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 		fs.SetOutput(stderr)
 		addr := fs.String("addr", "127.0.0.1:8080", "address to listen on")
+		webDir := fs.String("web-dir", os.Getenv("CATCHKEEP_WEB_DIR"), "directory with the built frontend (env CATCHKEEP_WEB_DIR)")
 		if err := fs.Parse(args[1:]); err != nil {
 			return 2
 		}
-		err := serve(ctx, serveConfig{addr: *addr}, func(a string) {
+		err := serve(ctx, serveConfig{addr: *addr, webDir: *webDir}, func(a string) {
 			_, _ = fmt.Fprintf(stdout, "listening on http://%s\n", a)
 		})
 		if err != nil {
@@ -63,7 +66,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 }
 
 type serveConfig struct {
-	addr string
+	addr   string
+	webDir string
 }
 
 // serve runs the HTTP API until ctx is canceled, then shuts down gracefully.
@@ -76,7 +80,7 @@ func serve(ctx context.Context, cfg serveConfig, ready func(addr string)) error 
 	}
 
 	srv := &http.Server{
-		Handler:           httpapi.NewHandler(httpapi.Services{Health: app.NewHealth(buildinfo.Version())}),
+		Handler:           newRootHandler(cfg),
 		ReadHeaderTimeout: 5 * time.Second,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}
@@ -100,4 +104,17 @@ func serve(ctx context.Context, cfg serveConfig, ready func(addr string)) error 
 		return fmt.Errorf("serve: %w", err)
 	}
 	return nil
+}
+
+// newRootHandler routes /api/ to the API and everything else to the frontend
+// bundle when a web directory is configured.
+func newRootHandler(cfg serveConfig) http.Handler {
+	api := httpapi.NewHandler(httpapi.Services{Health: app.NewHealth(buildinfo.Version())})
+	if cfg.webDir == "" {
+		return api
+	}
+	mux := http.NewServeMux()
+	mux.Handle("/api/", api)
+	mux.Handle("/", web.Handler(os.DirFS(cfg.webDir)))
+	return mux
 }

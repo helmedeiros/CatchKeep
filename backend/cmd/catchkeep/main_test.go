@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -77,5 +80,39 @@ func TestServe_AnswersHealthAndStopsWhenContextIsCanceled(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("serve did not stop after context cancel")
+	}
+}
+
+func TestServe_ServesFrontendFromWebDirAlongsideAPI(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("<html>catchkeep</html>"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	addrs := make(chan string, 1)
+	go func() {
+		_ = serve(ctx, serveConfig{addr: "127.0.0.1:0", webDir: dir}, func(addr string) { addrs <- addr })
+	}()
+	addr := <-addrs
+
+	for path, want := range map[string]string{
+		"/":              "<html>catchkeep</html>",
+		"/some/page":     "<html>catchkeep</html>",
+		"/api/v1/health": `"status":"ok"`,
+	} {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+addr+path, http.NoBody)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		b, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusOK || !strings.Contains(string(b), want) {
+			t.Fatalf("GET %s = %d %q, want 200 containing %q", path, resp.StatusCode, b, want)
+		}
 	}
 }
