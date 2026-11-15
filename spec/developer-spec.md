@@ -194,6 +194,29 @@ Rules:
 - Layering is enforced in CI (`go-arch-lint` or `depguard` rules): `domain` imports only the standard library; `app` imports `domain` and `ports`; only `cmd` imports `adapters`.
 - Every driven port has an in-memory fake in `internal/adapters/fake` used by use-case tests.
 
+### 4.6 Frontend UI libraries **[Proposed]**
+
+Picked from Emil Kowalski's curated list ([emilkowalski/skills `pick-ui-library`](https://github.com/emilkowalski/skills)), one library per task. Choices marked _off-list_ fill tasks that list does not cover.
+
+| Task in CatchKeep                                                     | Library                                      | Where it is used                                                                                                      |
+| --------------------------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Accessible primitives (dialogs, popovers, menus, selects, checkboxes) | [base-ui](https://base-ui.com)               | Bulk-confirm dialog, CSV column mapping selects, profile menu, rule editors                                           |
+| PIN entry                                                             | [input-otp](https://input-otp.rodz.dev)      | Login, profile switch, PIN reset (V1-PRF-03/04)                                                                       |
+| Toasts                                                                | [Sonner](https://sonner.emilkowal.ski)       | "Marked 100 as transferred · Undo" (V1-IMP-11), import committed, stale-plan notices                                  |
+| Bottom sheets on iPhone                                               | [Vaul](https://vaul.emilkowal.ski)           | Record detail, candidate "why eligible", duplicate review on small screens                                            |
+| Long lists                                                            | [Virtuoso](https://virtuoso.dev)             | Collection (2,700+ records), plan checklist, import preview rows                                                      |
+| Drag and drop                                                         | [dnd kit](https://dndkit.com)                | Ordering goals in setup (V1-SET-01), V3 team editing; with keyboard sensor and up/down buttons as accessible fallback |
+| Animated numbers                                                      | [NumberFlow](https://number-flow.barvian.me) | Free slots, max feasible, shortfall counters as targets change                                                        |
+| Client UI state                                                       | [zustand](https://zustand.docs.pmnd.rs)      | Active profile, checklist selection, wizard progress. Not for server data.                                            |
+| Conditional class names                                               | [clsx](https://github.com/lukeed/clsx)       | Ad-hoc conditional classes                                                                                            |
+| Component variants                                                    | [cva](https://cva.style)                     | Buttons, badges (protected / eligible / unknown / favorite), status chips                                             |
+| Styling                                                               | Tailwind CSS (_off-list_)                    | Required by cva's variant model; utility classes, mobile-first                                                        |
+| Server state, caching, refetch on focus                               | TanStack Query (_off-list_)                  | Wraps the generated `openapi-fetch` client; stale-plan refetch, host-unreachable detection (§10.5)                    |
+
+Not used: motion (plain CSS transitions are enough for V1), cmdk, Leva, charts (no V1 chart needs; recharts if one appears), next-themes (not a Next.js app; theme follows `prefers-color-scheme`).
+
+---
+
 ## 5. Data model
 
 ### 5.1 Conventions
