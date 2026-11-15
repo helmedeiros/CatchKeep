@@ -106,3 +106,63 @@ func (c *FixedClock) Advance(d time.Duration) {
 	defer c.mu.Unlock()
 	c.now = c.now.Add(d)
 }
+
+// SessionStore is an in-memory ports.Sessions.
+type SessionStore struct {
+	mu     sync.Mutex
+	byHash map[string]domain.Session
+}
+
+// NewSessionStore returns an empty session store.
+func NewSessionStore() *SessionStore {
+	return &SessionStore{byHash: map[string]domain.Session{}}
+}
+
+// Create implements ports.Sessions.
+func (s *SessionStore) Create(_ context.Context, session domain.Session) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.byHash[session.TokenHash] = session
+	return nil
+}
+
+// Get implements ports.Sessions.
+func (s *SessionStore) Get(_ context.Context, tokenHash string) (domain.Session, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.byHash[tokenHash]
+	if !ok {
+		return domain.Session{}, domain.ErrNoSession
+	}
+	return session, nil
+}
+
+// Touch implements ports.Sessions.
+func (s *SessionStore) Touch(_ context.Context, tokenHash string, at time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.byHash[tokenHash]
+	if !ok {
+		return domain.ErrNoSession
+	}
+	session.LastSeenAt = at
+	s.byHash[tokenHash] = session
+	return nil
+}
+
+// Delete implements ports.Sessions.
+func (s *SessionStore) Delete(_ context.Context, tokenHash string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.byHash, tokenHash)
+	return nil
+}
+
+// SequentialTokens is a deterministic ports.Tokens.
+type SequentialTokens struct{ SequentialIDs }
+
+// NewSequentialTokens returns tokens id-1, id-2, ...
+func NewSequentialTokens() *SequentialTokens { return &SequentialTokens{} }
+
+// NewToken implements ports.Tokens.
+func (g *SequentialTokens) NewToken() string { return "token-" + g.NewID() }

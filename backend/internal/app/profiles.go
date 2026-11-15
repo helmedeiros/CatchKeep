@@ -22,11 +22,12 @@ type Profiles struct {
 	trainers ports.Trainers
 	hasher   ports.PINHasher
 	ids      ports.IDs
+	clock    ports.Clock
 }
 
 // NewProfiles wires the profile use cases.
-func NewProfiles(trainers ports.Trainers, hasher ports.PINHasher, ids ports.IDs) *Profiles {
-	return &Profiles{trainers: trainers, hasher: hasher, ids: ids}
+func NewProfiles(trainers ports.Trainers, hasher ports.PINHasher, ids ports.IDs, clock ports.Clock) *Profiles {
+	return &Profiles{trainers: trainers, hasher: hasher, ids: ids, clock: clock}
 }
 
 // Create validates the name and PIN and stores a new trainer with a hashed PIN.
@@ -42,7 +43,7 @@ func (p *Profiles) Create(ctx context.Context, displayName, pin string) (Profile
 	if err != nil {
 		return ProfileSummary{}, fmt.Errorf("hash PIN: %w", err)
 	}
-	t := domain.Trainer{ID: domain.TrainerID(p.ids.NewID()), DisplayName: name, PINHash: hash}
+	t := domain.Trainer{ID: domain.TrainerID(p.ids.NewID()), DisplayName: name, PINHash: hash, CreatedAt: p.clock.Now()}
 	if err := p.trainers.Create(ctx, t); err != nil {
 		return ProfileSummary{}, err
 	}

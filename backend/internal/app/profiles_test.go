@@ -3,6 +3,7 @@ package app_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/helmedeiros/catchkeep/backend/internal/app"
 	"github.com/helmedeiros/catchkeep/backend/internal/app/apptest"
@@ -11,7 +12,7 @@ import (
 
 func newProfiles() (*app.Profiles, *apptest.Trainers) {
 	trainers := apptest.NewTrainers()
-	return app.NewProfiles(trainers, apptest.PlainHasher{}, apptest.NewSequentialIDs()), trainers
+	return app.NewProfiles(trainers, apptest.PlainHasher{}, apptest.NewSequentialIDs(), apptest.NewFixedClock(time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC))), trainers
 }
 
 func TestCreateProfile_StoresTrainerWithHashedPIN(t *testing.T) {

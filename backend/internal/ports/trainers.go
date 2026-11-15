@@ -33,3 +33,17 @@ type IDs interface {
 type Clock interface {
 	Now() time.Time
 }
+
+// Sessions persists sign-in sessions keyed by the hash of their token.
+type Sessions interface {
+	Create(ctx context.Context, s domain.Session) error
+	// Get returns domain.ErrNoSession if no session has the token hash.
+	Get(ctx context.Context, tokenHash string) (domain.Session, error)
+	Touch(ctx context.Context, tokenHash string, at time.Time) error
+	Delete(ctx context.Context, tokenHash string) error
+}
+
+// Tokens generates unguessable session tokens.
+type Tokens interface {
+	NewToken() string
+}
