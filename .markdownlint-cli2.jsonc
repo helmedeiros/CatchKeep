@@ -1,0 +1,9 @@
+{
+  "config": {
+    "default": true,
+    // Tables and long requirement rows make line-length noise.
+    "MD013": false,
+  },
+  "globs": ["**/*.md"],
+  "ignores": ["node_modules/**"],
+}
