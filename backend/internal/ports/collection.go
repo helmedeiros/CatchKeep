@@ -18,8 +18,11 @@ type ImportBatches interface {
 	Save(ctx context.Context, b domain.ImportBatch) error
 	// Get returns domain.ErrImportNotFound unless the batch belongs to trainer.
 	Get(ctx context.Context, trainer domain.TrainerID, id string) (domain.ImportBatch, error)
-	// Commit atomically stores the batch (now committed) and adds the Pokémon.
-	Commit(ctx context.Context, b domain.ImportBatch, add []domain.Pokemon) error
+	// SaveResolutions stores the batch's duplicate review answers.
+	SaveResolutions(ctx context.Context, b domain.ImportBatch) error
+	// Commit atomically stores the batch (now committed), adds the new
+	// Pokémon and adds observations to the trainer's existing ones.
+	Commit(ctx context.Context, b domain.ImportBatch, add []domain.Pokemon, update []domain.PokemonUpdate) error
 }
 
 // CollectionReader reads a trainer's Pokémon.

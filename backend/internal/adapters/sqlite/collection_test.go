@@ -68,7 +68,7 @@ func TestImportBatches_CommitAddsPokemonWithObservations(t *testing.T) {
 	b.Status, b.CommittedAt = domain.ImportCommitted, at.Add(time.Minute)
 	pidgey := domain.Pokemon{ID: "P1", TrainerID: "ash", Observations: b.Parsed.Rows[0].Observations}
 
-	if err := coll.Commit(t.Context(), b, []domain.Pokemon{pidgey}); err != nil {
+	if err := coll.Commit(t.Context(), b, []domain.Pokemon{pidgey}, nil); err != nil {
 		t.Fatalf("Commit: %v", err)
 	}
 
@@ -98,7 +98,7 @@ func TestImportBatches_CommitIsAllOrNothing(t *testing.T) {
 	b.Status = domain.ImportCommitted
 	dup := domain.Pokemon{ID: "P1", TrainerID: "ash"}
 
-	if err := coll.Commit(t.Context(), b, []domain.Pokemon{dup, dup}); err == nil {
+	if err := coll.Commit(t.Context(), b, []domain.Pokemon{dup, dup}, nil); err == nil {
 		t.Fatal("Commit with duplicate ids succeeded")
 	}
 
@@ -107,5 +107,88 @@ func TestImportBatches_CommitIsAllOrNothing(t *testing.T) {
 	}
 	if got, _ := coll.Get(t.Context(), "ash", "B1"); got.Status != domain.ImportStaged {
 		t.Fatalf("status = %s after failed commit, want staged", got.Status)
+	}
+}
+
+func TestImportBatches_SaveResolutionsKeepsTheAnswers(t *testing.T) {
+	store, _ := openTemp(t)
+	withTrainers(t, store, "ash")
+	coll := sqlite.NewCollection(store)
+	b := stagedBatch()
+	if err := coll.Save(t.Context(), b); err != nil {
+		t.Fatal(err)
+	}
+	b.Resolutions = map[int]domain.Resolution{2: {Line: 2, SameAs: "P1"}, 5: {Line: 5}}
+
+	if err := coll.SaveResolutions(t.Context(), b); err != nil {
+		t.Fatalf("SaveResolutions: %v", err)
+	}
+
+	got, _ := coll.Get(t.Context(), "ash", "B1")
+	if len(got.Resolutions) != 2 || got.Resolutions[2].SameAs != "P1" || got.Resolutions[5].SameAs != "" {
+		t.Fatalf("Resolutions = %+v", got.Resolutions)
+	}
+}
+
+func TestImportBatches_CommitAddsObservationsToExistingPokemon(t *testing.T) {
+	store, _ := openTemp(t)
+	withTrainers(t, store, "ash", "misty")
+	coll := sqlite.NewCollection(store)
+	first := stagedBatch()
+	if err := coll.Save(t.Context(), first); err != nil {
+		t.Fatal(err)
+	}
+	first.Status, first.CommittedAt = domain.ImportCommitted, at
+	pidgey := domain.Pokemon{ID: "P1", TrainerID: "ash", Observations: first.Parsed.Rows[0].Observations}
+	if err := coll.Commit(t.Context(), first, []domain.Pokemon{pidgey}, nil); err != nil {
+		t.Fatal(err)
+	}
+	second := stagedBatch()
+	second.ID = "B2"
+	if err := coll.Save(t.Context(), second); err != nil {
+		t.Fatal(err)
+	}
+	second.Status, second.CommittedAt, second.UpdatedCount = domain.ImportCommitted, at.Add(time.Hour), 1
+	later := []domain.Observation{{Field: domain.FieldCP, Value: "150", Source: domain.SourceCSV, SourceRef: "poke-genie line 2", ObservedAt: at.Add(time.Hour)}}
+
+	if err := coll.Commit(t.Context(), second, nil, []domain.PokemonUpdate{{PokemonID: "P1", Observations: later}}); err != nil {
+		t.Fatalf("Commit: %v", err)
+	}
+
+	list, _ := coll.ListPokemon(t.Context(), "ash")
+	if cp, _ := list[0].Current().Int(domain.FieldCP); len(list) != 1 || cp != 150 {
+		t.Fatalf("collection = %+v", list)
+	}
+	if got, _ := coll.Get(t.Context(), "ash", "B2"); got.UpdatedCount != 1 {
+		t.Fatalf("UpdatedCount = %d, want 1", got.UpdatedCount)
+	}
+}
+
+func TestImportBatches_CommitRefusesToUpdateAnotherTrainersPokemon(t *testing.T) {
+	store, _ := openTemp(t)
+	withTrainers(t, store, "ash", "misty")
+	coll := sqlite.NewCollection(store)
+	mine := stagedBatch()
+	if err := coll.Save(t.Context(), mine); err != nil {
+		t.Fatal(err)
+	}
+	mine.Status = domain.ImportCommitted
+	if err := coll.Commit(t.Context(), mine, []domain.Pokemon{{ID: "P1", TrainerID: "ash"}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	theirs := stagedBatch()
+	theirs.ID, theirs.TrainerID = "B2", "misty"
+	if err := coll.Save(t.Context(), theirs); err != nil {
+		t.Fatal(err)
+	}
+	theirs.Status = domain.ImportCommitted
+
+	update := []domain.PokemonUpdate{{PokemonID: "P1", Observations: []domain.Observation{{Field: domain.FieldCP, Value: "1", Source: domain.SourceCSV, ObservedAt: at}}}}
+	if err := coll.Commit(t.Context(), theirs, nil, update); err == nil {
+		t.Fatal("updated another trainer's Pokémon")
+	}
+
+	if got, _ := coll.Get(t.Context(), "misty", "B2"); got.Status != domain.ImportStaged {
+		t.Fatalf("status = %s after refused commit, want staged", got.Status)
 	}
 }

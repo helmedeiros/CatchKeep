@@ -5,6 +5,7 @@ package apptest
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -198,12 +199,30 @@ func (s *CollectionStore) Get(_ context.Context, trainer domain.TrainerID, id st
 	return b, nil
 }
 
-// Commit implements ports.ImportBatches.
-func (s *CollectionStore) Commit(_ context.Context, b domain.ImportBatch, add []domain.Pokemon) error {
+// SaveResolutions implements ports.ImportBatches.
+func (s *CollectionStore) SaveResolutions(_ context.Context, b domain.ImportBatch) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	stored := s.batches[b.ID]
+	stored.Resolutions = b.Resolutions
+	s.batches[b.ID] = stored
+	return nil
+}
+
+// Commit implements ports.ImportBatches.
+func (s *CollectionStore) Commit(_ context.Context, b domain.ImportBatch, add []domain.Pokemon, update []domain.PokemonUpdate) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	owned := s.pokemon[b.TrainerID]
+	for _, u := range update {
+		i := slices.IndexFunc(owned, func(p domain.Pokemon) bool { return p.ID == u.PokemonID })
+		if i < 0 {
+			return fmt.Errorf("update %s: not in the collection", u.PokemonID)
+		}
+		owned[i].Observations = append(slices.Clone(owned[i].Observations), u.Observations...)
+	}
 	s.batches[b.ID] = b
-	s.pokemon[b.TrainerID] = append(s.pokemon[b.TrainerID], add...)
+	s.pokemon[b.TrainerID] = append(owned, add...)
 	return nil
 }
 
