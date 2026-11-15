@@ -11,6 +11,10 @@ security: []
 tags:
   - name: system
     description: Host status.
+  - name: profiles
+    description: Trainer profiles on this host.
+  - name: session
+    description: Signing in to a profile with its PIN.
 paths:
   /health:
     get:
@@ -26,8 +30,168 @@ paths:
                 $ref: "#/components/schemas/Health"
         default:
           $ref: "#/components/responses/Error"
+  /profiles:
+    get:
+      tags: [profiles]
+      operationId: listProfiles
+      summary: List the profiles on this host, for the profile picker.
+      responses:
+        "200":
+          description: All profiles, ordered by display name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProfileSummary"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [profiles]
+      operationId: createProfile
+      summary: Create a trainer profile protected by a PIN.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewProfile"
+      responses:
+        "201":
+          description: Profile created. The caller still has to sign in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileSummary"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+  /session:
+    post:
+      tags: [session]
+      operationId: signIn
+      summary: Sign in to a profile with its PIN.
+      description: >-
+        On success sets the session cookie. Signing in while signed in to
+        another profile replaces that session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignIn"
+      responses:
+        "200":
+          description: Signed in.
+          headers:
+            Set-Cookie:
+              description: The session cookie (`ck_session`), HttpOnly and SameSite=Strict.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [session]
+      operationId: signOut
+      summary: Sign out of the current profile.
+      security:
+        - session: []
+      responses:
+        "204":
+          description: Signed out; the session cookie is cleared.
+        "401":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+  /me:
+    get:
+      tags: [session]
+      operationId: getMe
+      summary: The profile the caller is signed in to.
+      security:
+        - session: []
+      responses:
+        "200":
+          description: The signed-in profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
 components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: ck_session
   schemas:
+    ProfileId:
+      type: string
+      description: Stable profile identifier (ULID).
+      pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+      examples: [01JD2Z8Q4M8V7Y6X5W4T3S2R1P]
+    DisplayName:
+      type: string
+      minLength: 1
+      maxLength: 40
+      examples: [Ash]
+    Pin:
+      type: string
+      description: 4 to 8 digits.
+      pattern: "^[0-9]{4,8}$"
+      examples: ["2468"]
+    ProfileSummary:
+      type: object
+      additionalProperties: false
+      required: [id, displayName]
+      properties:
+        id:
+          $ref: "#/components/schemas/ProfileId"
+        displayName:
+          $ref: "#/components/schemas/DisplayName"
+    NewProfile:
+      type: object
+      additionalProperties: false
+      required: [displayName, pin]
+      properties:
+        displayName:
+          $ref: "#/components/schemas/DisplayName"
+        pin:
+          $ref: "#/components/schemas/Pin"
+    SignIn:
+      type: object
+      additionalProperties: false
+      required: [profileId, pin]
+      properties:
+        profileId:
+          $ref: "#/components/schemas/ProfileId"
+        pin:
+          $ref: "#/components/schemas/Pin"
+    Me:
+      type: object
+      additionalProperties: false
+      required: [id, displayName]
+      properties:
+        id:
+          $ref: "#/components/schemas/ProfileId"
+        displayName:
+          $ref: "#/components/schemas/DisplayName"
     Health:
       type: object
       additionalProperties: false
@@ -46,23 +210,25 @@ components:
       required: [error]
       properties:
         error:
+          $ref: "#/components/schemas/ErrorDetail"
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message, correlationId]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable code (spec §10.2).
+          examples: [VALIDATION_FAILED]
+        message:
+          type: string
+          description: Human-readable explanation for the trainer.
+        details:
           type: object
-          additionalProperties: false
-          required: [code, message, correlationId]
-          properties:
-            code:
-              type: string
-              description: Stable machine-readable code (spec §10.2).
-              examples: [VALIDATION_FAILED]
-            message:
-              type: string
-              description: Human-readable explanation for the trainer.
-            details:
-              type: object
-              additionalProperties: true
-            correlationId:
-              type: string
-              description: Identifier to find the request in host logs.
+          additionalProperties: true
+        correlationId:
+          type: string
+          description: Identifier to find the request in host logs.
   responses:
     Error:
       description: Error envelope (spec §10.2).
