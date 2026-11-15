@@ -58,6 +58,7 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
   let signedIn: Profile | null = null;
   let failures = 0;
   let next = 0;
+  let setup: Schemas["Setup"] | null = null;
   const collection: Stored[] = [];
   const imports = new Map<string, FakeImport>();
   const err = (status: number, code: string, message: string) =>
@@ -176,6 +177,21 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
       }
       return jsonResponse(200, preview(answer[1] ?? ""));
     }
+    if (path === "/setup") {
+      if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
+      if (req.method === "PUT") {
+        setup = body as Schemas["Setup"];
+        return jsonResponse(200, setup);
+      }
+      return setup
+        ? jsonResponse(200, setup)
+        : err(404, "NOT_FOUND", "setup not done yet");
+    }
+    if (path === "/keep-summary") {
+      if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
+      if (!setup) return err(409, "SETUP_REQUIRED", "Set up first.");
+      return jsonResponse(200, keepSummary(setup));
+    }
     if (path === "/collection/confirmations" && req.method === "POST") {
       if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
       const c = body as Schemas["AbsenceConfirmation"];
@@ -237,6 +253,46 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
     });
     const pending = matches.filter((m) => m.answer === "pending").length;
     return { add, update, matches, pending };
+  }
+
+  /** Groups by species once all five variant features are confirmed. */
+  function keepSummary(s: Schemas["Setup"]): Schemas["KeepSummary"] {
+    const minimum = s.capacity <= 1000 ? 1 : s.capacity <= 4000 ? 2 : 3;
+    const groups = new Map<string, Stored[]>();
+    let needsConfirmation = 0;
+    for (const p of collection) {
+      if ((p.absent?.length ?? 0) < 5) {
+        needsConfirmation += 1;
+        continue;
+      }
+      groups.set(p.species, [...(groups.get(p.species) ?? []), p]);
+    }
+    const out = [...groups.entries()].map(([species, members]) => {
+      const best = [...members].sort((a, b) => b.cp - a.cp);
+      return {
+        species,
+        form: "Normal",
+        shiny: false,
+        costume: false,
+        background: false,
+        dynamax: false,
+        gigantamax: false,
+        count: members.length,
+        minimum,
+        keep: Math.min(minimum, members.length),
+        surplusIds: best.slice(minimum).map((p) => p.id),
+      };
+    });
+    out.sort((a, b) => b.surplusIds.length - a.surplusIds.length);
+    const surplus = out.reduce((n, g) => n + g.surplusIds.length, 0);
+    return {
+      total: collection.length,
+      kept: collection.length - surplus - needsConfirmation,
+      surplus,
+      needsConfirmation,
+      minimum,
+      groups: out,
+    };
   }
 
   function preview(id: string): Schemas["ImportPreview"] {
