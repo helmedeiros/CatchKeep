@@ -17,8 +17,9 @@ var ErrNotConfirmable = errors.New("only shiny, costume, background, dynamax and
 var ConfirmableFields = []Field{FieldShiny, FieldCostume, FieldBackground, FieldDynamax, FieldGigantamax}
 
 // ConfirmAbsent records the trainer's word that none of their Pokémon of one
-// species and form has the given features. Only unknown values are set, as
-// manual "false" observations; a feature already known either way is kept.
+// species and form (or of the whole collection, when species is empty) has
+// the given features. Only unknown values are set, as manual "false"
+// observations; a feature already known either way is kept.
 func ConfirmAbsent(pokemon []Pokemon, species, form string, fields []Field, at time.Time) ([]PokemonUpdate, error) {
 	if len(fields) == 0 {
 		return nil, ErrNotConfirmable
@@ -31,7 +32,7 @@ func ConfirmAbsent(pokemon []Pokemon, species, form string, fields []Field, at t
 	var out []PokemonUpdate
 	for _, p := range pokemon {
 		cur := p.Current()
-		if !strings.EqualFold(cur.String(FieldSpecies), species) || !strings.EqualFold(formOf(cur), form) {
+		if species != "" && (!strings.EqualFold(cur.String(FieldSpecies), species) || !strings.EqualFold(formOf(cur), form)) {
 			continue
 		}
 		u := PokemonUpdate{PokemonID: p.ID}

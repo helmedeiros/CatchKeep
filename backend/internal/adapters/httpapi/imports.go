@@ -130,6 +130,13 @@ func (s *server) AnswerPossibleMatches(ctx context.Context, req AnswerPossibleMa
 	return AnswerPossibleMatches200JSONResponse(toPreview(p)), nil
 }
 
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 func toResolution(a MatchAnswer) (domain.Resolution, bool) {
 	switch {
 	case a.Answer == MatchAnswerAnswerDifferent:
@@ -171,8 +178,9 @@ func (s *server) ConfirmAbsent(ctx context.Context, req ConfirmAbsentRequestObje
 	invalid := func(msg string) ConfirmAbsentResponseObject {
 		return ConfirmAbsent422JSONResponse(errorBody(codeValidationFailed, msg))
 	}
-	if strings.TrimSpace(req.Body.Species) == "" || strings.TrimSpace(req.Body.Form) == "" {
-		return invalid("Name the species and form to confirm."), nil
+	species, form := strings.TrimSpace(deref(req.Body.Species)), strings.TrimSpace(deref(req.Body.Form))
+	if (species == "") != (form == "") {
+		return invalid("Name both the species and the form, or neither to confirm the whole collection."), nil
 	}
 	fields := make([]domain.Field, 0, len(req.Body.Features))
 	for _, f := range req.Body.Features {
@@ -181,7 +189,7 @@ func (s *server) ConfirmAbsent(ctx context.Context, req ConfirmAbsentRequestObje
 		}
 		fields = append(fields, domain.Field(f))
 	}
-	n, err := s.services.Collection.ConfirmAbsent(ctx, trainer, req.Body.Species, req.Body.Form, fields)
+	n, err := s.services.Collection.ConfirmAbsent(ctx, trainer, species, form, fields)
 	if errors.Is(err, domain.ErrNotConfirmable) {
 		return invalid(err.Error()), nil
 	}

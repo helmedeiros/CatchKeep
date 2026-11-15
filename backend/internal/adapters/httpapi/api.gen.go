@@ -188,15 +188,15 @@ func (e TriState) Valid() bool {
 	}
 }
 
-// AbsenceConfirmation defines model for AbsenceConfirmation.
+// AbsenceConfirmation Give species and form together, or neither for the whole collection.
 type AbsenceConfirmation struct {
 	Features []ConfirmableFeature `json:"features"`
 
 	// Form Examples: Normal
-	Form string `json:"form"`
+	Form *string `json:"form,omitempty"`
 
 	// Species Examples: Pidgey
-	Species string `json:"species"`
+	Species *string `json:"species,omitempty"`
 }
 
 // Attributes defines model for Attributes.
@@ -482,7 +482,7 @@ type ServerInterface interface {
 	// ListCollection Every active Pokémon of the signed-in trainer.
 	// (GET /collection)
 	ListCollection(w http.ResponseWriter, r *http.Request)
-	// ConfirmAbsent Confirm that none of a species' Pokémon have some features.
+	// ConfirmAbsent Confirm that none of a species' (or any) Pokémon have some features.
 	// (POST /collection/confirmations)
 	ConfirmAbsent(w http.ResponseWriter, r *http.Request)
 	// GetHealth Report whether the API is up.
@@ -1657,7 +1657,7 @@ type StrictServerInterface interface {
 	// ListCollection Every active Pokémon of the signed-in trainer.
 	// (GET /collection)
 	ListCollection(ctx context.Context, request ListCollectionRequestObject) (ListCollectionResponseObject, error)
-	// ConfirmAbsent Confirm that none of a species' Pokémon have some features.
+	// ConfirmAbsent Confirm that none of a species' (or any) Pokémon have some features.
 	// (POST /collection/confirmations)
 	ConfirmAbsent(ctx context.Context, request ConfirmAbsentRequestObject) (ConfirmAbsentResponseObject, error)
 	// GetHealth Report whether the API is up.
