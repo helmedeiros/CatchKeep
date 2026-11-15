@@ -32,7 +32,8 @@ type Resolution struct {
 type PossibleMatch struct {
 	Row        ImportRow
 	Candidates []Candidate
-	// Exact means one candidate, with every identity field known and equal.
+	// Exact means one candidate, with every identity field known and equal
+	// (gender may be absent on both sides).
 	Exact bool
 	// Resolution is the trainer's answer, if any.
 	Resolution *Resolution
@@ -135,10 +136,16 @@ func ReviewImport(existing []Pokemon, rows []ImportRow, answers map[int]Resoluti
 	return out
 }
 
+// identityKnownAndEqual reports whether every identity field is known and
+// equal on both sides. Gender missing on both sides counts as equal, because
+// genderless species (most legendaries) never have one.
 func identityKnownAndEqual(a, b Snapshot) bool {
 	for _, f := range identityFields {
 		va, okA := a[f]
 		vb, okB := b[f]
+		if f == FieldGender && !okA && !okB {
+			continue
+		}
 		if !okA || !okB || !strings.EqualFold(va, vb) {
 			return false
 		}

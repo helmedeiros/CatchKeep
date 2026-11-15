@@ -369,7 +369,7 @@ type PossibleMatch struct {
 	Answer     PossibleMatchAnswer `json:"answer"`
 	Candidates []MatchCandidate    `json:"candidates"`
 
-	// Exact One candidate, with species, form, gender, IVs and catch date all known and equal. Safe to confirm in bulk.
+	// Exact One candidate, with species, form, gender, IVs and catch date all known and equal (genderless on both sides counts as equal). Safe to confirm in bulk.
 	Exact    bool    `json:"exact"`
 	Incoming Pokemon `json:"incoming"`
 

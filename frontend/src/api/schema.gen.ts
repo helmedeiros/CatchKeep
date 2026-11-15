@@ -287,7 +287,7 @@ export interface components {
             row: number;
             incoming: components["schemas"]["Pokemon"];
             candidates: components["schemas"]["MatchCandidate"][];
-            /** @description One candidate, with species, form, gender, IVs and catch date all known and equal. Safe to confirm in bulk. */
+            /** @description One candidate, with species, form, gender, IVs and catch date all known and equal (genderless on both sides counts as equal). Safe to confirm in bulk. */
             exact: boolean;
             /** @enum {string} */
             answer: "pending" | "same" | "different";
