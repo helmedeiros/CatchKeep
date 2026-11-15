@@ -54,7 +54,10 @@ type ImportBatch struct {
 	Status             ImportStatus
 	Parsed             ParsedExport
 	NewCount           int
+	UpdatedCount       int
 	PossibleMatchCount int
-	CreatedAt          time.Time
-	CommittedAt        time.Time
+	// Resolutions are the trainer's duplicate review answers, by line.
+	Resolutions map[int]Resolution
+	CreatedAt   time.Time
+	CommittedAt time.Time
 }

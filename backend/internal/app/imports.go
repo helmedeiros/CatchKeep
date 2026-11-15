@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"slices"
 
 	"github.com/helmedeiros/catchkeep/backend/internal/domain"
@@ -24,10 +25,13 @@ type ImportPreview struct {
 	Source             string
 	TotalRows          int
 	NewCount           int
+	UpdatedCount       int
 	PossibleMatchCount int
-	Problems           []domain.ImportProblem
-	IgnoredColumns     []string
-	UnknownFields      []domain.Field
+	// Matches are the possible duplicates and their answers; staged only.
+	Matches        []domain.PossibleMatch
+	Problems       []domain.ImportProblem
+	IgnoredColumns []string
+	UnknownFields  []domain.Field
 }
 
 // Imports stages exports for review and commits them to the collection.
@@ -50,32 +54,75 @@ func (u *Imports) Stage(ctx context.Context, trainer domain.TrainerID, r io.Read
 	if err != nil {
 		return ImportPreview{}, err
 	}
-	existing, err := u.collection.ListPokemon(ctx, trainer)
+	batch := domain.ImportBatch{
+		ID: u.ids.NewID(), TrainerID: trainer, Status: domain.ImportStaged, Parsed: parsed, CreatedAt: u.clock.Now(),
+	}
+	review, err := u.review(ctx, batch)
 	if err != nil {
 		return ImportPreview{}, err
 	}
-	review := domain.ReviewImport(existing, parsed.Rows, nil)
-	batch := domain.ImportBatch{
-		ID: u.ids.NewID(), TrainerID: trainer, Status: domain.ImportStaged, Parsed: parsed,
-		NewCount: len(review.Add), PossibleMatchCount: review.Pending(), CreatedAt: u.clock.Now(),
-	}
-	if err := u.batches.Save(ctx, batch); err != nil {
+	if err := u.batches.Save(ctx, withCounts(batch, review)); err != nil {
 		return ImportPreview{}, fmt.Errorf("save import: %w", err)
 	}
-	return previewOf(batch), nil
+	return stagedPreview(batch, review), nil
 }
 
-// Get returns the trainer's import.
+// Get returns the trainer's import. A staged import is reviewed against the
+// collection as it is now.
 func (u *Imports) Get(ctx context.Context, trainer domain.TrainerID, id string) (ImportPreview, error) {
 	batch, err := u.batches.Get(ctx, trainer, id)
 	if err != nil {
 		return ImportPreview{}, err
 	}
-	return previewOf(batch), nil
+	if batch.Status == domain.ImportCommitted {
+		return previewOf(batch), nil
+	}
+	review, err := u.review(ctx, batch)
+	if err != nil {
+		return ImportPreview{}, err
+	}
+	return stagedPreview(batch, review), nil
 }
 
-// Commit adds the import's new Pokémon. Rows are classified again against
-// the collection as it is now, so imports committed in between are respected.
+// Resolve records the trainer's answers for possible duplicates: the same
+// Pokémon as a candidate, or a different one. Later answers for a line
+// replace earlier ones.
+func (u *Imports) Resolve(ctx context.Context, trainer domain.TrainerID, id string, answers []domain.Resolution) (ImportPreview, error) {
+	batch, err := u.batches.Get(ctx, trainer, id)
+	if err != nil {
+		return ImportPreview{}, err
+	}
+	if batch.Status == domain.ImportCommitted {
+		return ImportPreview{}, domain.ErrImportAlreadyCommitted
+	}
+	review, err := u.review(ctx, batch)
+	if err != nil {
+		return ImportPreview{}, err
+	}
+	resolutions := maps.Clone(batch.Resolutions)
+	if resolutions == nil {
+		resolutions = make(map[int]domain.Resolution, len(answers))
+	}
+	for _, a := range answers {
+		if err := review.Validate(a); err != nil {
+			return ImportPreview{}, err
+		}
+		resolutions[a.Line] = a
+	}
+	batch.Resolutions = resolutions
+	if err := u.batches.SaveResolutions(ctx, batch); err != nil {
+		return ImportPreview{}, fmt.Errorf("save answers: %w", err)
+	}
+	if review, err = u.review(ctx, batch); err != nil {
+		return ImportPreview{}, err
+	}
+	return stagedPreview(batch, review), nil
+}
+
+// Commit adds the import's new Pokémon and updates the ones the trainer
+// answered as the same. Rows are reviewed again against the collection as it
+// is now, so imports committed in between are respected; unanswered possible
+// duplicates are held back.
 func (u *Imports) Commit(ctx context.Context, trainer domain.TrainerID, id string) (ImportPreview, error) {
 	batch, err := u.batches.Get(ctx, trainer, id)
 	if err != nil {
@@ -84,20 +131,39 @@ func (u *Imports) Commit(ctx context.Context, trainer domain.TrainerID, id strin
 	if batch.Status == domain.ImportCommitted {
 		return ImportPreview{}, domain.ErrImportAlreadyCommitted
 	}
-	existing, err := u.collection.ListPokemon(ctx, trainer)
+	review, err := u.review(ctx, batch)
 	if err != nil {
 		return ImportPreview{}, err
 	}
-	review := domain.ReviewImport(existing, batch.Parsed.Rows, nil)
 	add := make([]domain.Pokemon, 0, len(review.Add))
 	for _, row := range review.Add {
 		add = append(add, domain.Pokemon{ID: domain.PokemonID(u.ids.NewID()), TrainerID: trainer, Observations: row.Observations})
 	}
-	batch.Status, batch.NewCount, batch.PossibleMatchCount, batch.CommittedAt = domain.ImportCommitted, len(review.Add), review.Pending(), u.clock.Now()
-	if err := u.batches.Commit(ctx, batch, add); err != nil {
+	batch = withCounts(batch, review)
+	batch.Status, batch.CommittedAt = domain.ImportCommitted, u.clock.Now()
+	if err := u.batches.Commit(ctx, batch, add, review.Update); err != nil {
 		return ImportPreview{}, fmt.Errorf("commit import: %w", err)
 	}
 	return previewOf(batch), nil
+}
+
+func (u *Imports) review(ctx context.Context, b domain.ImportBatch) (domain.ImportReview, error) {
+	existing, err := u.collection.ListPokemon(ctx, b.TrainerID)
+	if err != nil {
+		return domain.ImportReview{}, err
+	}
+	return domain.ReviewImport(existing, b.Parsed.Rows, b.Resolutions), nil
+}
+
+func withCounts(b domain.ImportBatch, r domain.ImportReview) domain.ImportBatch {
+	b.NewCount, b.UpdatedCount, b.PossibleMatchCount = len(r.Add), len(r.Update), r.Pending()
+	return b
+}
+
+func stagedPreview(b domain.ImportBatch, r domain.ImportReview) ImportPreview {
+	p := previewOf(withCounts(b, r))
+	p.Matches = r.Matches
+	return p
 }
 
 func previewOf(b domain.ImportBatch) ImportPreview {
@@ -109,8 +175,9 @@ func previewOf(b domain.ImportBatch) ImportPreview {
 	}
 	return ImportPreview{
 		ID: b.ID, Status: b.Status, Source: b.Parsed.Source,
-		TotalRows: len(b.Parsed.Rows) + skipped, NewCount: b.NewCount, PossibleMatchCount: b.PossibleMatchCount,
-		Problems: b.Parsed.Problems, IgnoredColumns: b.Parsed.IgnoredColumns, UnknownFields: b.Parsed.UnknownFields,
+		TotalRows: len(b.Parsed.Rows) + skipped, NewCount: b.NewCount, UpdatedCount: b.UpdatedCount,
+		PossibleMatchCount: b.PossibleMatchCount,
+		Problems:           b.Parsed.Problems, IgnoredColumns: b.Parsed.IgnoredColumns, UnknownFields: b.Parsed.UnknownFields,
 	}
 }
 

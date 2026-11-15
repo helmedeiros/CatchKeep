@@ -144,3 +144,97 @@ func TestStage_RejectsUnrecognizedFiles(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+// reimportPoweredUp commits a Pidgey, then stages it again with more CP.
+func reimportPoweredUp(t *testing.T, f importsFixture) app.ImportPreview {
+	t.Helper()
+	first, err := f.imports.Stage(t.Context(), ash, strings.NewReader("Pidgey,1,2,3,100\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.imports.Commit(t.Context(), ash, first.ID); err != nil {
+		t.Fatal(err)
+	}
+	preview, err := f.imports.Stage(t.Context(), ash, strings.NewReader("Pidgey,1,2,3,150\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return preview
+}
+
+func TestStage_ListsPossibleDuplicatesWithTheirCandidates(t *testing.T) {
+	f := newImportsFixture()
+
+	preview := reimportPoweredUp(t, f)
+
+	if len(preview.Matches) != 1 || preview.Matches[0].Row.Line != 2 || len(preview.Matches[0].Candidates) != 1 {
+		t.Fatalf("matches = %+v", preview.Matches)
+	}
+}
+
+func TestResolve_SameUpdatesTheExistingPokemonOnCommit(t *testing.T) {
+	f := newImportsFixture()
+	preview := reimportPoweredUp(t, f)
+	existing := preview.Matches[0].Candidates[0].Ref
+
+	resolved, err := f.imports.Resolve(t.Context(), ash, preview.ID, []domain.Resolution{{Line: 2, SameAs: existing}})
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if resolved.PossibleMatchCount != 0 || resolved.UpdatedCount != 1 || resolved.Matches[0].Resolution == nil {
+		t.Fatalf("resolved = %+v", resolved)
+	}
+	if again, _ := f.imports.Get(t.Context(), ash, preview.ID); again.UpdatedCount != 1 {
+		t.Fatalf("answer not kept: %+v", again)
+	}
+
+	committed, err := f.imports.Commit(t.Context(), ash, preview.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if committed.UpdatedCount != 1 || committed.NewCount != 0 || len(committed.Matches) != 0 {
+		t.Fatalf("committed = %+v", committed)
+	}
+	list, _ := f.collection.List(t.Context(), ash)
+	if len(list) != 1 || string(list[0].ID) != existing {
+		t.Fatalf("collection = %+v, want only %s", list, existing)
+	}
+	if cp, _ := list[0].Current().Int(domain.FieldCP); cp != 150 {
+		t.Fatalf("CP = %d, want the newer 150", cp)
+	}
+}
+
+func TestResolve_DifferentAddsTheRowOnCommit(t *testing.T) {
+	f := newImportsFixture()
+	preview := reimportPoweredUp(t, f)
+
+	if _, err := f.imports.Resolve(t.Context(), ash, preview.ID, []domain.Resolution{{Line: 2}}); err != nil {
+		t.Fatal(err)
+	}
+	committed, err := f.imports.Commit(t.Context(), ash, preview.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if list, _ := f.collection.List(t.Context(), ash); committed.NewCount != 1 || len(list) != 2 {
+		t.Fatalf("committed = %+v, collection size %d", committed, len(list))
+	}
+}
+
+func TestResolve_RejectsInvalidAnswersAndCommittedImports(t *testing.T) {
+	f := newImportsFixture()
+	preview := reimportPoweredUp(t, f)
+
+	if _, err := f.imports.Resolve(t.Context(), ash, preview.ID, []domain.Resolution{{Line: 2, SameAs: "nope"}}); !errors.Is(err, domain.ErrInvalidResolution) {
+		t.Fatalf("invalid answer: err = %v", err)
+	}
+	if _, err := f.imports.Resolve(t.Context(), "misty", preview.ID, []domain.Resolution{{Line: 2}}); !errors.Is(err, domain.ErrImportNotFound) {
+		t.Fatalf("other trainer: err = %v", err)
+	}
+	if _, err := f.imports.Commit(t.Context(), ash, preview.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.imports.Resolve(t.Context(), ash, preview.ID, []domain.Resolution{{Line: 2}}); !errors.Is(err, domain.ErrImportAlreadyCommitted) {
+		t.Fatalf("committed import: err = %v", err)
+	}
+}
