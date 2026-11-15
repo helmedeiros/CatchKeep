@@ -13,3 +13,10 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+  - package-ecosystem: gomod
+    directory: /backend
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
