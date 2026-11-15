@@ -22,6 +22,7 @@ jobs:
       pull-requests: read
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -31,6 +32,11 @@ jobs:
             backend:
               - 'backend/**'
               - 'api/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              - 'api/**'
+              - '.nvmrc'
               - '.github/workflows/ci.yml'
 
   repo:
@@ -82,10 +88,30 @@ jobs:
       - run: make check
       - run: make build
 
+  frontend:
+    name: Frontend checks
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm run build
+
   gate:
     name: Quality gates
     if: always()
-    needs: [changes, repo, backend]
+    needs: [changes, repo, backend, frontend]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:

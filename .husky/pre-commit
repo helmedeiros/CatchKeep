@@ -2,3 +2,6 @@ npm run check
 if git diff --cached --name-only | grep -q '^backend/'; then
   make -C backend check
 fi
+if git diff --cached --name-only | grep -q '^frontend/'; then
+  npm --prefix frontend run check
+fi

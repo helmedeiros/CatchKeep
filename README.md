@@ -14,6 +14,7 @@ Requires Node.js 24 (`.nvmrc`) and Go (version pinned in `backend/go.mod`).
 npm install   # also installs git hooks
 npm run check # formatting, markdown lint, shellcheck, OpenAPI lint
 make -C backend check # gofmt/goimports, go vet, golangci-lint, go test -race
+npm --prefix frontend install && npm --prefix frontend run check # tsc, oxlint, vitest
 ```
 
 ### Workflow

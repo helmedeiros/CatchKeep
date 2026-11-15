@@ -5,5 +5,5 @@
     "MD013": false,
   },
   "globs": ["**/*.md"],
-  "ignores": ["node_modules/**", ".beads/**", "local/**"],
+  "ignores": ["**/node_modules/**", "**/dist/**", ".beads/**", "local/**"],
 }
