@@ -194,6 +194,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in trainer's setup. */
+        get: operations["getSetup"];
+        /** Save storage capacity and goals in priority order. */
+        put: operations["saveSetup"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/keep-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the keep rules do with the collection.
+         * @description Kept, surplus (beyond the rules; possible transfers) and Pokémon waiting for confirmation of unknown features add up to the total. Returns 409 SETUP_REQUIRED until the trainer has saved a setup.
+         */
+        get: operations["getKeepSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -347,6 +385,41 @@ export interface components {
         ConfirmationResult: {
             /** @description Pokémon that had at least one of the features unknown. */
             updated: number;
+        };
+        Setup: {
+            /**
+             * @description Pokémon storage slots.
+             * @example 2700
+             */
+            capacity: number;
+            /** @description Goals, most important first. */
+            goals: ("collecting" | "trading" | "battling")[];
+        };
+        KeepSummary: {
+            total: number;
+            kept: number;
+            /** @description Pokémon beyond the keep rules; possible transfers. */
+            surplus: number;
+            /** @description Kept until unknown features (shiny, costume…) are confirmed. */
+            needsConfirmation: number;
+            /** @description Copies of each variant kept by default for this capacity. */
+            minimum: number;
+            /** @description One per fully known variant, largest surplus first. */
+            groups: components["schemas"]["VariantGroup"][];
+        };
+        VariantGroup: {
+            species: string;
+            form: string;
+            shiny: boolean;
+            costume: boolean;
+            background: boolean;
+            dynamax: boolean;
+            gigantamax: boolean;
+            count: number;
+            minimum: number;
+            keep: number;
+            /** @description Pokémon beyond the minimum, best first. */
+            surplusIds: string[];
         };
         InvalidRow: {
             /** @description 1-based line number in the file, counting the header. */
@@ -690,6 +763,79 @@ export interface operations {
             };
             401: components["responses"]["Error"];
             422: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getSetup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setup. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Setup"];
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    saveSetup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Setup"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Setup"];
+                };
+            };
+            401: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getKeepSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeepSummary"];
+                };
+            };
+            401: components["responses"]["Error"];
+            409: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };
     };

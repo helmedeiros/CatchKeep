@@ -19,6 +19,7 @@ type Services struct {
 	Sessions   *app.Sessions
 	Imports    *app.Imports
 	Collection *app.Collection
+	Keep       *app.Keep
 
 	// SecureCookies marks the session cookie Secure. Enable it whenever the
 	// API is served over HTTPS.

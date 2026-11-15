@@ -167,6 +167,27 @@ func (e PossibleMatchAnswer) Valid() bool {
 	}
 }
 
+// Defines values for SetupGoals.
+const (
+	Battling   SetupGoals = "battling"
+	Collecting SetupGoals = "collecting"
+	Trading    SetupGoals = "trading"
+)
+
+// Valid indicates whether the value is a known member of the SetupGoals enum.
+func (e SetupGoals) Valid() bool {
+	switch e {
+	case Battling:
+		return true
+	case Collecting:
+		return true
+	case Trading:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TriState.
 const (
 	No      TriState = "no"
@@ -328,6 +349,23 @@ type InvalidRow struct {
 	Row int `json:"row"`
 }
 
+// KeepSummary defines model for KeepSummary.
+type KeepSummary struct {
+	// Groups One per fully known variant, largest surplus first.
+	Groups []VariantGroup `json:"groups"`
+	Kept   int            `json:"kept"`
+
+	// Minimum Copies of each variant kept by default for this capacity.
+	Minimum int `json:"minimum"`
+
+	// NeedsConfirmation Kept until unknown features (shiny, costume…) are confirmed.
+	NeedsConfirmation int `json:"needsConfirmation"`
+
+	// Surplus Pokémon beyond the keep rules; possible transfers.
+	Surplus int `json:"surplus"`
+	Total   int `json:"total"`
+}
+
 // MatchAnswer defines model for MatchAnswer.
 type MatchAnswer struct {
 	Answer MatchAnswerAnswer `json:"answer"`
@@ -446,6 +484,20 @@ type ProfileSummary struct {
 	Id ProfileId `json:"id"`
 }
 
+// Setup defines model for Setup.
+type Setup struct {
+	// Capacity Pokémon storage slots.
+	//
+	// Examples: 2700
+	Capacity int `json:"capacity"`
+
+	// Goals Goals, most important first.
+	Goals []SetupGoals `json:"goals"`
+}
+
+// SetupGoals defines model for Setup.Goals.
+type SetupGoals string
+
 // SignIn defines model for SignIn.
 type SignIn struct {
 	// Pin 4 to 8 digits.
@@ -462,6 +514,23 @@ type SignIn struct {
 // TriState Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
 type TriState string
 
+// VariantGroup defines model for VariantGroup.
+type VariantGroup struct {
+	Background bool   `json:"background"`
+	Costume    bool   `json:"costume"`
+	Count      int    `json:"count"`
+	Dynamax    bool   `json:"dynamax"`
+	Form       string `json:"form"`
+	Gigantamax bool   `json:"gigantamax"`
+	Keep       int    `json:"keep"`
+	Minimum    int    `json:"minimum"`
+	Shiny      bool   `json:"shiny"`
+	Species    string `json:"species"`
+
+	// SurplusIds Pokémon beyond the minimum, best first.
+	SurplusIds []string `json:"surplusIds"`
+}
+
 // ImportId defines model for ImportId.
 type ImportId = string
 
@@ -476,6 +545,9 @@ type CreateProfileJSONRequestBody = NewProfile
 
 // SignInJSONRequestBody defines body for SignIn for application/json ContentType.
 type SignInJSONRequestBody = SignIn
+
+// SaveSetupJSONRequestBody defines body for SaveSetup for application/json ContentType.
+type SaveSetupJSONRequestBody = Setup
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -500,6 +572,9 @@ type ServerInterface interface {
 	// CommitImport Add the staged Pokémon to the collection.
 	// (POST /imports/{importId}/commit)
 	CommitImport(w http.ResponseWriter, r *http.Request, importId ImportId)
+	// GetKeepSummary What the keep rules do with the collection.
+	// (GET /keep-summary)
+	GetKeepSummary(w http.ResponseWriter, r *http.Request)
 	// GetMe The profile the caller is signed in to.
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -515,6 +590,12 @@ type ServerInterface interface {
 	// SignIn Sign in to a profile with its PIN.
 	// (POST /session)
 	SignIn(w http.ResponseWriter, r *http.Request)
+	// GetSetup The signed-in trainer's setup.
+	// (GET /setup)
+	GetSetup(w http.ResponseWriter, r *http.Request)
+	// SaveSetup Save storage capacity and goals in priority order.
+	// (PUT /setup)
+	SaveSetup(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -660,6 +741,20 @@ func (siw *ServerInterfaceWrapper) CommitImport(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// GetKeepSummary operation middleware
+func (siw *ServerInterfaceWrapper) GetKeepSummary(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetKeepSummary(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
 
@@ -721,6 +816,34 @@ func (siw *ServerInterfaceWrapper) SignIn(w http.ResponseWriter, r *http.Request
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SignIn(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSetup operation middleware
+func (siw *ServerInterfaceWrapper) GetSetup(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSetup(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SaveSetup operation middleware
+func (siw *ServerInterfaceWrapper) SaveSetup(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SaveSetup(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -862,6 +985,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{importId}/answers", wrapper.AnswerPossibleMatches)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/collection", wrapper.ListCollection)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/collection/confirmations", wrapper.ConfirmAbsent)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/setup", wrapper.GetSetup)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/setup", wrapper.SaveSetup)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/keep-summary", wrapper.GetKeepSummary)
 
 	return m
 }
@@ -1350,6 +1476,72 @@ func (response CommitImportdefaultJSONResponse) VisitCommitImportResponse(w http
 	return err
 }
 
+type GetKeepSummaryRequestObject struct {
+}
+
+type GetKeepSummaryResponseObject interface {
+	VisitGetKeepSummaryResponse(w http.ResponseWriter) error
+}
+
+type GetKeepSummary200JSONResponse KeepSummary
+
+func (response GetKeepSummary200JSONResponse) VisitGetKeepSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetKeepSummary401JSONResponse struct{ ErrorJSONResponse }
+
+func (response GetKeepSummary401JSONResponse) VisitGetKeepSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetKeepSummary409JSONResponse Error
+
+func (response GetKeepSummary409JSONResponse) VisitGetKeepSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetKeepSummarydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetKeepSummarydefaultJSONResponse) VisitGetKeepSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -1652,6 +1844,139 @@ func (response SignIndefaultJSONResponse) VisitSignInResponse(w http.ResponseWri
 	return err
 }
 
+type GetSetupRequestObject struct {
+}
+
+type GetSetupResponseObject interface {
+	VisitGetSetupResponse(w http.ResponseWriter) error
+}
+
+type GetSetup200JSONResponse Setup
+
+func (response GetSetup200JSONResponse) VisitGetSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSetup401JSONResponse struct{ ErrorJSONResponse }
+
+func (response GetSetup401JSONResponse) VisitGetSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSetup404JSONResponse Error
+
+func (response GetSetup404JSONResponse) VisitGetSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSetupdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetSetupdefaultJSONResponse) VisitGetSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSetupRequestObject struct {
+	Body *SaveSetupJSONRequestBody
+}
+
+type SaveSetupResponseObject interface {
+	VisitSaveSetupResponse(w http.ResponseWriter) error
+}
+
+type SaveSetup200JSONResponse Setup
+
+func (response SaveSetup200JSONResponse) VisitSaveSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSetup401JSONResponse struct{ ErrorJSONResponse }
+
+func (response SaveSetup401JSONResponse) VisitSaveSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSetup422JSONResponse Error
+
+func (response SaveSetup422JSONResponse) VisitSaveSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSetupdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response SaveSetupdefaultJSONResponse) VisitSaveSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// ListCollection Every active Pokémon of the signed-in trainer.
@@ -1675,6 +2000,9 @@ type StrictServerInterface interface {
 	// CommitImport Add the staged Pokémon to the collection.
 	// (POST /imports/{importId}/commit)
 	CommitImport(ctx context.Context, request CommitImportRequestObject) (CommitImportResponseObject, error)
+	// GetKeepSummary What the keep rules do with the collection.
+	// (GET /keep-summary)
+	GetKeepSummary(ctx context.Context, request GetKeepSummaryRequestObject) (GetKeepSummaryResponseObject, error)
 	// GetMe The profile the caller is signed in to.
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -1690,6 +2018,12 @@ type StrictServerInterface interface {
 	// SignIn Sign in to a profile with its PIN.
 	// (POST /session)
 	SignIn(ctx context.Context, request SignInRequestObject) (SignInResponseObject, error)
+	// GetSetup The signed-in trainer's setup.
+	// (GET /setup)
+	GetSetup(ctx context.Context, request GetSetupRequestObject) (GetSetupResponseObject, error)
+	// SaveSetup Save storage capacity and goals in priority order.
+	// (PUT /setup)
+	SaveSetup(ctx context.Context, request SaveSetupRequestObject) (SaveSetupResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -1921,6 +2255,30 @@ func (sh *strictHandler) CommitImport(w http.ResponseWriter, r *http.Request, im
 	}
 }
 
+// GetKeepSummary operation middleware
+func (sh *strictHandler) GetKeepSummary(w http.ResponseWriter, r *http.Request) {
+	var request GetKeepSummaryRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetKeepSummary(ctx, request.(GetKeepSummaryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetKeepSummary")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetKeepSummaryResponseObject); ok {
+		if err := validResponse.VisitGetKeepSummaryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetMe operation middleware
 func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	var request GetMeRequestObject
@@ -2048,6 +2406,61 @@ func (sh *strictHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SignInResponseObject); ok {
 		if err := validResponse.VisitSignInResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSetup operation middleware
+func (sh *strictHandler) GetSetup(w http.ResponseWriter, r *http.Request) {
+	var request GetSetupRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSetup(ctx, request.(GetSetupRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSetup")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSetupResponseObject); ok {
+		if err := validResponse.VisitGetSetupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SaveSetup operation middleware
+func (sh *strictHandler) SaveSetup(w http.ResponseWriter, r *http.Request) {
+	var request SaveSetupRequestObject
+
+	var body SaveSetupJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SaveSetup(ctx, request.(SaveSetupRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SaveSetup")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SaveSetupResponseObject); ok {
+		if err := validResponse.VisitSaveSetupResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
