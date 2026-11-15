@@ -50,7 +50,7 @@ func newImportsFixture() importsFixture {
 	ids := apptest.NewSequentialIDs()
 	return importsFixture{
 		imports:    app.NewImports(fakeParser{}, store, store, ids, clock),
-		collection: app.NewCollection(store),
+		collection: app.NewCollection(store, store, clock),
 	}
 }
 
@@ -236,5 +236,38 @@ func TestResolve_RejectsInvalidAnswersAndCommittedImports(t *testing.T) {
 	}
 	if _, err := f.imports.Resolve(t.Context(), ash, preview.ID, []domain.Resolution{{Line: 2}}); !errors.Is(err, domain.ErrImportAlreadyCommitted) {
 		t.Fatalf("committed import: err = %v", err)
+	}
+}
+
+func TestConfirmAbsent_SetsUnknownFeaturesOfOneSpeciesToNo(t *testing.T) {
+	f := newImportsFixture()
+	preview, _ := f.imports.Stage(t.Context(), ash, strings.NewReader("Pidgey,1,2,3,100\nPidgey,4,5,6,120\nRattata,4,5,6,200\n"))
+	if _, err := f.imports.Commit(t.Context(), ash, preview.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	n, err := f.collection.ConfirmAbsent(t.Context(), ash, "Pidgey", "Normal", []domain.Field{domain.FieldShiny})
+	if err != nil {
+		t.Fatalf("ConfirmAbsent: %v", err)
+	}
+
+	if n != 2 {
+		t.Fatalf("updated %d, want 2", n)
+	}
+	list, _ := f.collection.List(t.Context(), ash)
+	for _, p := range list {
+		want := domain.No
+		if p.Current().String(domain.FieldSpecies) == "Rattata" {
+			want = domain.Unknown
+		}
+		if got := p.Current().Tri(domain.FieldShiny); got != want {
+			t.Fatalf("%s shiny = %v, want %v", p.Current().String(domain.FieldSpecies), got, want)
+		}
+	}
+	if again, _ := f.collection.ConfirmAbsent(t.Context(), ash, "Pidgey", "Normal", []domain.Field{domain.FieldShiny}); again != 0 {
+		t.Fatalf("confirming again updated %d, want 0", again)
+	}
+	if _, err := f.collection.ConfirmAbsent(t.Context(), ash, "Pidgey", "Normal", []domain.Field{domain.FieldCP}); !errors.Is(err, domain.ErrNotConfirmable) {
+		t.Fatalf("CP: err = %v", err)
 	}
 }

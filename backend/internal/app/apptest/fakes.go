@@ -213,16 +213,32 @@ func (s *CollectionStore) SaveResolutions(_ context.Context, b domain.ImportBatc
 func (s *CollectionStore) Commit(_ context.Context, b domain.ImportBatch, add []domain.Pokemon, update []domain.PokemonUpdate) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	owned := s.pokemon[b.TrainerID]
-	for _, u := range update {
+	if err := s.addObservations(b.TrainerID, update); err != nil {
+		return err
+	}
+	s.batches[b.ID] = b
+	s.pokemon[b.TrainerID] = append(s.pokemon[b.TrainerID], add...)
+	return nil
+}
+
+// AddObservations implements ports.CollectionWriter.
+func (s *CollectionStore) AddObservations(_ context.Context, trainer domain.TrainerID, updates []domain.PokemonUpdate) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.addObservations(trainer, updates)
+}
+
+// addObservations applies all updates or none; s.mu must be held.
+func (s *CollectionStore) addObservations(trainer domain.TrainerID, updates []domain.PokemonUpdate) error {
+	owned := slices.Clone(s.pokemon[trainer])
+	for _, u := range updates {
 		i := slices.IndexFunc(owned, func(p domain.Pokemon) bool { return p.ID == u.PokemonID })
 		if i < 0 {
 			return fmt.Errorf("update %s: not in the collection", u.PokemonID)
 		}
 		owned[i].Observations = append(slices.Clone(owned[i].Observations), u.Observations...)
 	}
-	s.batches[b.ID] = b
-	s.pokemon[b.TrainerID] = append(owned, add...)
+	s.pokemon[trainer] = owned
 	return nil
 }
 
