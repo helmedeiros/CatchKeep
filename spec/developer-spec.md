@@ -84,7 +84,7 @@ V1 CSV cleanup, V2 screenshot import, V3 battle recommendations (§3).
 | V2 · Screenshot import      | Import batches, review uncertain readings, update existing records                     | English list, detail and appraisal screenshots work locally on the MacBook                      |
 | V3 · Battle recommendations | Manage recommended rosters and upgrades                                                | Recommendations refresh from versioned battle data and use confirmed builds for roster coverage |
 
-Each release MUST pass the full acceptance suite of all prior releases (§15.7) and MUST restore backups made by every prior release (§13).
+Each release MUST pass the full acceptance suite of all prior releases (§15.11) and MUST restore backups made by every prior release (§13).
 
 ---
 
@@ -297,7 +297,7 @@ Each component may be unknown. A record with any unknown component has a _set_ o
 | ---------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | V1-HOST-01 | Serve one HTTPS URL on the home network, usable in iPhone Safari.                                    | Loads on each family iPhone without certificate warnings after one-time setup. |
 | V1-HOST-02 | Manual start by default; opt-in launch at Mac login.                                                 | Toggle in admin console installs/removes the LaunchAgent.                      |
-| V1-PRF-01  | Each trainer has their own collection, capacity, rules, manual teams, history.                       | Cross-profile isolation test (§15.5).                                          |
+| V1-PRF-01  | Each trainer has their own collection, capacity, rules, manual teams, history.                       | Cross-profile isolation test (§15.9).                                          |
 | V1-PRF-02  | Show the active profile name before every import and confirmation.                                   | Present on staging, plan and confirm screens.                                  |
 | V1-PRF-03  | Switching profile requires the destination trainer's PIN.                                            | No path switches profile without PIN.                                          |
 | V1-PRF-04  | Admin generates a one-time PIN reset code, emailed or shown on the MacBook. Trainer chooses new PIN. | Code single use, expires, all sessions for that trainer revoked on reset.      |
@@ -398,7 +398,7 @@ Upgrade comparison: capacity-upgrade-only = slots needed `T`; cleanup+upgrade = 
 
 `PlanInput = { trainerRevision, records (active, resolved fields), rules, protections, duplicateReviews, goals, preferences, target, rosters (V3), upgradePlans (V3), datasetVersion (V3) }`
 
-The input is hashed; the plan stores `input_revision`. Plans are pure functions of input + solver version; same input ⇒ same output (determinism test, §15.2).
+The input is hashed; the plan stores `input_revision`. Plans are pure functions of input + solver version; same input ⇒ same output (determinism test, §15.7).
 
 ### 7.2 Hard protections (removed from candidate set)
 
@@ -649,7 +649,7 @@ A field may only be set to a definite value (including `false`) from a view whos
 - **Contents:** trainers, records, observations, import batches (metadata, not raw files), duplicate reviews, rules, saved searches, favorite species, teams, transfer events. V2 adds screenshot metadata (images optional). V3 adds upgrade plans and the active dataset version reference.
 - **Restore:** validate manifest and checksums → refuse newer `schemaVersion` → run in-memory migrations from backup version to current → preview what will be replaced → single transaction replace for the target profile(s) → bump revision → replan. Failure leaves the database untouched.
 - **Migrations:** forward-only, numbered SQL files, each with a test. Automatic pre-migration database snapshot on app upgrade.
-- **Compatibility guarantee:** every release restores backups from every earlier release. Golden backup fixtures are committed per release (§15.6).
+- **Compatibility guarantee:** every release restores backups from every earlier release. Golden backup fixtures are committed per release (§15.10).
 
 ---
 
@@ -686,17 +686,102 @@ UI English for V1. Search strings and screenshot parsing are English-only; keep 
 
 ## 15. Testing plan
 
-### 15.1 Tooling **[Proposed]**
+### 15.1 Test-driven development
 
-Backend and frontend each have their own tooling and CI job; a change to one never requires the other to build.
+All production code is written test first.
 
-| Side       | Tooling                                                                                                                           |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Backend    | `go test -race` with coverage, `pgregory.net/rapid` (property-based), `testing.B` (benchmarks), real SQLite for integration tests |
-| Frontend   | Vitest + Testing Library, Playwright (WebKit, iPhone profiles) against a mock server generated from the contract                  |
-| End to end | Playwright against the real backend binary with a seeded SQLite database and the built frontend                                   |
+1. **Red** — write the smallest failing test that expresses the next behaviour. Run it and see it fail for the expected reason.
+2. **Green** — write the simplest code that passes.
+3. **Refactor** — clean up with all tests green. No behaviour change.
 
-### 15.2 Unit tests
+Rules:
+
+- Work **outside in** for each feature slice: start from an acceptance or API-level test, drive the use case with fakes of its driven ports, then drive the domain with unit tests. Adapters are driven by their own integration tests.
+- A commit contains a behaviour change **and** the tests that drove it. Pure refactors go in their own commit with no test changes other than renames.
+- A bug fix starts with a test that reproduces the bug.
+- No production code without a test that failed first. Code review checks that test and code arrived together.
+- Tests are named for behaviour (`TestPlan_NeverRecommendsProtectedRecord`), not for methods.
+- Every test is deterministic: injected `Clock` and `IDGenerator`, seeded randomness, no sleeps, no network.
+- Fakes (in-memory port implementations) are preferred over mocks. Mocks are only for verifying interactions that have no observable state (e.g. "mailer was called").
+
+### 15.2 Test pyramid
+
+Each side has its own balanced pyramid. Most tests are fast and isolated; few are slow and broad. Proportions are guidelines for review, not targets to game.
+
+```text
+                 ▲  manual (per release, every family iPhone)
+                ▲▲▲  smoke (every build and every host start)
+              ▲▲▲▲▲▲▲  end-to-end (full stack, few, critical journeys)
+          ▲▲▲▲▲▲▲▲▲▲▲▲▲  integration / contract / component
+   ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲  unit (domain, use cases, pure frontend logic)
+```
+
+#### Backend (Go)
+
+| Layer               | Share | Scope                                                                                                                                                                                  | Tooling                                    | Speed budget       |
+| ------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ------------------ |
+| Domain unit         | ~60%  | `internal/domain`: variant keys, tri-state, observation resolution, rules engine, target arithmetic, planner model and checker, search strings                                         | `go test`, table tests, `rapid` properties | whole layer < 10 s |
+| Use case            | ~20%  | `internal/app` with in-memory fakes for every driven port: transactions, revision checks, protections, staleness, idempotency                                                          | `go test` + `internal/adapters/fake`       | < 10 s             |
+| Adapter integration | ~15%  | SQLite repositories and migrations (temp DB file), CSV adapters (fixture files), HiGHS solver, OCR sidecar (V2), battle sources (recorded responses, V3), HTTP handlers via `httptest` | `go test -tags=integration`                | < 60 s             |
+| Contract            | ~5%   | Every handler response validates against `api/openapi.yaml`; every documented status code is exercised                                                                                 | `kin-openapi` validator in `httptest`      | < 30 s             |
+
+#### Frontend (TypeScript)
+
+| Layer                 | Share | Scope                                                                                                                                                    | Tooling                                                 | Speed budget |
+| --------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------ |
+| Unit                  | ~50%  | Pure functions, formatters, client-side state stores, view-model mapping from API DTOs                                                                   | Vitest                                                  | < 10 s       |
+| Component             | ~35%  | Components and screens rendered with the API mocked from the contract: PIN entry, import preview, duplicate review, rule inspector, plan checklist, undo | Vitest + Testing Library + contract-based request mocks | < 60 s       |
+| Flow (mocked backend) | ~15%  | Multi-screen journeys in WebKit with iPhone viewports against the contract mock server: setup, import, plan, confirm, undo                               | Playwright                                              | < 3 min      |
+
+Frontend tests never contain domain rules. If a test needs to assert _why_ a Pokémon is protected, that belongs in a backend test; the frontend asserts that the reason returned by the API is shown.
+
+#### End-to-end (full stack)
+
+Few, slow, and only for critical journeys: the acceptance scenarios in §15.11. They run the real backend binary with a seeded SQLite database and the built frontend bundle, in Playwright WebKit with iPhone profiles. Budget < 10 min.
+
+### 15.3 Smoke tests
+
+Smoke tests answer "is this build alive and safe to use?" in under a minute. They never mutate trainer data.
+
+| When                                          | What runs                                                                            | Checks                                                                                                                                                                              |
+| --------------------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CI, after building both sides                 | Backend binary started against an empty temp database with the built frontend dir    | `/api/v1/health` 200; migrations applied; static index served; one login with a seeded smoke profile; one read-only API call                                                        |
+| Every host start                              | Built-in startup self-check, then `catchkeep smoke` on demand from the admin console | DB `integrity_check`; schema version current; web dir present; TLS certificate valid and not expiring within 30 days; OCR sidecar responds (V2); active battle dataset present (V3) |
+| After installing a new release on the MacBook | `catchkeep smoke` + open the app on one iPhone                                       | Same as above + manual "page loads, PIN screen appears"                                                                                                                             |
+
+A failed startup self-check keeps the API read-only and shows an admin banner (§10.3).
+
+### 15.4 Manual tests
+
+Run per release on **every** family iPhone, and record results in `docs/manual-test-log.md` (date, device, iOS version, release, pass/fail, notes).
+
+- HTTPS trust, no certificate warnings.
+- Login, profile switch with PIN, wrong-PIN lockout message.
+- CSV upload from the Files app; preview readable on the smallest family iPhone.
+- Copy a search string and paste it into Pokémon GO; it finds the intended Pokémon.
+- Bulk confirm and undo with the real collection of one trainer (after a backup).
+- Host asleep: banner shown, no mutation possible.
+- V2: screenshot batch upload from Photos; review queue usable one-handed.
+- V3: roster view and copyable tags.
+
+Plus a 30-minute **exploratory session** per release with a written charter (e.g. "try to make the planner recommend something that should be kept").
+
+### 15.5 Where each gate runs
+
+| Gate                                              | Pre-commit (local) | PR CI     | Release            |
+| ------------------------------------------------- | ------------------ | --------- | ------------------ |
+| Format, lint, type-check (side touched)           | ✓                  | ✓         | ✓                  |
+| Unit + use case / unit + component (side touched) | ✓                  | ✓         | ✓                  |
+| Integration + contract (backend)                  |                    | ✓         | ✓                  |
+| Flow tests (frontend, mocked backend)             |                    | ✓         | ✓                  |
+| Full-stack E2E                                    |                    | ✓         | ✓                  |
+| Smoke                                             |                    | ✓         | ✓ (on the MacBook) |
+| Benchmarks (§15.12)                               |                    | on demand | ✓                  |
+| Manual + exploratory                              |                    |           | ✓                  |
+
+Coverage floors **[Proposed]**: backend domain ≥ 90% statements, backend overall ≥ 80%, frontend ≥ 80%. A PR may not lower coverage of the package it touches.
+
+### 15.6 Unit test focus
 
 - **Variant key** and tri-state handling: `null` never coerced to `false`.
 - **Observation resolution:** manual beats import; latest observed_at wins; supersession.
@@ -706,7 +791,7 @@ Backend and frontend each have their own tooling and CI job; a change to one nev
 - **CSV adapter:** Poke Genie header, BOM, quoted fields, invalid values, unknown columns, mapping by header signature.
 - **Auth:** hashing, rate limiter schedule, reset code expiry/single-use, session revocation.
 
-### 15.3 Planner tests
+### 15.7 Planner tests
 
 - **Brute-force oracle:** for random instances ≤ 16 eligible records, Phase A optimum equals exhaustive search; Phase B cost equals exhaustive minimum.
 - **Property-based invariants** (rapid, thousands of random instances):
@@ -720,7 +805,7 @@ Backend and frontend each have their own tooling and CI job; a change to one nev
 - **Timeout path:** forced tiny budget ⇒ result feasible and flagged `maxIsLowerBound`; greedy fallback feasible.
 - **Verification failure path:** inject a faulty solver ⇒ `PLANNER_VERIFICATION_FAILED`, no plan returned.
 
-### 15.4 Integration tests (API + real SQLite)
+### 15.8 Integration tests (API + real SQLite)
 
 - Import stage → preview → commit; staged batch outdated by concurrent commit.
 - Full refresh with missing records: commit blocked until resolved; undo restores and replans.
@@ -729,20 +814,20 @@ Backend and frontend each have their own tooling and CI job; a change to one nev
 - Transaction atomicity: inject failure mid-commit/bulk-confirm/restore ⇒ database unchanged.
 - Manual correction survives re-import.
 
-### 15.5 Security tests
+### 15.9 Security tests
 
 - Cross-profile isolation: for every trainer route, a session for A cannot read/modify B (expect 404). Generated from the route table so new routes are covered automatically.
 - Static check: every repository method requires `trainerId`.
 - Rate limiting and lockout progression; reset revokes sessions; admin routes unreachable from non-loopback.
 - Concurrent imports from two sessions on different profiles touch only their own data.
 
-### 15.6 Migration and backup tests
+### 15.10 Migration and backup tests
 
 - Each migration: apply on fixture DB of previous version, assert schema and data.
 - Golden backups per release restore into current version; round-trip export → restore ⇒ identical data.
 - Corrupted/newer/checksum-mismatch backups rejected with no changes.
 
-### 15.7 Acceptance tests (E2E, Playwright WebKit iPhone profile)
+### 15.11 Acceptance tests (full-stack E2E)
 
 | #   | Scenario                                                           | Expected                                                                                      | Req                  |
 | --- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- | -------------------- |
@@ -762,17 +847,13 @@ Backend and frontend each have their own tooling and CI job; a change to one nev
 
 A1–A6, A9, A11–A13 gate V1; A3 (screenshot half) gates V2; A7, A8, A10 gate V3.
 
-### 15.8 Manual device tests (per release, every family iPhone)
-
-HTTPS trust and no warnings · login/switch with PIN · CSV upload from Files app · copy search string and paste into Pokémon GO · screenshot batch upload from Photos (V2) · host asleep banner.
-
-### 15.9 OCR validation (V2)
-
-Fixture corpus: supplied PNGs + new captures for every screen kind × protected feature (shiny, costume, background, Dynamax, Gigantamax, Favorite). Report per-field precision/recall; fill the capability matrix (§11) from results; thresholds set to hit the precision target. Regression run on every OCR change.
-
-### 15.10 Performance
+### 15.12 Performance
 
 Benchmarks (§14.1) run in CI on demand and before each release; results recorded in `docs/benchmarks.md`.
+
+### 15.13 OCR validation (V2)
+
+Fixture corpus: supplied PNGs + new captures for every screen kind × protected feature (shiny, costume, background, Dynamax, Gigantamax, Favorite). Report per-field precision/recall; fill the capability matrix (§11) from results; thresholds set to hit the precision target. Regression run on every OCR change.
 
 ---
 
@@ -799,10 +880,10 @@ Benchmarks (§14.1) run in CI on demand and before each release; results recorde
 | Milestone | Scope                                                                                                                                                                                               | Done when                                                                                            |
 | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | M0        | Contract skeleton (`api/openapi.yaml`); Go backend skeleton (hexagonal layout, layering check, SQLite + migrations, health endpoint); frontend skeleton (Vite + generated client); separate CI jobs | Both CI jobs green independently; frontend shows health from a mock and from the real backend        |
-| M1        | Host + HTTPS on LAN, profiles, PIN auth, sessions, switching, admin console, reset codes                                                                                                            | Security tests §15.5 pass; device check on each iPhone (OD-04)                                       |
+| M1        | Host + HTTPS on LAN, profiles, PIN auth, sessions, switching, admin console, reset codes                                                                                                            | Security tests §15.9 pass; device check on each iPhone (OD-04)                                       |
 | M2        | CSV import: Poke Genie adapter, mapping, staging, preview, observations, duplicate review, incremental commit                                                                                       | Import of the real family CSVs; measure how many records end up protected by unknowns (OD-03, OD-11) |
 | M3        | Setup wizard, rules engine, capacity bands, overrides, favorite species, manual protection/teams, rule inspector                                                                                    | A1, A2, A12 pass                                                                                     |
-| M4        | Planner (Phase A/B, tie-break, timeout, verifier), target arithmetic, upgrade comparison, benchmark                                                                                                 | §15.3 passes; A4, A5, A11 pass; OD-09 resolved                                                       |
+| M4        | Planner (Phase A/B, tie-break, timeout, verifier), target arithmetic, upgrade comparison, benchmark                                                                                                 | §15.7 passes; A4, A5, A11 pass; OD-09 resolved                                                       |
 | M5        | Checklist, search strings + collision check, transfer confirm (single/bulk), history, undo, staleness + diff, full refresh                                                                          | A6, A9, A13 pass                                                                                     |
 | M6        | Backup/restore, launch at login, rolling backups, polish, manual device test pass                                                                                                                   | V1 exit criteria met                                                                                 |
 
