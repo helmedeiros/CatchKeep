@@ -12,6 +12,8 @@ interface Row {
   species: string;
   cp: number;
   lucky: boolean;
+  /** Features confirmed absent. */
+  absent?: string[];
 }
 interface Stored extends Row {
   id: string;
@@ -23,24 +25,27 @@ interface FakeImport {
   done?: { newCount: number; updatedCount: number; pending: number };
 }
 
-const toPokemon = (id: string, p: Row): Schemas["Pokemon"] => ({
-  id,
-  species: p.species,
-  form: "Normal",
-  cp: p.cp,
-  iv: { attack: 15, defense: 14, stamina: 13 },
-  attributes: {
-    shiny: "unknown",
-    lucky: p.lucky ? "yes" : "unknown",
-    shadow: "unknown",
-    purified: "unknown",
-    favorite: "unknown",
-    costume: "unknown",
-    background: "unknown",
-    dynamax: "unknown",
-    gigantamax: "unknown",
-  },
-});
+const toPokemon = (id: string, p: Row): Schemas["Pokemon"] => {
+  const tri = (f: string) => (p.absent?.includes(f) ? "no" : "unknown");
+  return {
+    id,
+    species: p.species,
+    form: "Normal",
+    cp: p.cp,
+    iv: { attack: 15, defense: 14, stamina: 13 },
+    attributes: {
+      shiny: tri("shiny"),
+      lucky: p.lucky ? "yes" : "unknown",
+      shadow: "unknown",
+      purified: "unknown",
+      favorite: "unknown",
+      costume: tri("costume"),
+      background: tri("background"),
+      dynamax: tri("dynamax"),
+      gigantamax: tri("gigantamax"),
+    },
+  };
+};
 
 /**
  * An in-memory stand-in for the CatchKeep API that follows the contract
@@ -170,6 +175,19 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
         imp.answers.set(a.row, a);
       }
       return jsonResponse(200, preview(answer[1] ?? ""));
+    }
+    if (path === "/collection/confirmations" && req.method === "POST") {
+      if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
+      const c = body as Schemas["AbsenceConfirmation"];
+      let updated = 0;
+      for (const p of collection) {
+        if (p.species !== c.species) continue;
+        const add = c.features.filter((f) => !p.absent?.includes(f));
+        if (add.length === 0) continue;
+        p.absent = [...(p.absent ?? []), ...add];
+        updated += 1;
+      }
+      return jsonResponse(200, { updated });
     }
     if (path === "/collection") {
       if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
