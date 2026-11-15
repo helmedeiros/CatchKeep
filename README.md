@@ -1,12 +1,10 @@
 # CatchKeep
 
-A self-hosted web app that recommends which Pokémon GO Pokémon to keep or transfer to reach a storage target. All transfers happen manually in the game.
+A Pokémon GO storage helper.
 
 ## Status
 
-Specification phase. See [`spec/`](spec/):
-
-- [`developer-spec.md`](spec/developer-spec.md) — implementation contract: architecture, data model, planner, API, security, error handling, testing plan, open decisions.
+Early development — nothing usable yet. The plan is in [`spec/developer-spec.md`](spec/developer-spec.md).
 
 ## Development
 
