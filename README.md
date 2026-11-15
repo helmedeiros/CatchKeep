@@ -5,6 +5,7 @@ A Pokémon GO storage helper.
 ## What you can do today
 
 - Give each trainer their own PIN-protected profile, so collections never get mixed up.
+- Bring in your collection from a Poke Genie CSV export: see a preview first, then browse it strongest first. Pokémon that might already be there are held back instead of counted twice, and anything the export can't tell (shiny, costume, background, Dynamax) stays "unknown" instead of being assumed absent.
 
 ## Status
 

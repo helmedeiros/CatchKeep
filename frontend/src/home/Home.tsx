@@ -1,11 +1,17 @@
-import { card, secondaryButton } from "../ui/styles";
+import { CollectionView } from "../collection/CollectionView";
+import { ImportCard } from "../collection/ImportCard";
+import { useCollection } from "../collection/useCollection";
 import { useSignOut } from "../session/useSession";
+import { alert, card, secondaryButton } from "../ui/styles";
 
 export function Home({ displayName }: { displayName: string }) {
   const signOut = useSignOut();
+  const collection = useCollection();
+  const pokemon = collection.data?.pokemon ?? [];
+
   return (
-    <section className={`${card} flex flex-col gap-3`}>
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-4">
+      <section className={`${card} flex items-center justify-between`}>
         <h2 className="text-lg font-semibold">Hi, {displayName}</h2>
         <button
           type="button"
@@ -14,10 +20,16 @@ export function Home({ displayName }: { displayName: string }) {
         >
           Sign out
         </button>
-      </div>
-      <p className="text-sm text-slate-600 dark:text-slate-400">
-        Your collection will appear here once you import it.
-      </p>
-    </section>
+      </section>
+      {collection.isError && (
+        <p className={alert}>Couldn't load your collection.</p>
+      )}
+      {collection.isSuccess && (
+        <>
+          <ImportCard hasPokemon={pokemon.length > 0} />
+          <CollectionView pokemon={pokemon} />
+        </>
+      )}
+    </div>
   );
 }
