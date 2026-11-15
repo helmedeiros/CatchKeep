@@ -90,76 +90,109 @@ Each release MUST pass the full acceptance suite of all prior releases (§15.7) 
 
 ## 4. Architecture
 
+Two independent applications that share only a versioned HTTP contract:
+
+- **Backend** — Go, hexagonal (ports and adapters). Owns all domain logic, persistence, auth, planning, imports and battle data.
+- **Frontend** — a standalone web client. Holds no domain rules; renders what the API returns.
+
+They have separate source trees, toolchains, dependencies, quality gates, CI jobs and release versions. Neither imports code from the other. The only shared artifact is the OpenAPI document `api/openapi.yaml`.
+
 ### 4.1 Topology
 
 ```text
- iPhone Safari (×N)  ──HTTPS over home Wi-Fi──►  MacBook host
-                                                  ┌───────────────────────────────┐
-                                                  │ Web client (static, responsive)│
-                                                  │ HTTP API (profile-scoped)      │
-                                                  │  ├─ auth                       │
-                                                  │  ├─ import adapters (CSV, V2 OCR)│
-                                                  │  ├─ reconciliation             │
-                                                  │  ├─ rules engine               │
-                                                  │  ├─ cleanup planner            │
-                                                  │  ├─ battle data ingestion (V3) │
-                                                  │  └─ roster/upgrade engine (V3) │
-                                                  │ SQLite (WAL) + image store (V2)│
-                                                  │ Admin console (loopback only)  │
-                                                  └───────────────────────────────┘
+ iPhone Safari (×N)
+        │  HTTPS over home Wi-Fi (one URL, one certificate)
+        ▼
+ MacBook host
+ ┌────────────────────────────────────────────────────────────┐
+ │ catchkeep (Go binary)                                      │
+ │   ├─ /api/v1/*      profile-scoped JSON API                │
+ │   └─ /*             static files from a configured dir     │
+ │                     (the frontend's build output)          │
+ │   SQLite (WAL) · image store (V2) · OCR sidecar (V2)       │
+ │   Admin console (loopback only)                            │
+ └────────────────────────────────────────────────────────────┘
 ```
 
-- One process serves the client and the API at a single home Wi-Fi URL.
+- The backend serves the frontend bundle from a directory set at runtime (`CATCHKEEP_WEB_DIR`). There is no build-time coupling: either side can be rebuilt and redeployed alone. Serving both from one origin keeps one URL and one TLS certificate on the iPhones and avoids CORS.
+- In development the frontend runs on its own dev server and proxies `/api` to a backend, or to a mock server generated from `api/openapi.yaml`.
 - Start manually by default; offer an opt-in "launch at Mac login" (**[Proposed]** a per-user `launchd` LaunchAgent installed/removed from the admin console).
 - The host must be on and awake. The client MUST detect an unreachable host and say so plainly (§10.5).
 
-### 4.2 Stack **[Proposed]**
+### 4.2 API contract
 
-| Concern              | Choice                                                                          | Rationale / tradeoff                                                                                                                  |
-| -------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Language             | TypeScript end to end                                                           | One language for client, API, planner and tests.                                                                                      |
-| Runtime              | Node.js LTS                                                                     | Native SQLite bindings, good WASM support for the solver.                                                                             |
-| HTTP                 | Fastify                                                                         | Schema-validated routes; JSON Schema doubles as API contract.                                                                         |
-| Database             | SQLite in WAL mode via `better-sqlite3`                                         | Transactional, single file, trivial backup. Single writer is fine for one family.                                                     |
-| Migrations / queries | Kysely + versioned SQL migrations                                               | Typed queries without an ORM hiding transactions.                                                                                     |
-| Client               | React + Vite, mobile-first                                                      | Static bundle served by the API process.                                                                                              |
-| Planner solver       | HiGHS MILP (`highs` WASM build) with greedy fallback                            | Exact optimum for 2,700-record instances in practice; fallback gives a verified lower bound on timeout. Must be benchmarked (§14.1).  |
-| OCR (V2)             | Apple Vision text recognition via a small Swift CLI sidecar                     | Local, free, strong English accuracy on macOS. Tradeoff: macOS-only, which matches the deployment. Pending accuracy validation (§16). |
-| Password hashing     | Argon2id                                                                        | Standard for low-entropy secrets like PINs.                                                                                           |
-| Local HTTPS          | Local CA (e.g. `mkcert`) + root profile installed on each iPhone, mDNS hostname | Safari requires full-trust installation; must be validated on family iPhones (§16).                                                   |
+- `api/openapi.yaml` (OpenAPI 3.1) is the source of truth for every route, request, response and error code (§8, §10.2).
+- The API is versioned in the path (`/v1`). Breaking changes require `/v2`; additive changes do not.
+- Backend: server interfaces and DTOs generated from the contract; handlers adapt DTOs to use cases.
+- Frontend: typed client generated from the contract.
+- CI checks that generated code is up to date on both sides and runs a breaking-change diff of the contract against `main`.
+- A contract change lands in its own PR before either side implements it.
 
-### 4.3 Module boundaries
+### 4.3 Backend stack **[Proposed]**
 
-Hexagonal layout. The domain core has no I/O. Adapters implement ports.
+| Concern          | Choice                                                                                 | Rationale / tradeoff                                                                                                                                                                                    |
+| ---------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language         | Go (latest stable)                                                                     | Single static binary on the MacBook; strong standard library; easy concurrency for background jobs.                                                                                                     |
+| HTTP             | `net/http` (method-pattern routing) + `oapi-codegen` strict server                     | No framework; contract-first.                                                                                                                                                                           |
+| Database         | SQLite in WAL mode via `modernc.org/sqlite`                                            | Transactional, single file, trivial backup; pure Go driver.                                                                                                                                             |
+| Queries          | `sqlc` over hand-written SQL                                                           | Type-safe queries; transactions stay explicit.                                                                                                                                                          |
+| Migrations       | `goose`, SQL files embedded with `embed`                                               | Forward-only, numbered, tested (§13).                                                                                                                                                                   |
+| Planner solver   | HiGHS MILP via its C API (cgo) behind a `Solver` port, plus a pure-Go greedy fallback  | Exact optimum in practice for 2,700 records; greedy gives a verified lower bound. Tradeoff: cgo complicates cross-compilation — acceptable since the only target is macOS. Must be benchmarked (§14.1). |
+| Password hashing | Argon2id (`golang.org/x/crypto/argon2`)                                                | Standard for low-entropy secrets like PINs.                                                                                                                                                             |
+| Logging          | `log/slog` JSON handler                                                                | Structured, standard library.                                                                                                                                                                           |
+| OCR (V2)         | Apple Vision text recognition via a small Swift CLI sidecar behind an `OcrEngine` port | Local, strong English accuracy on macOS. Pending validation (§16).                                                                                                                                      |
+| Local HTTPS      | Local CA (e.g. `mkcert`) + root profile installed on each iPhone, mDNS hostname        | Safari requires full-trust installation; validate on family iPhones (§16).                                                                                                                              |
+
+### 4.4 Frontend stack **[Proposed]**
+
+| Concern           | Choice                                 | Rationale / tradeoff                                |
+| ----------------- | -------------------------------------- | --------------------------------------------------- |
+| Language          | TypeScript (strict)                    | Typed client generated from the contract.           |
+| Framework / build | React + Vite                           | Static bundle; no server runtime needed.            |
+| API client        | `openapi-typescript` + `openapi-fetch` | Types come from the contract; no hand-written DTOs. |
+| UI libraries      | See §4.6                               |                                                     |
+
+### 4.5 Backend hexagonal layout
+
+The domain core has no I/O and imports nothing outside the standard library. Dependencies point inward: `adapters → app → domain`. Ports are interfaces defined by the consumer (domain or app), implemented by adapters.
 
 ```text
-src/
-  domain/            # pure: entities, variant keys, rules engine, planner model, roster model
-    rules/
-    planner/
-    reconciliation/
-    battle/          # V3
-  application/       # use cases; owns transactions and revision checks
-  ports/             # Repository, Clock, IdGenerator, Solver, OcrEngine, BattleSource, Mailer, Hasher
-  adapters/
-    http/            # Fastify routes, auth middleware, DTO mapping
-    sqlite/          # repositories, migrations
-    csv/             # Poke Genie adapter + generic mapped-CSV adapter
-    ocr/             # V2 Vision sidecar
-    battle-sources/  # V3 one adapter per source
-    solver/          # HiGHS + greedy fallback
-    mailer/          # SMTP (optional, see §16)
-  client/            # web app
+backend/
+  cmd/catchkeep/         # main: config, wiring (composition root), server start
+  internal/
+    domain/              # pure: entities, variant keys, rules engine, planner model, roster model
+      rules/
+      planner/
+      reconciliation/
+      battle/            # V3
+    app/                 # use cases; own transactions and revision checks; define driven ports
+    ports/               # driven ports: repositories, Clock, IDGenerator, Solver, OcrEngine,
+                         # BattleSource, Mailer, Hasher, UnitOfWork
+    adapters/
+      httpapi/           # driving: generated server, auth middleware, DTO ↔ use-case mapping
+      sqlite/            # repositories, migrations, UnitOfWork
+      csvimport/         # Poke Genie + generic mapped-CSV adapters
+      ocr/               # V2 Vision sidecar
+      battlesource/      # V3, one adapter per source
+      solver/            # HiGHS (cgo) + greedy fallback
+      mailer/            # SMTP (optional, OD-07)
+      clock/, ids/       # system implementations
+  go.mod
+frontend/
+  src/
+  package.json
+api/
+  openapi.yaml
 ```
 
 Rules:
 
-- Every repository method takes a `trainerId`. There is no unscoped query path for trainer data (enforced by a lint rule and a test, §15.5).
-- Use cases are the only place transactions begin. One use case = one transaction.
-- The planner is a pure function `plan(input) -> PlanResult` given an injected `Solver` and time budget.
-- Import adapters produce `ImportCandidate[]` (normalized observations). They never write to the database directly.
-
----
+- Every repository method takes a `TrainerID`. There is no unscoped query path for trainer data.
+- Use cases are the only place transactions begin. One use case = one transaction (`UnitOfWork`).
+- The planner is a pure function `Plan(input, solver, budget) (PlanResult, error)`.
+- Import adapters produce `[]ImportCandidate` (normalized observations). They never write to the database.
+- Layering is enforced in CI (`go-arch-lint` or `depguard` rules): `domain` imports only the standard library; `app` imports `domain` and `ports`; only `cmd` imports `adapters`.
+- Every driven port has an in-memory fake in `internal/adapters/fake` used by use-case tests.
 
 ## 5. Data model
 
@@ -417,35 +450,35 @@ Any revision change marks current plans `stale`. Opening a stale plan computes t
 
 ## 8. API surface
 
-JSON over HTTPS. All trainer routes derive `trainerId` from the session; it never appears in the path or body. Mutations accept `If-Match: <revision>` and an `Idempotency-Key` header.
+JSON over HTTPS, defined in `api/openapi.yaml` (§4.2). Paths below are relative to `/api/v1`. All trainer routes derive `trainerId` from the session; it never appears in the path or body. Mutations accept `If-Match: <revision>` and an `Idempotency-Key` header.
 
-| Method    | Path                                        | Purpose                                                         |
-| --------- | ------------------------------------------- | --------------------------------------------------------------- |
-| POST      | `/api/session`                              | Login: `{profileId, pin}`                                       |
-| POST      | `/api/session/switch`                       | Switch: `{profileId, pin}` (revokes current session)            |
-| DELETE    | `/api/session`                              | Logout                                                          |
-| POST      | `/api/pin/reset`                            | `{profileId, code, newPin}`                                     |
-| GET/PATCH | `/api/me`                                   | Profile, capacity, reported count, goals, preferences           |
-| GET/PUT   | `/api/rules` · `/api/rules/inspect?group=`  | Rules and effective-minimum inspector                           |
-| GET/PUT   | `/api/favorite-species`                     |                                                                 |
-| CRUD      | `/api/teams`                                | Manual teams                                                    |
-| GET       | `/api/records?filter=` · `/api/records/:id` | Collection, record detail with observations                     |
-| PATCH     | `/api/records/:id`                          | Manual corrections / protection                                 |
-| POST      | `/api/records/confirm-attributes`           | Bulk attribute confirmation (§7.3)                              |
-| POST      | `/api/imports`                              | Upload + stage (multipart)                                      |
-| GET       | `/api/imports/:id`                          | Staged preview                                                  |
-| PUT       | `/api/imports/:id/mapping`                  | Column mapping                                                  |
-| POST      | `/api/imports/:id/commit` · `/discard`      |                                                                 |
-| GET/POST  | `/api/duplicate-reviews` · `/:id/resolve`   |                                                                 |
-| POST      | `/api/plans`                                | Compute plan for target                                         |
-| GET       | `/api/plans/current`                        | Current plan (+ stale flag/diff)                                |
-| POST      | `/api/transfers`                            | Confirm transfers `{recordIds, planId?}`                        |
-| POST      | `/api/transfers/:eventId/undo`              |                                                                 |
-| GET       | `/api/history`                              | Transfer/import/undo events                                     |
-| GET       | `/api/backup` · POST `/api/restore`         | §13                                                             |
-| —         | Admin (loopback only)                       | profiles, reset codes, launch-at-login, backups of all profiles |
+| Method    | Path                                  | Purpose                                                         |
+| --------- | ------------------------------------- | --------------------------------------------------------------- |
+| POST      | `/session`                            | Login: `{profileId, pin}`                                       |
+| POST      | `/session/switch`                     | Switch: `{profileId, pin}` (revokes current session)            |
+| DELETE    | `/session`                            | Logout                                                          |
+| POST      | `/pin/reset`                          | `{profileId, code, newPin}`                                     |
+| GET/PATCH | `/me`                                 | Profile, capacity, reported count, goals, preferences           |
+| GET/PUT   | `/rules` · `/rules/inspect?group=`    | Rules and effective-minimum inspector                           |
+| GET/PUT   | `/favorite-species`                   |                                                                 |
+| CRUD      | `/teams`                              | Manual teams                                                    |
+| GET       | `/records?filter=` · `/records/:id`   | Collection, record detail with observations                     |
+| PATCH     | `/records/:id`                        | Manual corrections / protection                                 |
+| POST      | `/records/confirm-attributes`         | Bulk attribute confirmation (§7.3)                              |
+| POST      | `/imports`                            | Upload + stage (multipart)                                      |
+| GET       | `/imports/:id`                        | Staged preview                                                  |
+| PUT       | `/imports/:id/mapping`                | Column mapping                                                  |
+| POST      | `/imports/:id/commit` · `/discard`    |                                                                 |
+| GET/POST  | `/duplicate-reviews` · `/:id/resolve` |                                                                 |
+| POST      | `/plans`                              | Compute plan for target                                         |
+| GET       | `/plans/current`                      | Current plan (+ stale flag/diff)                                |
+| POST      | `/transfers`                          | Confirm transfers `{recordIds, planId?}`                        |
+| POST      | `/transfers/:eventId/undo`            |                                                                 |
+| GET       | `/history`                            | Transfer/import/undo events                                     |
+| GET       | `/backup` · POST `/restore`           | §13                                                             |
+| —         | Admin (loopback only)                 | profiles, reset codes, launch-at-login, backups of all profiles |
 
-V2 adds `/api/screenshots/*`; V3 adds `/api/battle/*`, `/api/upgrades/*`, `/api/rosters/*`.
+V2 adds `/screenshots/*`; V3 adds `/battle/*`, `/upgrades/*`, `/rosters/*`.
 
 Error envelope (all non-2xx):
 
@@ -536,7 +569,7 @@ Structured JSON logs to a rotating file under the app data dir. Every request ha
 
 ### 10.5 Host unavailable
 
-Client checks `/api/health` on focus and before mutations. If unreachable: banner "CatchKeep isn't reachable — is the MacBook on and awake?"; mutations disabled; nothing queued offline **[Proposed]** (avoids confirming transfers against an unknown server state).
+Client checks `/health` on focus and before mutations. If unreachable: banner "CatchKeep isn't reachable — is the MacBook on and awake?"; mutations disabled; nothing queued offline **[Proposed]** (avoids confirming transfers against an unknown server state).
 
 ---
 
@@ -655,7 +688,13 @@ UI English for V1. Search strings and screenshot parsing are English-only; keep 
 
 ### 15.1 Tooling **[Proposed]**
 
-Vitest (unit/integration), fast-check (property-based), Playwright with WebKit + iPhone device profiles (E2E), a benchmark runner (tinybench), GitHub Actions or local CI script. Every commit keeps lint, format, type-check and tests green.
+Backend and frontend each have their own tooling and CI job; a change to one never requires the other to build.
+
+| Side       | Tooling                                                                                                                           |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Backend    | `go test -race` with coverage, `pgregory.net/rapid` (property-based), `testing.B` (benchmarks), real SQLite for integration tests |
+| Frontend   | Vitest + Testing Library, Playwright (WebKit, iPhone profiles) against a mock server generated from the contract                  |
+| End to end | Playwright against the real backend binary with a seeded SQLite database and the built frontend                                   |
 
 ### 15.2 Unit tests
 
@@ -670,7 +709,7 @@ Vitest (unit/integration), fast-check (property-based), Playwright with WebKit +
 ### 15.3 Planner tests
 
 - **Brute-force oracle:** for random instances ≤ 16 eligible records, Phase A optimum equals exhaustive search; Phase B cost equals exhaustive minimum.
-- **Property-based invariants** (fast-check, thousands of random instances):
+- **Property-based invariants** (rapid, thousands of random instances):
   - Every returned plan satisfies all floor constraints (independent checker).
   - No protected record is ever recommended.
   - `recommended = min(T, maxFeasible)`; `shortfall` correct.
@@ -757,14 +796,14 @@ Benchmarks (§14.1) run in CI on demand and before each release; results recorde
 
 ## 17. Implementation sequence (V1)
 
-| Milestone | Scope                                                                                                                      | Done when                                                                                            |
-| --------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| M0        | Repo, tooling, CI, lint/format/type-check, empty hexagonal skeleton, SQLite + migrations                                   | Green pipeline, health endpoint                                                                      |
-| M1        | Host + HTTPS on LAN, profiles, PIN auth, sessions, switching, admin console, reset codes                                   | Security tests §15.5 pass; device check on each iPhone (OD-04)                                       |
-| M2        | CSV import: Poke Genie adapter, mapping, staging, preview, observations, duplicate review, incremental commit              | Import of the real family CSVs; measure how many records end up protected by unknowns (OD-03, OD-11) |
-| M3        | Setup wizard, rules engine, capacity bands, overrides, favorite species, manual protection/teams, rule inspector           | A1, A2, A12 pass                                                                                     |
-| M4        | Planner (Phase A/B, tie-break, timeout, verifier), target arithmetic, upgrade comparison, benchmark                        | §15.3 passes; A4, A5, A11 pass; OD-09 resolved                                                       |
-| M5        | Checklist, search strings + collision check, transfer confirm (single/bulk), history, undo, staleness + diff, full refresh | A6, A9, A13 pass                                                                                     |
-| M6        | Backup/restore, launch at login, rolling backups, polish, manual device test pass                                          | V1 exit criteria met                                                                                 |
+| Milestone | Scope                                                                                                                                                                                               | Done when                                                                                            |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| M0        | Contract skeleton (`api/openapi.yaml`); Go backend skeleton (hexagonal layout, layering check, SQLite + migrations, health endpoint); frontend skeleton (Vite + generated client); separate CI jobs | Both CI jobs green independently; frontend shows health from a mock and from the real backend        |
+| M1        | Host + HTTPS on LAN, profiles, PIN auth, sessions, switching, admin console, reset codes                                                                                                            | Security tests §15.5 pass; device check on each iPhone (OD-04)                                       |
+| M2        | CSV import: Poke Genie adapter, mapping, staging, preview, observations, duplicate review, incremental commit                                                                                       | Import of the real family CSVs; measure how many records end up protected by unknowns (OD-03, OD-11) |
+| M3        | Setup wizard, rules engine, capacity bands, overrides, favorite species, manual protection/teams, rule inspector                                                                                    | A1, A2, A12 pass                                                                                     |
+| M4        | Planner (Phase A/B, tie-break, timeout, verifier), target arithmetic, upgrade comparison, benchmark                                                                                                 | §15.3 passes; A4, A5, A11 pass; OD-09 resolved                                                       |
+| M5        | Checklist, search strings + collision check, transfer confirm (single/bulk), history, undo, staleness + diff, full refresh                                                                          | A6, A9, A13 pass                                                                                     |
+| M6        | Backup/restore, launch at login, rolling backups, polish, manual device test pass                                                                                                                   | V1 exit criteria met                                                                                 |
 
 V2 and V3 follow the same pattern: resolve their open decisions (OD-05, OD-06) first, then build against §11 and §12.
