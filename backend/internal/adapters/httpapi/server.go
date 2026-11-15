@@ -14,9 +14,11 @@ const BaseURL = "/api/v1"
 
 // Services are the use cases the HTTP API exposes.
 type Services struct {
-	Health   *app.Health
-	Profiles *app.Profiles
-	Sessions *app.Sessions
+	Health     *app.Health
+	Profiles   *app.Profiles
+	Sessions   *app.Sessions
+	Imports    *app.Imports
+	Collection *app.Collection
 
 	// SecureCookies marks the session cookie Secure. Enable it whenever the
 	// API is served over HTTPS.

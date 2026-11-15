@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/helmedeiros/catchkeep/backend/internal/adapters/csvimport"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/httpapi"
 	"github.com/helmedeiros/catchkeep/backend/internal/app"
 	"github.com/helmedeiros/catchkeep/backend/internal/app/apptest"
@@ -24,10 +25,13 @@ func newAPI(t *testing.T) *apiClient {
 	trainers := apptest.NewTrainers()
 	clock := apptest.NewFixedClock(time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC))
 	hasher := apptest.PlainHasher{}
+	collection := apptest.NewCollectionStore()
 	return &apiClient{t: t, handler: httpapi.NewHandler(httpapi.Services{
-		Health:   app.NewHealth("test"),
-		Profiles: app.NewProfiles(trainers, hasher, ulidLike{}, clock),
-		Sessions: app.NewSessions(trainers, apptest.NewSessionStore(), hasher, apptest.NewSequentialTokens(), clock),
+		Health:     app.NewHealth("test"),
+		Profiles:   app.NewProfiles(trainers, hasher, ulidLike{}, clock),
+		Sessions:   app.NewSessions(trainers, apptest.NewSessionStore(), hasher, apptest.NewSequentialTokens(), clock),
+		Imports:    app.NewImports(csvimport.NewPokeGenie(time.UTC), collection, collection, ulidLike{}, clock),
+		Collection: app.NewCollection(collection),
 	})}
 }
 
@@ -47,12 +51,17 @@ func (ulidLike) NewID() string {
 
 func (c *apiClient) do(method, path, body string) *httptest.ResponseRecorder {
 	c.t.Helper()
+	return c.doWithType(method, path, body, "application/json")
+}
+
+func (c *apiClient) doWithType(method, path, body, contentType string) *httptest.ResponseRecorder {
+	c.t.Helper()
 	var req *http.Request
 	if body == "" {
 		req = httptest.NewRequestWithContext(c.t.Context(), method, path, http.NoBody)
 	} else {
 		req = httptest.NewRequestWithContext(c.t.Context(), method, path, strings.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Type", contentType)
 	}
 	if c.cookie != nil {
 		req.AddCookie(c.cookie)
