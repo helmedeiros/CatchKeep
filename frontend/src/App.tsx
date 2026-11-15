@@ -1,3 +1,4 @@
+import { Toaster } from "sonner";
 import { Home } from "./home/Home";
 import { HostStatus } from "./host/HostStatus";
 import { SignedOut } from "./session/SignedOut";
@@ -22,6 +23,7 @@ export default function App() {
           <HostStatus />
         </section>
       </main>
+      <Toaster position="top-center" richColors />
     </div>
   );
 }
