@@ -1,0 +1,72 @@
+openapi: 3.1.0
+info:
+  title: CatchKeep API
+  version: 0.1.0
+  description: >-
+    Profile-scoped API for CatchKeep. Every trainer route derives the trainer
+    from the session; trainer IDs never appear in paths or bodies.
+servers:
+  - url: /api/v1
+security: []
+tags:
+  - name: system
+    description: Host status.
+paths:
+  /health:
+    get:
+      tags: [system]
+      operationId: getHealth
+      summary: Report whether the API is up.
+      responses:
+        "200":
+          description: The API is up.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        default:
+          $ref: "#/components/responses/Error"
+components:
+  schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status, version]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        version:
+          type: string
+          description: Backend build version.
+          examples: [0.1.0]
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, correlationId]
+          properties:
+            code:
+              type: string
+              description: Stable machine-readable code (spec §10.2).
+              examples: [VALIDATION_FAILED]
+            message:
+              type: string
+              description: Human-readable explanation for the trainer.
+            details:
+              type: object
+              additionalProperties: true
+            correlationId:
+              type: string
+              description: Identifier to find the request in host logs.
+  responses:
+    Error:
+      description: Error envelope (spec §10.2).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"

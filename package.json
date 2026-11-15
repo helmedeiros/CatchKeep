@@ -10,13 +10,15 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint:md": "markdownlint-cli2",
-    "check": "npm run format:check && npm run lint:md && npm run lint:sh",
+    "check": "npm run format:check && npm run lint:md && npm run lint:sh && npm run lint:api",
     "prepare": "husky",
-    "lint:sh": "shellcheck scripts/*.sh && shellcheck -s sh .husky/pre-commit .husky/commit-msg"
+    "lint:sh": "shellcheck scripts/*.sh && shellcheck -s sh .husky/pre-commit .husky/commit-msg",
+    "lint:api": "REDOCLY_TELEMETRY=off REDOCLY_SUPPRESS_UPDATE_NOTICE=true redocly lint api/openapi.yaml"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
     "@commitlint/config-conventional": "21.2.4",
+    "@redocly/cli": "2.78.0",
     "husky": "9.1.7",
     "markdownlint-cli2": "0.24.1",
     "prettier": "3.10.1"

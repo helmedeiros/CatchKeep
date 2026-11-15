@@ -14,7 +14,7 @@ Requires Node.js 24 (`.nvmrc`).
 
 ```sh
 npm install   # also installs git hooks
-npm run check # formatting, markdown lint, shellcheck
+npm run check # formatting, markdown lint, shellcheck, OpenAPI lint
 ```
 
 ### Workflow
