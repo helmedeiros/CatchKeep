@@ -135,6 +135,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/imports/{importId}/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: components["parameters"]["ImportId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer whether held-back rows are Pokémon already collected.
+         * @description For each row, "same" names the candidate it is (its newer readings are added to that Pokémon on commit) and "different" adds it as a new Pokémon. A later answer for a row replaces the earlier one. All answers are applied, or none.
+         */
+        post: operations["answerPossibleMatches"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/collection": {
         parameters: {
             query?: never;
@@ -199,7 +221,7 @@ export interface components {
          */
         TriState: "yes" | "no" | "unknown";
         Pokemon: {
-            /** @description Stable record id (ULID). */
+            /** @description Stable record id (ULID). A row of an import that is not collected yet has the id "row-N". */
             id: string;
             /** @example Metagross */
             species: string;
@@ -248,13 +270,49 @@ export interface components {
             totalRows: number;
             /** @description Rows that will be added (or were added, once committed). */
             newCount: number;
-            /** @description Rows that might be Pokémon already in the collection; held for review. */
+            /** @description Pokémon already collected that get (or got) this import's newer readings. */
+            updatedCount: number;
+            /** @description Unanswered rows that might be Pokémon already collected; held back. */
             possibleMatchCount: number;
+            /** @description Rows that might be Pokémon already collected, with their answers. Empty once committed. */
+            possibleMatches: components["schemas"]["PossibleMatch"][];
             invalidRows: components["schemas"]["InvalidRow"][];
             /** @description Columns this importer does not use. */
             ignoredColumns: string[];
             /** @description Features this export cannot establish; they stay unknown. */
             unknownFields: string[];
+        };
+        PossibleMatch: {
+            /** @description 1-based line number in the file, counting the header. */
+            row: number;
+            incoming: components["schemas"]["Pokemon"];
+            candidates: components["schemas"]["MatchCandidate"][];
+            /** @description One candidate, with species, form, gender, IVs and catch date all known and equal. Safe to confirm in bulk. */
+            exact: boolean;
+            /** @enum {string} */
+            answer: "pending" | "same" | "different";
+            /** @description The candidate's pokemon id when the answer is "same". */
+            sameAs?: string;
+        };
+        MatchCandidate: {
+            /**
+             * @description A Pokémon already collected, or an earlier row of the same file.
+             * @enum {string}
+             */
+            origin: "collection" | "import";
+            /** @description The earlier row's line number, for origin "import". */
+            row?: number;
+            pokemon: components["schemas"]["Pokemon"];
+        };
+        MatchAnswers: {
+            answers: components["schemas"]["MatchAnswer"][];
+        };
+        MatchAnswer: {
+            row: number;
+            /** @enum {string} */
+            answer: "same" | "different";
+            /** @description Required when the answer is "same"; a candidate's pokemon id. */
+            sameAs?: string;
         };
         InvalidRow: {
             /** @description 1-based line number in the file, counting the header. */
@@ -518,6 +576,37 @@ export interface operations {
             401: components["responses"]["Error"];
             404: components["responses"]["Error"];
             409: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    answerPossibleMatches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: components["parameters"]["ImportId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchAnswers"];
+            };
+        };
+        responses: {
+            /** @description Answers saved; the updated preview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };
     };

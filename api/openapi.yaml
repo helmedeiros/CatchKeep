@@ -220,6 +220,43 @@ paths:
           $ref: "#/components/responses/Error"
         default:
           $ref: "#/components/responses/Error"
+  /imports/{importId}/answers:
+    parameters:
+      - $ref: "#/components/parameters/ImportId"
+    post:
+      tags: [imports]
+      operationId: answerPossibleMatches
+      summary: Answer whether held-back rows are Pokémon already collected.
+      description: >-
+        For each row, "same" names the candidate it is (its newer readings are
+        added to that Pokémon on commit) and "different" adds it as a new
+        Pokémon. A later answer for a row replaces the earlier one. All
+        answers are applied, or none.
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MatchAnswers"
+      responses:
+        "200":
+          description: Answers saved; the updated preview.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportPreview"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
   /collection:
     get:
       tags: [collection]
@@ -329,7 +366,9 @@ components:
       properties:
         id:
           type: string
-          description: Stable record id (ULID).
+          description: >-
+            Stable record id (ULID). A row of an import that is not collected
+            yet has the id "row-N".
         species:
           type: string
           examples: [Metagross]
@@ -431,7 +470,9 @@ components:
           source,
           totalRows,
           newCount,
+          updatedCount,
           possibleMatchCount,
+          possibleMatches,
           invalidRows,
           ignoredColumns,
           unknownFields,
@@ -452,10 +493,19 @@ components:
           type: integer
           minimum: 0
           description: Rows that will be added (or were added, once committed).
+        updatedCount:
+          type: integer
+          minimum: 0
+          description: Pokémon already collected that get (or got) this import's newer readings.
         possibleMatchCount:
           type: integer
           minimum: 0
-          description: Rows that might be Pokémon already in the collection; held for review.
+          description: Unanswered rows that might be Pokémon already collected; held back.
+        possibleMatches:
+          type: array
+          description: Rows that might be Pokémon already collected, with their answers. Empty once committed.
+          items:
+            $ref: "#/components/schemas/PossibleMatch"
         invalidRows:
           type: array
           items:
@@ -470,6 +520,73 @@ components:
           description: Features this export cannot establish; they stay unknown.
           items:
             type: string
+    PossibleMatch:
+      type: object
+      additionalProperties: false
+      required: [row, incoming, candidates, exact, answer]
+      properties:
+        row:
+          type: integer
+          minimum: 1
+          description: 1-based line number in the file, counting the header.
+        incoming:
+          $ref: "#/components/schemas/Pokemon"
+        candidates:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/MatchCandidate"
+        exact:
+          type: boolean
+          description: >-
+            One candidate, with species, form, gender, IVs and catch date all
+            known and equal. Safe to confirm in bulk.
+        answer:
+          type: string
+          enum: [pending, same, different]
+        sameAs:
+          type: string
+          description: The candidate's pokemon id when the answer is "same".
+    MatchCandidate:
+      type: object
+      additionalProperties: false
+      required: [origin, pokemon]
+      properties:
+        origin:
+          type: string
+          enum: [collection, import]
+          description: A Pokémon already collected, or an earlier row of the same file.
+        row:
+          type: integer
+          minimum: 1
+          description: The earlier row's line number, for origin "import".
+        pokemon:
+          $ref: "#/components/schemas/Pokemon"
+    MatchAnswers:
+      type: object
+      additionalProperties: false
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items:
+            $ref: "#/components/schemas/MatchAnswer"
+    MatchAnswer:
+      type: object
+      additionalProperties: false
+      required: [row, answer]
+      properties:
+        row:
+          type: integer
+          minimum: 1
+        answer:
+          type: string
+          enum: [same, different]
+        sameAs:
+          type: string
+          description: Required when the answer is "same"; a candidate's pokemon id.
     InvalidRow:
       type: object
       additionalProperties: false

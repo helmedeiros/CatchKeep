@@ -65,6 +65,42 @@ func (e ImportPreviewStatus) Valid() bool {
 	}
 }
 
+// Defines values for MatchAnswerAnswer.
+const (
+	MatchAnswerAnswerDifferent MatchAnswerAnswer = "different"
+	MatchAnswerAnswerSame      MatchAnswerAnswer = "same"
+)
+
+// Valid indicates whether the value is a known member of the MatchAnswerAnswer enum.
+func (e MatchAnswerAnswer) Valid() bool {
+	switch e {
+	case MatchAnswerAnswerDifferent:
+		return true
+	case MatchAnswerAnswerSame:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MatchCandidateOrigin.
+const (
+	MatchCandidateOriginCollection MatchCandidateOrigin = "collection"
+	MatchCandidateOriginImport     MatchCandidateOrigin = "import"
+)
+
+// Valid indicates whether the value is a known member of the MatchCandidateOrigin enum.
+func (e MatchCandidateOrigin) Valid() bool {
+	switch e {
+	case MatchCandidateOriginCollection:
+		return true
+	case MatchCandidateOriginImport:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PokemonGender.
 const (
 	Female PokemonGender = "female"
@@ -77,6 +113,27 @@ func (e PokemonGender) Valid() bool {
 	case Female:
 		return true
 	case Male:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PossibleMatchAnswer.
+const (
+	PossibleMatchAnswerDifferent PossibleMatchAnswer = "different"
+	PossibleMatchAnswerPending   PossibleMatchAnswer = "pending"
+	PossibleMatchAnswerSame      PossibleMatchAnswer = "same"
+)
+
+// Valid indicates whether the value is a known member of the PossibleMatchAnswer enum.
+func (e PossibleMatchAnswer) Valid() bool {
+	switch e {
+	case PossibleMatchAnswerDifferent:
+		return true
+	case PossibleMatchAnswerPending:
+		return true
+	case PossibleMatchAnswerSame:
 		return true
 	default:
 		return false
@@ -194,14 +251,20 @@ type ImportPreview struct {
 	// NewCount Rows that will be added (or were added, once committed).
 	NewCount int `json:"newCount"`
 
-	// PossibleMatchCount Rows that might be Pokémon already in the collection; held for review.
-	PossibleMatchCount int                 `json:"possibleMatchCount"`
-	Source             ImportPreviewSource `json:"source"`
-	Status             ImportPreviewStatus `json:"status"`
-	TotalRows          int                 `json:"totalRows"`
+	// PossibleMatchCount Unanswered rows that might be Pokémon already collected; held back.
+	PossibleMatchCount int `json:"possibleMatchCount"`
+
+	// PossibleMatches Rows that might be Pokémon already collected, with their answers. Empty once committed.
+	PossibleMatches []PossibleMatch     `json:"possibleMatches"`
+	Source          ImportPreviewSource `json:"source"`
+	Status          ImportPreviewStatus `json:"status"`
+	TotalRows       int                 `json:"totalRows"`
 
 	// UnknownFields Features this export cannot establish; they stay unknown.
 	UnknownFields []string `json:"unknownFields"`
+
+	// UpdatedCount Pokémon already collected that get (or got) this import's newer readings.
+	UpdatedCount int `json:"updatedCount"`
 }
 
 // ImportPreviewSource defines model for ImportPreview.Source.
@@ -217,6 +280,36 @@ type InvalidRow struct {
 	// Row 1-based line number in the file, counting the header.
 	Row int `json:"row"`
 }
+
+// MatchAnswer defines model for MatchAnswer.
+type MatchAnswer struct {
+	Answer MatchAnswerAnswer `json:"answer"`
+	Row    int               `json:"row"`
+
+	// SameAs Required when the answer is "same"; a candidate's pokemon id.
+	SameAs *string `json:"sameAs,omitempty"`
+}
+
+// MatchAnswerAnswer defines model for MatchAnswer.Answer.
+type MatchAnswerAnswer string
+
+// MatchAnswers defines model for MatchAnswers.
+type MatchAnswers struct {
+	Answers []MatchAnswer `json:"answers"`
+}
+
+// MatchCandidate defines model for MatchCandidate.
+type MatchCandidate struct {
+	// Origin A Pokémon already collected, or an earlier row of the same file.
+	Origin  MatchCandidateOrigin `json:"origin"`
+	Pokemon Pokemon              `json:"pokemon"`
+
+	// Row The earlier row's line number, for origin "import".
+	Row *int `json:"row,omitempty"`
+}
+
+// MatchCandidateOrigin A Pokémon already collected, or an earlier row of the same file.
+type MatchCandidateOrigin string
 
 // Me defines model for Me.
 type Me struct {
@@ -259,7 +352,7 @@ type Pokemon struct {
 	Gender *PokemonGender `json:"gender,omitempty"`
 	Hp     *int           `json:"hp,omitempty"`
 
-	// Id Stable record id (ULID).
+	// Id Stable record id (ULID). A row of an import that is not collected yet has the id "row-N".
 	Id    string   `json:"id"`
 	Iv    *IVs     `json:"iv,omitempty"`
 	Level *float32 `json:"level,omitempty"`
@@ -270,6 +363,25 @@ type Pokemon struct {
 
 // PokemonGender defines model for Pokemon.Gender.
 type PokemonGender string
+
+// PossibleMatch defines model for PossibleMatch.
+type PossibleMatch struct {
+	Answer     PossibleMatchAnswer `json:"answer"`
+	Candidates []MatchCandidate    `json:"candidates"`
+
+	// Exact One candidate, with species, form, gender, IVs and catch date all known and equal. Safe to confirm in bulk.
+	Exact    bool    `json:"exact"`
+	Incoming Pokemon `json:"incoming"`
+
+	// Row 1-based line number in the file, counting the header.
+	Row int `json:"row"`
+
+	// SameAs The candidate's pokemon id when the answer is "same".
+	SameAs *string `json:"sameAs,omitempty"`
+}
+
+// PossibleMatchAnswer defines model for PossibleMatch.Answer.
+type PossibleMatchAnswer string
 
 // ProfileId Stable profile identifier (ULID).
 //
@@ -306,6 +418,9 @@ type TriState string
 // ImportId defines model for ImportId.
 type ImportId = string
 
+// AnswerPossibleMatchesJSONRequestBody defines body for AnswerPossibleMatches for application/json ContentType.
+type AnswerPossibleMatchesJSONRequestBody = MatchAnswers
+
 // CreateProfileJSONRequestBody defines body for CreateProfile for application/json ContentType.
 type CreateProfileJSONRequestBody = NewProfile
 
@@ -326,6 +441,9 @@ type ServerInterface interface {
 	// GetImport The preview of a staged or committed import.
 	// (GET /imports/{importId})
 	GetImport(w http.ResponseWriter, r *http.Request, importId ImportId)
+	// AnswerPossibleMatches Answer whether held-back rows are Pokémon already collected.
+	// (POST /imports/{importId}/answers)
+	AnswerPossibleMatches(w http.ResponseWriter, r *http.Request, importId ImportId)
 	// CommitImport Add the staged Pokémon to the collection.
 	// (POST /imports/{importId}/commit)
 	CommitImport(w http.ResponseWriter, r *http.Request, importId ImportId)
@@ -414,6 +532,32 @@ func (siw *ServerInterfaceWrapper) GetImport(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetImport(w, r, importId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AnswerPossibleMatches operation middleware
+func (siw *ServerInterfaceWrapper) AnswerPossibleMatches(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "importId" -------------
+	var importId ImportId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "importId", r.PathValue("importId"), &importId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "importId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AnswerPossibleMatches(w, r, importId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -648,6 +792,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports", wrapper.StageImport)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/imports/{importId}", wrapper.GetImport)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{importId}/commit", wrapper.CommitImport)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{importId}/answers", wrapper.AnswerPossibleMatches)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/collection", wrapper.ListCollection)
 
 	return m
@@ -882,6 +1027,102 @@ type GetImportdefaultJSONResponse struct {
 }
 
 func (response GetImportdefaultJSONResponse) VisitGetImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnswerPossibleMatchesRequestObject struct {
+	ImportId ImportId `json:"importId"`
+	Body     *AnswerPossibleMatchesJSONRequestBody
+}
+
+type AnswerPossibleMatchesResponseObject interface {
+	VisitAnswerPossibleMatchesResponse(w http.ResponseWriter) error
+}
+
+type AnswerPossibleMatches200JSONResponse ImportPreview
+
+func (response AnswerPossibleMatches200JSONResponse) VisitAnswerPossibleMatchesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnswerPossibleMatches401JSONResponse struct{ ErrorJSONResponse }
+
+func (response AnswerPossibleMatches401JSONResponse) VisitAnswerPossibleMatchesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnswerPossibleMatches404JSONResponse Error
+
+func (response AnswerPossibleMatches404JSONResponse) VisitAnswerPossibleMatchesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnswerPossibleMatches409JSONResponse Error
+
+func (response AnswerPossibleMatches409JSONResponse) VisitAnswerPossibleMatchesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnswerPossibleMatches422JSONResponse Error
+
+func (response AnswerPossibleMatches422JSONResponse) VisitAnswerPossibleMatchesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnswerPossibleMatchesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response AnswerPossibleMatchesdefaultJSONResponse) VisitAnswerPossibleMatchesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -1290,6 +1531,9 @@ type StrictServerInterface interface {
 	// GetImport The preview of a staged or committed import.
 	// (GET /imports/{importId})
 	GetImport(ctx context.Context, request GetImportRequestObject) (GetImportResponseObject, error)
+	// AnswerPossibleMatches Answer whether held-back rows are Pokémon already collected.
+	// (POST /imports/{importId}/answers)
+	AnswerPossibleMatches(ctx context.Context, request AnswerPossibleMatchesRequestObject) (AnswerPossibleMatchesResponseObject, error)
 	// CommitImport Add the staged Pokémon to the collection.
 	// (POST /imports/{importId}/commit)
 	CommitImport(ctx context.Context, request CommitImportRequestObject) (CommitImportResponseObject, error)
@@ -1442,6 +1686,39 @@ func (sh *strictHandler) GetImport(w http.ResponseWriter, r *http.Request, impor
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetImportResponseObject); ok {
 		if err := validResponse.VisitGetImportResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AnswerPossibleMatches operation middleware
+func (sh *strictHandler) AnswerPossibleMatches(w http.ResponseWriter, r *http.Request, importId ImportId) {
+	var request AnswerPossibleMatchesRequestObject
+
+	request.ImportId = importId
+
+	var body AnswerPossibleMatchesJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AnswerPossibleMatches(ctx, request.(AnswerPossibleMatchesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AnswerPossibleMatches")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AnswerPossibleMatchesResponseObject); ok {
+		if err := validResponse.VisitAnswerPossibleMatchesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

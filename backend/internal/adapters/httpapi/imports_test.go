@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -32,9 +33,20 @@ type preview struct {
 	Status             string
 	TotalRows          int
 	NewCount           int
+	UpdatedCount       int
 	PossibleMatchCount int
-	InvalidRows        []struct{ Row int }
-	UnknownFields      []string
+	PossibleMatches    []struct {
+		Row        int
+		Exact      bool
+		Answer     string
+		Incoming   struct{ ID, Species string }
+		Candidates []struct {
+			Origin  string
+			Pokemon struct{ ID, Species string }
+		}
+	}
+	InvalidRows   []struct{ Row int }
+	UnknownFields []string
 }
 
 func decode[T any](t *testing.T, body []byte) T {
@@ -122,4 +134,56 @@ func TestImport_RejectsUnrecognizedAndOversizedFiles(t *testing.T) {
 
 	huge := fixture(t) + strings.Repeat("x", 11<<20)
 	wantStatus(t, api.doWithType(http.MethodPost, "/api/v1/imports", huge, "text/csv"), http.StatusRequestEntityTooLarge)
+}
+
+func TestImport_AnswersDecideWhetherHeldBackRowsUpdateOrAdd(t *testing.T) {
+	api := signedIn(t, "Ash")
+	first := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+first.ID+"/commit", ""), http.StatusOK)
+	again := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
+	if len(again.PossibleMatches) != 4 {
+		t.Fatalf("possible matches = %+v", again.PossibleMatches)
+	}
+	m0, m1 := again.PossibleMatches[0], again.PossibleMatches[1]
+	if m0.Answer != "pending" || m0.Incoming.ID != fmt.Sprintf("row-%d", m0.Row) || m0.Candidates[0].Origin != "collection" {
+		t.Fatalf("first match = %+v", m0)
+	}
+
+	body := fmt.Sprintf(`{"answers":[{"row":%d,"answer":"same","sameAs":%q},{"row":%d,"answer":"different"}]}`,
+		m0.Row, m0.Candidates[0].Pokemon.ID, m1.Row)
+	answered := api.do(http.MethodPost, "/api/v1/imports/"+again.ID+"/answers", body)
+	wantStatus(t, answered, http.StatusOK)
+	if got := decode[preview](t, answered.Body.Bytes()); got.UpdatedCount != 1 || got.NewCount != 1 || got.PossibleMatchCount != 2 {
+		t.Fatalf("answered = %+v", got)
+	}
+
+	committed := decode[preview](t, api.do(http.MethodPost, "/api/v1/imports/"+again.ID+"/commit", "").Body.Bytes())
+	if committed.UpdatedCount != 1 || committed.NewCount != 1 || len(committed.PossibleMatches) != 0 {
+		t.Fatalf("committed = %+v", committed)
+	}
+	if c := decode[struct{ Total int }](t, api.do(http.MethodGet, "/api/v1/collection", "").Body.Bytes()); c.Total != 5 {
+		t.Fatalf("collection has %d, want 4 + 1 different", c.Total)
+	}
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+again.ID+"/answers", body), http.StatusConflict)
+}
+
+func TestImport_InvalidAnswersAreRejected(t *testing.T) {
+	api := signedIn(t, "Ash")
+	first := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+first.ID+"/commit", ""), http.StatusOK)
+	again := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
+	row := again.PossibleMatches[0].Row
+
+	for name, body := range map[string]string{
+		"same without a candidate": fmt.Sprintf(`{"answers":[{"row":%d,"answer":"same"}]}`, row),
+		"unknown candidate":        fmt.Sprintf(`{"answers":[{"row":%d,"answer":"same","sameAs":"nope"}]}`, row),
+		"not a held-back row":      `{"answers":[{"row":999,"answer":"different"}]}`,
+	} {
+		rec := api.do(http.MethodPost, "/api/v1/imports/"+again.ID+"/answers", body)
+		wantStatus(t, rec, http.StatusUnprocessableEntity)
+		if code := errorCode(t, rec); code != "VALIDATION_FAILED" {
+			t.Errorf("%s: code = %q", name, code)
+		}
+	}
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/unknown/answers", `{"answers":[{"row":2,"answer":"different"}]}`), http.StatusNotFound)
 }

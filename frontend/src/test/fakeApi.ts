@@ -1,3 +1,4 @@
+import type { components } from "../api/schema.gen";
 import { jsonResponse } from "./render";
 
 interface Profile {
@@ -25,7 +26,7 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
     string,
     {
       rows: Array<{ species: string; cp: number; lucky: boolean }>;
-      status: string;
+      status: "staged" | "committed";
     }
   >();
   const err = (status: number, code: string, message: string) =>
@@ -164,7 +165,7 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
     return err(404, "NOT_FOUND", `no fake for ${req.method} ${path}`);
   };
 
-  function preview(id: string) {
+  function preview(id: string): components["schemas"]["ImportPreview"] {
     const imp = imports.get(id);
     return {
       id,
@@ -172,7 +173,9 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
       source: "poke-genie",
       totalRows: imp?.rows.length ?? 0,
       newCount: imp?.rows.length ?? 0,
+      updatedCount: 0,
       possibleMatchCount: 0,
+      possibleMatches: [],
       invalidRows: [],
       ignoredColumns: ["Dust"],
       unknownFields: [
