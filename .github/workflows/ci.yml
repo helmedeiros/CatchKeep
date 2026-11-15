@@ -13,8 +13,28 @@ permissions:
   contents: read
 
 jobs:
-  quality:
-    name: Quality gates
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'api/**'
+              - '.github/workflows/ci.yml'
+
+  repo:
+    name: Repo checks
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -40,3 +60,43 @@ jobs:
             echo "PR title/description must not contain AI attribution" >&2
             exit 1
           fi
+
+  backend:
+    name: Backend checks
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - run: go mod verify
+      - name: go.mod and go.sum are tidy
+        run: go mod tidy -diff
+      - run: make check
+      - run: make build
+
+  gate:
+    name: Quality gates
+    if: always()
+    needs: [changes, repo, backend]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: All required jobs passed or were skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "a required job ended with: $r" >&2; exit 1 ;;
+            esac
+          done
