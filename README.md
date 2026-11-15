@@ -15,6 +15,7 @@ npm install   # also installs git hooks
 npm run check # formatting, markdown lint, shellcheck, OpenAPI lint
 make -C backend check # gofmt/goimports, go vet, golangci-lint, go test -race
 npm --prefix frontend install && npm --prefix frontend run check # tsc, oxlint, vitest
+scripts/smoke.sh backend/bin/catchkeep frontend/dist # after building both: real binary + bundle
 ```
 
 ### Workflow
