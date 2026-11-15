@@ -2,7 +2,7 @@
   "name": "catchkeep",
   "version": "0.0.0",
   "private": true,
-  "description": "Family web app that recommends which Pokémon GO Pokémon to keep or transfer to reach a storage target.",
+  "description": "Self-hosted web app that recommends which Pokémon GO Pokémon to keep or transfer to reach a storage target.",
   "engines": {
     "node": ">=24"
   },

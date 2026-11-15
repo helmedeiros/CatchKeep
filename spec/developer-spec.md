@@ -2,7 +2,7 @@
 
 ## Developer Specification · v1.0 · 15 November 2026
 
-Source: [`brainstorming-handoff.md`](brainstorming-handoff.md) (brainstorming handoff, 15 Nov 2026). This document is the implementation contract. Where the handoff left something open, this spec either proposes a default (marked **[Proposed]**) or keeps it open (marked **[Open]**, see §16). Everything unmarked comes from the handoff and is **[Decided]**.
+Source: an internal product brief from the brainstorming sessions (kept private). Requirements below restate everything needed from it.
 
 Keywords MUST / SHOULD / MAY follow RFC 2119. Requirement IDs (`V1-IMP-03`) are stable; reference them in commits, tests and issues.
 
@@ -32,7 +32,7 @@ Keywords MUST / SHOULD / MAY follow RFC 2119. Requirement IDs (`V1-IMP-03`) are 
 
 ## 1. Product summary and scope
 
-A standalone family web app, hosted on a MacBook and used from iPhone Safari over home Wi-Fi, that recommends which Pokémon each trainer should keep or transfer to reach a storage target.
+A self-hosted web app, run on a single macOS host and used from mobile browsers on the local network, that recommends which Pokémon each trainer should keep or transfer to reach a storage target.
 
 ### Principles
 
@@ -48,12 +48,12 @@ V1 CSV cleanup, V2 screenshot import, V3 battle recommendations (§3).
 
 ### Out of scope (all releases unless reopened)
 
-- Access away from home (future release).
+- Access from outside the local network (future release).
 - Any integration that reads from or writes to Pokémon GO accounts or servers.
 - Automating transfers, unfavoriting or tagging in the game.
 - Non-English game UI for searches (V1) and screenshots (V2).
 - Native iOS app. Safari is the only required client.
-- Cloud processing of screenshots. OCR stays on the MacBook even after remote access is added, unless that decision is explicitly changed.
+- Cloud processing of screenshots. OCR stays on the host even after remote access is added, unless that decision is explicitly changed.
 
 ---
 
@@ -61,8 +61,8 @@ V1 CSV cleanup, V2 screenshot import, V3 battle recommendations (§3).
 
 | Term              | Meaning                                                                                                                                                  |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Trainer / profile | One family member's isolated space: collection, capacity, rules, teams, history.                                                                         |
-| Home admin        | The person operating the MacBook host. Can issue PIN reset codes.                                                                                        |
+| Trainer / profile | One trainer's isolated space: collection, capacity, rules, teams, history.                                                                               |
+| Host admin        | The person operating the host machine. Can issue PIN reset codes.                                                                                        |
 | Record            | One Pokémon in the app, with a stable app ID.                                                                                                            |
 | Observation       | One value for one field of one record, with source and timestamp.                                                                                        |
 | Variant           | Distinct combination of species, form, shiny, costume, background, Dynamax/Gigantamax.                                                                   |
@@ -78,10 +78,10 @@ V1 CSV cleanup, V2 screenshot import, V3 battle recommendations (§3).
 
 ## 3. Releases and exit criteria
 
-| Release                     | Family workflow                                                                        | Exit criteria                                                                                   |
+| Release                     | Trainer workflow                                                                       | Exit criteria                                                                                   |
 | --------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | V1 · CSV cleanup            | Import, set keep rules, protect Pokémon and teams manually, plan and confirm transfers | A trainer can reach a feasible cleanup target and undo mistaken app confirmations               |
-| V2 · Screenshot import      | Import batches, review uncertain readings, update existing records                     | English list, detail and appraisal screenshots work locally on the MacBook                      |
+| V2 · Screenshot import      | Import batches, review uncertain readings, update existing records                     | English list, detail and appraisal screenshots work locally on the host                         |
 | V3 · Battle recommendations | Manage recommended rosters and upgrades                                                | Recommendations refresh from versioned battle data and use confirmed builds for roster coverage |
 
 Each release MUST pass the full acceptance suite of all prior releases (§15.11) and MUST restore backups made by every prior release (§13).
@@ -100,10 +100,10 @@ They have separate source trees, toolchains, dependencies, quality gates, CI job
 ### 4.1 Topology
 
 ```text
- iPhone Safari (×N)
-        │  HTTPS over home Wi-Fi (one URL, one certificate)
+ Mobile Safari (×N)
+        │  HTTPS on the local network (one URL, one certificate)
         ▼
- MacBook host
+ macOS host
  ┌────────────────────────────────────────────────────────────┐
  │ catchkeep (Go binary)                                      │
  │   ├─ /api/v1/*      profile-scoped JSON API                │
@@ -114,9 +114,9 @@ They have separate source trees, toolchains, dependencies, quality gates, CI job
  └────────────────────────────────────────────────────────────┘
 ```
 
-- The backend serves the frontend bundle from a directory set at runtime (`CATCHKEEP_WEB_DIR`). There is no build-time coupling: either side can be rebuilt and redeployed alone. Serving both from one origin keeps one URL and one TLS certificate on the iPhones and avoids CORS.
+- The backend serves the frontend bundle from a directory set at runtime (`CATCHKEEP_WEB_DIR`). There is no build-time coupling: either side can be rebuilt and redeployed alone. Serving both from one origin keeps one URL and one TLS certificate on client devices and avoids CORS.
 - In development the frontend runs on its own dev server and proxies `/api` to a backend, or to a mock server generated from `api/openapi.yaml`.
-- Start manually by default; offer an opt-in "launch at Mac login" (**[Proposed]** a per-user `launchd` LaunchAgent installed/removed from the admin console).
+- Start manually by default; offer an opt-in "launch at login" (**[Proposed]** a per-user `launchd` LaunchAgent installed/removed from the admin console).
 - The host must be on and awake. The client MUST detect an unreachable host and say so plainly (§10.5).
 
 ### 4.2 API contract
@@ -132,7 +132,7 @@ They have separate source trees, toolchains, dependencies, quality gates, CI job
 
 | Concern          | Choice                                                                                 | Rationale / tradeoff                                                                                                                                                                                    |
 | ---------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Language         | Go (latest stable)                                                                     | Single static binary on the MacBook; strong standard library; easy concurrency for background jobs.                                                                                                     |
+| Language         | Go (latest stable)                                                                     | Single static binary on the host; strong standard library; easy concurrency for background jobs.                                                                                                        |
 | HTTP             | `net/http` (method-pattern routing) + `oapi-codegen` strict server                     | No framework; contract-first.                                                                                                                                                                           |
 | Database         | SQLite in WAL mode via `modernc.org/sqlite`                                            | Transactional, single file, trivial backup; pure Go driver.                                                                                                                                             |
 | Queries          | `sqlc` over hand-written SQL                                                           | Type-safe queries; transactions stay explicit.                                                                                                                                                          |
@@ -141,7 +141,7 @@ They have separate source trees, toolchains, dependencies, quality gates, CI job
 | Password hashing | Argon2id (`golang.org/x/crypto/argon2`)                                                | Standard for low-entropy secrets like PINs.                                                                                                                                                             |
 | Logging          | `log/slog` JSON handler                                                                | Structured, standard library.                                                                                                                                                                           |
 | OCR (V2)         | Apple Vision text recognition via a small Swift CLI sidecar behind an `OcrEngine` port | Local, strong English accuracy on macOS. Pending validation (§16).                                                                                                                                      |
-| Local HTTPS      | Local CA (e.g. `mkcert`) + root profile installed on each iPhone, mDNS hostname        | Safari requires full-trust installation; validate on family iPhones (§16).                                                                                                                              |
+| Local HTTPS      | Local CA (e.g. `mkcert`) + root profile installed on each client device, mDNS hostname | Safari requires full-trust installation; validate on every client device (§16).                                                                                                                         |
 
 ### 4.4 Frontend stack **[Proposed]**
 
@@ -203,7 +203,7 @@ Picked from Emil Kowalski's curated list ([emilkowalski/skills `pick-ui-library`
 | Accessible primitives (dialogs, popovers, menus, selects, checkboxes) | [base-ui](https://base-ui.com)               | Bulk-confirm dialog, CSV column mapping selects, profile menu, rule editors                                           |
 | PIN entry                                                             | [input-otp](https://input-otp.rodz.dev)      | Login, profile switch, PIN reset (V1-PRF-03/04)                                                                       |
 | Toasts                                                                | [Sonner](https://sonner.emilkowal.ski)       | "Marked 100 as transferred · Undo" (V1-IMP-11), import committed, stale-plan notices                                  |
-| Bottom sheets on iPhone                                               | [Vaul](https://vaul.emilkowal.ski)           | Record detail, candidate "why eligible", duplicate review on small screens                                            |
+| Bottom sheets on phones                                               | [Vaul](https://vaul.emilkowal.ski)           | Record detail, candidate "why eligible", duplicate review on small screens                                            |
 | Long lists                                                            | [Virtuoso](https://virtuoso.dev)             | Collection (2,700+ records), plan checklist, import preview rows                                                      |
 | Drag and drop                                                         | [dnd kit](https://dndkit.com)                | Ordering goals in setup (V1-SET-01), V3 team editing; with keyboard sensor and up/down buttons as accessible fallback |
 | Animated numbers                                                      | [NumberFlow](https://number-flow.barvian.me) | Free slots, max feasible, shortfall counters as targets change                                                        |
@@ -314,17 +314,17 @@ Each component may be unknown. A record with any unknown component has a _set_ o
 
 ## 6. V1 functional requirements
 
-### 6.1 Home deployment and profiles
+### 6.1 Deployment and profiles
 
-| ID         | Requirement                                                                                          | Acceptance                                                                     |
-| ---------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| V1-HOST-01 | Serve one HTTPS URL on the home network, usable in iPhone Safari.                                    | Loads on each family iPhone without certificate warnings after one-time setup. |
-| V1-HOST-02 | Manual start by default; opt-in launch at Mac login.                                                 | Toggle in admin console installs/removes the LaunchAgent.                      |
-| V1-PRF-01  | Each trainer has their own collection, capacity, rules, manual teams, history.                       | Cross-profile isolation test (§15.9).                                          |
-| V1-PRF-02  | Show the active profile name before every import and confirmation.                                   | Present on staging, plan and confirm screens.                                  |
-| V1-PRF-03  | Switching profile requires the destination trainer's PIN.                                            | No path switches profile without PIN.                                          |
-| V1-PRF-04  | Admin generates a one-time PIN reset code, emailed or shown on the MacBook. Trainer chooses new PIN. | Code single use, expires, all sessions for that trainer revoked on reset.      |
-| V1-BAK-01  | Manual export/restore of profiles, collections, rules, teams, transfer history.                      | §13.                                                                           |
+| ID         | Requirement                                                                                       | Acceptance                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| V1-HOST-01 | Serve one HTTPS URL on the local network, usable in mobile Safari.                                | Loads on each supported client device without certificate warnings after one-time setup. |
+| V1-HOST-02 | Manual start by default; opt-in launch at login.                                                  | Toggle in admin console installs/removes the LaunchAgent.                                |
+| V1-PRF-01  | Each trainer has their own collection, capacity, rules, manual teams, history.                    | Cross-profile isolation test (§15.9).                                                    |
+| V1-PRF-02  | Show the active profile name before every import and confirmation.                                | Present on staging, plan and confirm screens.                                            |
+| V1-PRF-03  | Switching profile requires the destination trainer's PIN.                                         | No path switches profile without PIN.                                                    |
+| V1-PRF-04  | Admin generates a one-time PIN reset code, emailed or shown on the host. Trainer chooses new PIN. | Code single use, expires, all sessions for that trainer revoked on reset.                |
+| V1-BAK-01  | Manual export/restore of profiles, collections, rules, teams, transfer history.                   | §13.                                                                                     |
 
 ### 6.2 Progressive setup
 
@@ -387,7 +387,7 @@ A staged batch is invalidated if the trainer revision changes before commit (ano
 
 ### 6.5 Poke Genie CSV format
 
-Findings from a real export (484 rows, 226 species, 15 Nov 2026). The raw export contains personal data and MUST NOT be committed. Tests use synthetic fixtures with the same header and encodings.
+Findings from a real export. The raw export contains personal data and MUST NOT be committed. Tests use synthetic fixtures with the same header and encodings.
 
 **File:** UTF-8 (may start with a BOM), comma-separated, double-quoted where needed, 50 columns, one row per scanned Pokémon. Non-ASCII values occur (`♂`, `♀`).
 
@@ -404,7 +404,7 @@ Findings from a real export (484 rows, 226 species, 15 Nov 2026). The raw export
 | `Level Min`, `Level Max`                                                                                  | `level`                      | Decimal. Equal on every sample row; if they differ, store the range.                                                                                                                                                                                                                         |
 | `Quick Move`, `Charge Move`, `Charge Move 2`                                                              | moves                        | **Empty on every sample row.** Treat empty as unknown. Moves come from screenshots (V2) or manual entry.                                                                                                                                                                                     |
 | `Scan Date`, `Original Scan Date`                                                                         | `observed_at`                | `YYYY-MM-DD HH:MM`, local time, no zone. Interpret in the host's zone. `Scan Date` is the observation time for every field from this row.                                                                                                                                                    |
-| `Catch Date`                                                                                              | `catch_date`                 | `M/D/YYYY` (US order). Blank on 11 of 484 rows → unknown.                                                                                                                                                                                                                                    |
+| `Catch Date`                                                                                              | `catch_date`                 | `M/D/YYYY` (US order). Blank on some rows → unknown.                                                                                                                                                                                                                                         |
 | `Weight`, `Height`                                                                                        | `weight_kg`, `height_m`      | Blank on almost every row → unknown.                                                                                                                                                                                                                                                         |
 | `Lucky`                                                                                                   | `lucky`                      | `0`/`1`. Treat `1` as true; `0` as false only once OD-03 confirms the scanner detects lucky reliably, otherwise unknown.                                                                                                                                                                     |
 | `Shadow/Purified`                                                                                         | `shadow`, `purified`         | `0` and `1` seen. Assumed `1` = shadow, `2` = purified; **must be validated** (OD-03). Until then `1` → shadow, any other non-zero → unknown.                                                                                                                                                |
@@ -470,7 +470,7 @@ For each record `r` and each unknown tri-state attribute `a` (shiny, costume, ba
 - Decision-relevant unknown ⇒ protected, with reason "Confirm shiny status (etc.) to make eligible".
 - Unknown records never count toward a floor for a value they _might_ have. They count only toward groups determined by their known fields.
 
-Consequence to surface in UI and in testing: with a CSV lacking shiny/costume/background, many records may be protected pending confirmation. **[Proposed]** Provide bulk confirmation per species ("None of my 34 Pidgey are shiny, costumed or have a background") recorded as `manual` observations. This is the main V1 usability risk; validate with real family data early (§17, M2).
+Consequence to surface in UI and in testing: with a CSV lacking shiny/costume/background, many records may be protected pending confirmation. **[Proposed]** Provide bulk confirmation per species ("None of my 34 Pidgey are shiny, costumed or have a background") recorded as `manual` observations. This is the main V1 usability risk; validate with real user data early (§17, M2).
 
 ### 7.4 Optimization model
 
@@ -552,19 +552,19 @@ Error envelope (all non-2xx):
 
 ## 9. Security and authentication
 
-| ID     | Requirement                                                                                                                                                                                               |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SEC-01 | PINs hashed with Argon2id; never logged or returned. PIN length **[Proposed]** 4–8 digits (family app; brute force bounded by SEC-02).                                                                    |
-| SEC-02 | Rate limit PIN attempts per profile and per client IP. **[Proposed]** 5 failures → 1 min lockout, doubling to 1 h max; counter resets on success.                                                         |
-| SEC-03 | Sessions: random 256-bit token, `HttpOnly; Secure; SameSite=Strict` cookie, bound to one profile, idle timeout **[Proposed]** 30 days on device, revocable.                                               |
-| SEC-04 | Reset codes: random, single use, stored hashed, expire **[Proposed]** 15 min. Delivered by email (if SMTP configured) or shown on the MacBook admin console. Reset revokes all sessions for that trainer. |
-| SEC-05 | Admin console binds to loopback only; no admin routes on the LAN interface.                                                                                                                               |
-| SEC-06 | Profile isolation: trainerId always from session; every repository query scoped; cross-profile access returns 404 (not 403) to avoid enumeration.                                                         |
-| SEC-07 | HTTPS only on the LAN interface; HTTP redirects. Validate on every family iPhone before shipping V1.                                                                                                      |
-| SEC-08 | CSRF: SameSite=Strict + require `Content-Type: application/json` or multipart with a CSRF token for uploads.                                                                                              |
-| SEC-09 | Upload limits: CSV ≤ 10 MB, screenshots ≤ 15 MB each, batch ≤ 200 images **[Proposed]**. Reject by content sniffing, not extension.                                                                       |
-| SEC-10 | Audit log: logins, failed PINs, switches, resets, restores, bulk confirms, undos.                                                                                                                         |
-| SEC-11 | Backups contain personal data and PIN hashes; UI labels them sensitive. **[Open]** whether to encrypt backups with a passphrase (OD-08).                                                                  |
+| ID     | Requirement                                                                                                                                                                                            |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| SEC-01 | PINs hashed with Argon2id; never logged or returned. PIN length **[Proposed]** 4–8 digits (small trusted user group; brute force bounded by SEC-02).                                                   |
+| SEC-02 | Rate limit PIN attempts per profile and per client IP. **[Proposed]** 5 failures → 1 min lockout, doubling to 1 h max; counter resets on success.                                                      |
+| SEC-03 | Sessions: random 256-bit token, `HttpOnly; Secure; SameSite=Strict` cookie, bound to one profile, idle timeout **[Proposed]** 30 days on device, revocable.                                            |
+| SEC-04 | Reset codes: random, single use, stored hashed, expire **[Proposed]** 15 min. Delivered by email (if SMTP configured) or shown on the host admin console. Reset revokes all sessions for that trainer. |
+| SEC-05 | Admin console binds to loopback only; no admin routes on the LAN interface.                                                                                                                            |
+| SEC-06 | Profile isolation: trainerId always from session; every repository query scoped; cross-profile access returns 404 (not 403) to avoid enumeration.                                                      |
+| SEC-07 | HTTPS only on the LAN interface; HTTP redirects. Validate on every supported client device before shipping V1.                                                                                         |
+| SEC-08 | CSRF: SameSite=Strict + require `Content-Type: application/json` or multipart with a CSRF token for uploads.                                                                                           |
+| SEC-09 | Upload limits: CSV ≤ 10 MB, screenshots ≤ 15 MB each, batch ≤ 200 images **[Proposed]**. Reject by content sniffing, not extension.                                                                    |
+| SEC-10 | Audit log: logins, failed PINs, switches, resets, restores, bulk confirms, undos.                                                                                                                      |
+| SEC-11 | Backups contain personal data and PIN hashes; UI labels them sensitive. **[Open]** whether to encrypt backups with a passphrase (OD-08).                                                               |
 
 ---
 
@@ -575,7 +575,7 @@ Error envelope (all non-2xx):
 1. **Fail safe for the collection.** Any error during planning or import results in _fewer_ recommended transfers, never more.
 2. **Atomic or nothing.** Import commits, bulk confirmations, undos, full-refresh applies and restores are single transactions. Partial application is a bug.
 3. **Say what happened and what to do next**, in trainer language. Technical detail goes to logs with a correlation ID shown in the UI.
-4. **Idempotent mutations.** Flaky Wi-Fi retries must not double-confirm transfers.
+4. **Idempotent mutations.** Flaky network retries must not double-confirm transfers.
 
 ### 10.2 Error taxonomy
 
@@ -624,7 +624,7 @@ Structured JSON logs to a rotating file under the app data dir. Every request ha
 
 ### 10.5 Host unavailable
 
-Client checks `/health` on focus and before mutations. If unreachable: banner "CatchKeep isn't reachable — is the MacBook on and awake?"; mutations disabled; nothing queued offline **[Proposed]** (avoids confirming transfers against an unknown server state).
+Client checks `/health` on focus and before mutations. If unreachable: banner "CatchKeep isn't reachable — is the host on and awake?"; mutations disabled; nothing queued offline **[Proposed]** (avoids confirming transfers against an unknown server state).
 
 ---
 
@@ -632,10 +632,10 @@ Client checks `/health` on focus and before mutations. If unreachable: banner "C
 
 | ID        | Requirement                                                                                                                                                  |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| V2-SCR-01 | Batch upload of English storage-list, detail and appraisal screenshots from iPhone Safari.                                                                   |
+| V2-SCR-01 | Batch upload of English storage-list, detail and appraisal screenshots from mobile Safari.                                                                   |
 | V2-SCR-02 | Screenshot-only onboarding and mixed CSV + screenshot imports.                                                                                               |
 | V2-SCR-03 | Multiple Pokémon per list screenshot.                                                                                                                        |
-| V2-SCR-04 | All processing local on the MacBook.                                                                                                                         |
+| V2-SCR-04 | All processing local on the host.                                                                                                                            |
 | V2-SCR-05 | Store confident observations; queue only uncertain readings for review. Trainer can correct manually or add another screenshot.                              |
 | V2-SCR-06 | A view that cannot display a feature cannot confirm its absence (per-view capability matrix below).                                                          |
 | V2-SCR-07 | Same unknown-field protection and duplicate confirmation as V1, including across overlapping screenshots and CSVs.                                           |
@@ -741,13 +741,13 @@ A field may only be set to a definite value (including `false`) from a view whos
 
 Benchmark before fixing thresholds (handoff requirement). Benchmark suite: synthetic collections of 2,700 and 5,400 records with realistic species distributions and rule sets.
 
-| Operation                            | Provisional target **[Proposed, replace after benchmark]** |
-| ------------------------------------ | ---------------------------------------------------------- |
-| CSV stage, 2,700 rows                | < 3 s on the MacBook                                       |
-| Commit, 2,700 rows                   | < 2 s                                                      |
-| Plan (Phase A + B), 2,700 records    | < 5 s p95; timeout fallback otherwise                      |
-| Collection list first page on iPhone | < 1 s on home Wi-Fi                                        |
-| Screenshot OCR (V2)                  | < 3 s per image, processed in background                   |
+| Operation                           | Provisional target **[Proposed, replace after benchmark]** |
+| ----------------------------------- | ---------------------------------------------------------- |
+| CSV stage, 2,700 rows               | < 3 s on the host                                          |
+| Commit, 2,700 rows                  | < 2 s                                                      |
+| Plan (Phase A + B), 2,700 records   | < 5 s p95; timeout fallback otherwise                      |
+| Collection list first page on phone | < 1 s on local network                                     |
+| Screenshot OCR (V2)                 | < 3 s per image, processed in background                   |
 
 ### 14.2 Reliability
 
@@ -756,7 +756,7 @@ Benchmark before fixing thresholds (handoff requirement). Benchmark suite: synth
 
 ### 14.3 Usability and accessibility
 
-- Mobile-first layouts for iPhone screen sizes; tap targets ≥ 44 pt; supports Dynamic Type scaling in Safari; WCAG 2.2 AA contrast.
+- Mobile-first layouts for phone screen sizes; tap targets ≥ 44 pt; supports Dynamic Type scaling in Safari; WCAG 2.2 AA contrast.
 - Active profile name and color visible on every screen.
 - Destructive or irreversible-in-game actions (bulk confirm, full refresh apply) require an explicit confirm step showing count and profile.
 
@@ -791,7 +791,7 @@ Rules:
 Each side has its own balanced pyramid. Most tests are fast and isolated; few are slow and broad. Proportions are guidelines for review, not targets to game.
 
 ```text
-                 ▲  manual (per release, every family iPhone)
+                 ▲  manual (per release, every supported client device)
                 ▲▲▲  smoke (every build and every host start)
               ▲▲▲▲▲▲▲  end-to-end (full stack, few, critical journeys)
           ▲▲▲▲▲▲▲▲▲▲▲▲▲  integration / contract / component
@@ -825,21 +825,21 @@ Few, slow, and only for critical journeys: the acceptance scenarios in §15.11. 
 
 Smoke tests answer "is this build alive and safe to use?" in under a minute. They never mutate trainer data.
 
-| When                                          | What runs                                                                            | Checks                                                                                                                                                                              |
-| --------------------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CI, after building both sides                 | Backend binary started against an empty temp database with the built frontend dir    | `/api/v1/health` 200; migrations applied; static index served; one login with a seeded smoke profile; one read-only API call                                                        |
-| Every host start                              | Built-in startup self-check, then `catchkeep smoke` on demand from the admin console | DB `integrity_check`; schema version current; web dir present; TLS certificate valid and not expiring within 30 days; OCR sidecar responds (V2); active battle dataset present (V3) |
-| After installing a new release on the MacBook | `catchkeep smoke` + open the app on one iPhone                                       | Same as above + manual "page loads, PIN screen appears"                                                                                                                             |
+| When                                       | What runs                                                                            | Checks                                                                                                                                                                              |
+| ------------------------------------------ | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CI, after building both sides              | Backend binary started against an empty temp database with the built frontend dir    | `/api/v1/health` 200; migrations applied; static index served; one login with a seeded smoke profile; one read-only API call                                                        |
+| Every host start                           | Built-in startup self-check, then `catchkeep smoke` on demand from the admin console | DB `integrity_check`; schema version current; web dir present; TLS certificate valid and not expiring within 30 days; OCR sidecar responds (V2); active battle dataset present (V3) |
+| After installing a new release on the host | `catchkeep smoke` + open the app on one phone                                        | Same as above + manual "page loads, PIN screen appears"                                                                                                                             |
 
 A failed startup self-check keeps the API read-only and shows an admin banner (§10.3).
 
 ### 15.4 Manual tests
 
-Run per release on **every** family iPhone, and record results in `docs/manual-test-log.md` (date, device, iOS version, release, pass/fail, notes).
+Run per release on **every** supported client device, and record results in `docs/manual-test-log.md` (date, device, iOS version, release, pass/fail, notes).
 
 - HTTPS trust, no certificate warnings.
 - Login, profile switch with PIN, wrong-PIN lockout message.
-- CSV upload from the Files app; preview readable on the smallest family iPhone.
+- CSV upload from the Files app; preview readable on the smallest supported phone.
 - Copy a search string and paste it into Pokémon GO; it finds the intended Pokémon.
 - Bulk confirm and undo with the real collection of one trainer (after a backup).
 - Host asleep: banner shown, no mutation possible.
@@ -850,16 +850,16 @@ Plus a 30-minute **exploratory session** per release with a written charter (e.g
 
 ### 15.5 Where each gate runs
 
-| Gate                                              | Pre-commit (local) | PR CI     | Release            |
-| ------------------------------------------------- | ------------------ | --------- | ------------------ |
-| Format, lint, type-check (side touched)           | ✓                  | ✓         | ✓                  |
-| Unit + use case / unit + component (side touched) | ✓                  | ✓         | ✓                  |
-| Integration + contract (backend)                  |                    | ✓         | ✓                  |
-| Flow tests (frontend, mocked backend)             |                    | ✓         | ✓                  |
-| Full-stack E2E                                    |                    | ✓         | ✓                  |
-| Smoke                                             |                    | ✓         | ✓ (on the MacBook) |
-| Benchmarks (§15.12)                               |                    | on demand | ✓                  |
-| Manual + exploratory                              |                    |           | ✓                  |
+| Gate                                              | Pre-commit (local) | PR CI     | Release         |
+| ------------------------------------------------- | ------------------ | --------- | --------------- |
+| Format, lint, type-check (side touched)           | ✓                  | ✓         | ✓               |
+| Unit + use case / unit + component (side touched) | ✓                  | ✓         | ✓               |
+| Integration + contract (backend)                  |                    | ✓         | ✓               |
+| Flow tests (frontend, mocked backend)             |                    | ✓         | ✓               |
+| Full-stack E2E                                    |                    | ✓         | ✓               |
+| Smoke                                             |                    | ✓         | ✓ (on the host) |
+| Benchmarks (§15.12)                               |                    | on demand | ✓               |
+| Manual + exploratory                              |                    |           | ✓               |
 
 Coverage floors **[Proposed]**: backend domain ≥ 90% statements, backend overall ≥ 80%, frontend ≥ 80%. A PR may not lower coverage of the package it touches.
 
@@ -921,7 +921,7 @@ Coverage floors **[Proposed]**: backend domain ≥ 90% statements, backend overa
 | A6  | Full refresh omits previously imported Pokémon                     | Confirmation required before removal; undo restores and recalculates                          | V1-IMP-08, -11       |
 | A7  | Raid upgrade accepted and pending                                  | Pokémon protected; roster slot open; completion fills slot if confirmed build qualifies       | V3-UPG-01, -02       |
 | A8  | Stronger imported attacker displaces a roster member               | Roster refreshed, change explained, eligible transfers and obsolete tags flagged              | V3-RST-01            |
-| A9  | Trainers import concurrently on different iPhones                  | Each operation affects only the authenticated profile                                         | V1-PRF-01, SEC-06    |
+| A9  | Trainers import concurrently on different devices                  | Each operation affects only the authenticated profile                                         | V1-PRF-01, SEC-06    |
 | A10 | Battle data refresh fails validation                               | Last successful dataset kept; refresh time shown                                              | V3-DAT-03            |
 | A11 | 400 feasible, request 100 additional slots                         | Exactly 100 recommendations                                                                   | V1-CLN-03            |
 | A12 | Two of a minimum of four exist                                     | Both kept                                                                                     | V1-RUL-06            |
@@ -946,27 +946,27 @@ Fixture corpus: supplied PNGs + new captures for every screen kind × protected 
 | OD-01 | Exact capacity bands and default minimums                                                                                                                                                       | V1 rules engine (M3) | Editable placeholder bands matching the reference points in V1-RUL-02  |
 | OD-02 | Semantics of nested group vs species minimum (A2 reading, §6.3)                                                                                                                                 | V1 rules engine (M3) | Constraint model in §6.3                                               |
 | OD-03 | Poke Genie export semantics not visible in the sample: does `Favorite=0` mean "not favorite" or "not captured"; `Lucky` reliability; `Shadow/Purified` codes; any hidden shiny/costume encoding | V1 import (M2)       | Per §6.5: `0` treated as unknown, shiny/costume/background/Max unknown |
-| OD-04 | Local HTTPS setup on family iPhones (CA install, hostname, mDNS reliability)                                                                                                                    | V1 host (M1)         | mkcert + `.local` hostname                                             |
+| OD-04 | Local HTTPS setup on client devices (CA install, hostname, mDNS reliability)                                                                                                                    | V1 host (M1)         | mkcert + `.local` hostname                                             |
 | OD-05 | Local OCR accuracy and per-view field capability                                                                                                                                                | V2                   | Apple Vision; matrix all "unknown"                                     |
 | OD-06 | Ranking sources (raid, PvP, Max), access and reuse terms                                                                                                                                        | V3 start             | GameInfo Top Attackers as raid candidate only                          |
 | OD-07 | SMTP for reset emails (which account/provider)                                                                                                                                                  | V1 auth (M1)         | In-person delivery only                                                |
 | OD-08 | Encrypt backups with passphrase?                                                                                                                                                                | V1 backup (M6)       | Unencrypted, labeled sensitive                                         |
 | OD-09 | Planner performance thresholds and timeouts                                                                                                                                                     | After M4 benchmark   | §14.1 provisional values                                               |
 | OD-10 | Storage upgrade increment for upgrade comparison                                                                                                                                                | V1 cleanup (M4)      | Configurable constant                                                  |
-| OD-11 | Bulk attribute confirmation UX (§7.3) acceptable to the family?                                                                                                                                 | M2 usability check   | Per-species bulk confirm                                               |
+| OD-11 | Bulk attribute confirmation UX (§7.3) acceptable to users?                                                                                                                                      | M2 usability check   | Per-species bulk confirm                                               |
 
 ---
 
 ## 17. Implementation sequence (V1)
 
-| Milestone | Scope                                                                                                                                                                                               | Done when                                                                                            |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| M0        | Contract skeleton (`api/openapi.yaml`); Go backend skeleton (hexagonal layout, layering check, SQLite + migrations, health endpoint); frontend skeleton (Vite + generated client); separate CI jobs | Both CI jobs green independently; frontend shows health from a mock and from the real backend        |
-| M1        | Host + HTTPS on LAN, profiles, PIN auth, sessions, switching, admin console, reset codes                                                                                                            | Security tests §15.9 pass; device check on each iPhone (OD-04)                                       |
-| M2        | CSV import: Poke Genie adapter, mapping, staging, preview, observations, duplicate review, incremental commit                                                                                       | Import of the real family CSVs; measure how many records end up protected by unknowns (OD-03, OD-11) |
-| M3        | Setup wizard, rules engine, capacity bands, overrides, favorite species, manual protection/teams, rule inspector                                                                                    | A1, A2, A12 pass                                                                                     |
-| M4        | Planner (Phase A/B, tie-break, timeout, verifier), target arithmetic, upgrade comparison, benchmark                                                                                                 | §15.7 passes; A4, A5, A11 pass; OD-09 resolved                                                       |
-| M5        | Checklist, search strings + collision check, transfer confirm (single/bulk), history, undo, staleness + diff, full refresh                                                                          | A6, A9, A13 pass                                                                                     |
-| M6        | Backup/restore, launch at login, rolling backups, polish, manual device test pass                                                                                                                   | V1 exit criteria met                                                                                 |
+| Milestone | Scope                                                                                                                                                                                               | Done when                                                                                        |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| M0        | Contract skeleton (`api/openapi.yaml`); Go backend skeleton (hexagonal layout, layering check, SQLite + migrations, health endpoint); frontend skeleton (Vite + generated client); separate CI jobs | Both CI jobs green independently; frontend shows health from a mock and from the real backend    |
+| M1        | Host + HTTPS on LAN, profiles, PIN auth, sessions, switching, admin console, reset codes                                                                                                            | Security tests §15.9 pass; device check on each client device (OD-04)                            |
+| M2        | CSV import: Poke Genie adapter, mapping, staging, preview, observations, duplicate review, incremental commit                                                                                       | Import of real CSV exports; measure how many records end up protected by unknowns (OD-03, OD-11) |
+| M3        | Setup wizard, rules engine, capacity bands, overrides, favorite species, manual protection/teams, rule inspector                                                                                    | A1, A2, A12 pass                                                                                 |
+| M4        | Planner (Phase A/B, tie-break, timeout, verifier), target arithmetic, upgrade comparison, benchmark                                                                                                 | §15.7 passes; A4, A5, A11 pass; OD-09 resolved                                                   |
+| M5        | Checklist, search strings + collision check, transfer confirm (single/bulk), history, undo, staleness + diff, full refresh                                                                          | A6, A9, A13 pass                                                                                 |
+| M6        | Backup/restore, launch at login, rolling backups, polish, manual device test pass                                                                                                                   | V1 exit criteria met                                                                             |
 
 V2 and V3 follow the same pattern: resolve their open decisions (OD-05, OD-06) first, then build against §11 and §12.
