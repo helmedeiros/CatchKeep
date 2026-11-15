@@ -181,7 +181,7 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
       const c = body as Schemas["AbsenceConfirmation"];
       let updated = 0;
       for (const p of collection) {
-        if (p.species !== c.species) continue;
+        if (c.species !== undefined && p.species !== c.species) continue;
         const add = c.features.filter((f) => !p.absent?.includes(f));
         if (add.length === 0) continue;
         p.absent = [...(p.absent ?? []), ...add];

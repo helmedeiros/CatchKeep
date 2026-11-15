@@ -32,6 +32,7 @@ export function ConfirmFeatures({ pokemon }: { pokemon: Pokemon[] }) {
     FEATURES.map(([f]) => f),
   );
   const [showAll, setShowAll] = useState(false);
+  const [confirmingAll, setConfirmingAll] = useState(false);
   const groups = useMemo(
     () => unknownGroups(pokemon, chosen),
     [pokemon, chosen],
@@ -55,6 +56,20 @@ export function ConfirmFeatures({ pokemon }: { pokemon: Pokemon[] }) {
           ),
       },
     );
+
+  const submitAll = () =>
+    confirm.mutate(
+      { features: chosen },
+      {
+        onSuccess: ({ updated }) => {
+          setConfirmingAll(false);
+          toast.success(
+            `Confirmed ${updated} Pokémon: no ${describe(chosen)}.`,
+          );
+        },
+      },
+    );
+  const total = groups.reduce((n, g) => n + g.unknown, 0);
 
   if (pokemon.length === 0) return null;
   return (
@@ -129,6 +144,41 @@ export function ConfirmFeatures({ pokemon }: { pokemon: Pokemon[] }) {
         >
           {showAll ? "Show fewer" : `Show all ${groups.length} species`}
         </button>
+      )}
+      {chosen.length > 0 && groups.length > 1 && !confirmingAll && (
+        <button
+          type="button"
+          className={secondaryButton}
+          onClick={() => setConfirmingAll(true)}
+        >
+          Confirm all {groups.length} species
+        </button>
+      )}
+      {confirmingAll && chosen.length > 0 && groups.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+          <p>
+            None of your {total} Pokémon in these {groups.length} species will
+            be counted as {describe(chosen)}. Only do this if you've checked
+            them in the game.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rounded-lg bg-teal-700 px-3 py-1.5 font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+              disabled={confirm.isPending}
+              onClick={submitAll}
+            >
+              Yes, I checked them all
+            </button>
+            <button
+              type="button"
+              className={secondaryButton}
+              onClick={() => setConfirmingAll(false)}
+            >
+              Not yet
+            </button>
+          </div>
+        </div>
       )}
       {confirm.isError && (
         <p role="alert" className={alert}>
