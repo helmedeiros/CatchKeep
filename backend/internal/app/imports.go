@@ -54,10 +54,10 @@ func (u *Imports) Stage(ctx context.Context, trainer domain.TrainerID, r io.Read
 	if err != nil {
 		return ImportPreview{}, err
 	}
-	fresh, possible := domain.ClassifyImport(existing, parsed.Rows)
+	review := domain.ReviewImport(existing, parsed.Rows, nil)
 	batch := domain.ImportBatch{
 		ID: u.ids.NewID(), TrainerID: trainer, Status: domain.ImportStaged, Parsed: parsed,
-		NewCount: len(fresh), PossibleMatchCount: possible, CreatedAt: u.clock.Now(),
+		NewCount: len(review.Add), PossibleMatchCount: review.Pending(), CreatedAt: u.clock.Now(),
 	}
 	if err := u.batches.Save(ctx, batch); err != nil {
 		return ImportPreview{}, fmt.Errorf("save import: %w", err)
@@ -88,12 +88,12 @@ func (u *Imports) Commit(ctx context.Context, trainer domain.TrainerID, id strin
 	if err != nil {
 		return ImportPreview{}, err
 	}
-	fresh, possible := domain.ClassifyImport(existing, batch.Parsed.Rows)
-	add := make([]domain.Pokemon, 0, len(fresh))
-	for _, row := range fresh {
+	review := domain.ReviewImport(existing, batch.Parsed.Rows, nil)
+	add := make([]domain.Pokemon, 0, len(review.Add))
+	for _, row := range review.Add {
 		add = append(add, domain.Pokemon{ID: domain.PokemonID(u.ids.NewID()), TrainerID: trainer, Observations: row.Observations})
 	}
-	batch.Status, batch.NewCount, batch.PossibleMatchCount, batch.CommittedAt = domain.ImportCommitted, len(fresh), possible, u.clock.Now()
+	batch.Status, batch.NewCount, batch.PossibleMatchCount, batch.CommittedAt = domain.ImportCommitted, len(review.Add), review.Pending(), u.clock.Now()
 	if err := u.batches.Commit(ctx, batch, add); err != nil {
 		return ImportPreview{}, fmt.Errorf("commit import: %w", err)
 	}
