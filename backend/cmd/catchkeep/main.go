@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/helmedeiros/catchkeep/backend/internal/adapters/csvimport"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/httpapi"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/ids"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/pinhash"
@@ -127,10 +128,14 @@ func newRootHandler(cfg serveConfig, store *sqlite.Store) http.Handler {
 	trainers := sqlite.NewTrainers(store)
 	hasher := pinhash.NewArgon2()
 	clock := ids.SystemClock{}
+	ulids := ids.NewULID()
+	collection := sqlite.NewCollection(store)
 	api := httpapi.NewHandler(httpapi.Services{
-		Health:   app.NewHealth(buildinfo.Version()),
-		Profiles: app.NewProfiles(trainers, hasher, ids.NewULID(), clock),
-		Sessions: app.NewSessions(trainers, sqlite.NewSessions(store), hasher, ids.Tokens{}, clock),
+		Health:     app.NewHealth(buildinfo.Version()),
+		Profiles:   app.NewProfiles(trainers, hasher, ulids, clock),
+		Sessions:   app.NewSessions(trainers, sqlite.NewSessions(store), hasher, ids.Tokens{}, clock),
+		Imports:    app.NewImports(csvimport.NewPokeGenie(time.Local), collection, collection, ulids, clock),
+		Collection: app.NewCollection(collection),
 	})
 	if cfg.webDir == "" {
 		return api

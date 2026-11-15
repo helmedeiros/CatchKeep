@@ -16,6 +16,10 @@ const (
 	codeRateLimited      = "RATE_LIMITED"
 	codeNameTaken        = "DISPLAY_NAME_TAKEN"
 	codeInternal         = "INTERNAL"
+	codeNotFound         = "NOT_FOUND"
+	codeConflict         = "IMPORT_ALREADY_COMMITTED"
+	codeUnsupportedFile  = "UNSUPPORTED_FILE"
+	codePayloadTooLarge  = "PAYLOAD_TOO_LARGE"
 )
 
 func errorBody(code, message string) Error {
