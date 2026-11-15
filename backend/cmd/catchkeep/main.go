@@ -11,10 +11,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/httpapi"
+	"github.com/helmedeiros/catchkeep/backend/internal/adapters/sqlite"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/web"
 	"github.com/helmedeiros/catchkeep/backend/internal/app"
 	"github.com/helmedeiros/catchkeep/backend/internal/buildinfo"
@@ -22,7 +24,7 @@ import (
 
 const usage = `usage:
   catchkeep version                print the build version
-  catchkeep serve [-addr host:port] [-web-dir dir]
+  catchkeep serve [-addr host:port] [-db file] [-web-dir dir]
                                    serve the API and, if set, the built frontend`
 
 const shutdownTimeout = 10 * time.Second
@@ -47,11 +49,12 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 		fs.SetOutput(stderr)
 		addr := fs.String("addr", "127.0.0.1:8080", "address to listen on")
+		dbPath := fs.String("db", envOr("CATCHKEEP_DB", defaultDBPath()), "SQLite database file (env CATCHKEEP_DB)")
 		webDir := fs.String("web-dir", os.Getenv("CATCHKEEP_WEB_DIR"), "directory with the built frontend (env CATCHKEEP_WEB_DIR)")
 		if err := fs.Parse(args[1:]); err != nil {
 			return 2
 		}
-		err := serve(ctx, serveConfig{addr: *addr, webDir: *webDir}, func(a string) {
+		err := serve(ctx, serveConfig{addr: *addr, dbPath: *dbPath, webDir: *webDir}, func(a string) {
 			_, _ = fmt.Fprintf(stdout, "listening on http://%s\n", a)
 		})
 		if err != nil {
@@ -67,12 +70,22 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 
 type serveConfig struct {
 	addr   string
+	dbPath string
 	webDir string
 }
 
 // serve runs the HTTP API until ctx is canceled, then shuts down gracefully.
 // ready is called with the bound address once the listener is open.
 func serve(ctx context.Context, cfg serveConfig, ready func(addr string)) error {
+	if err := os.MkdirAll(filepath.Dir(cfg.dbPath), 0o700); err != nil {
+		return fmt.Errorf("create database folder: %w", err)
+	}
+	store, err := sqlite.Open(ctx, cfg.dbPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = store.Close() }()
+
 	var lc net.ListenConfig
 	ln, err := lc.Listen(ctx, "tcp", cfg.addr)
 	if err != nil {
@@ -117,4 +130,21 @@ func newRootHandler(cfg serveConfig) http.Handler {
 	mux.Handle("/api/", api)
 	mux.Handle("/", web.Handler(os.DirFS(cfg.webDir)))
 	return mux
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+// defaultDBPath is <user config dir>/CatchKeep/catchkeep.db, falling back to
+// the working directory if the config dir is unknown.
+func defaultDBPath() string {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "catchkeep.db"
+	}
+	return filepath.Join(dir, "CatchKeep", "catchkeep.db")
 }

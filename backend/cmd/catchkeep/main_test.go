@@ -45,7 +45,7 @@ func TestServe_AnswersHealthAndStopsWhenContextIsCanceled(t *testing.T) {
 	done := make(chan error, 1)
 
 	go func() {
-		done <- serve(ctx, serveConfig{addr: "127.0.0.1:0"}, func(addr string) { addrs <- addr })
+		done <- serve(ctx, serveConfig{addr: "127.0.0.1:0", dbPath: filepath.Join(t.TempDir(), "test.db")}, func(addr string) { addrs <- addr })
 	}()
 
 	var addr string
@@ -92,7 +92,7 @@ func TestServe_ServesFrontendFromWebDirAlongsideAPI(t *testing.T) {
 	defer cancel()
 	addrs := make(chan string, 1)
 	go func() {
-		_ = serve(ctx, serveConfig{addr: "127.0.0.1:0", webDir: dir}, func(addr string) { addrs <- addr })
+		_ = serve(ctx, serveConfig{addr: "127.0.0.1:0", dbPath: filepath.Join(t.TempDir(), "test.db"), webDir: dir}, func(addr string) { addrs <- addr })
 	}()
 	addr := <-addrs
 
@@ -114,5 +114,44 @@ func TestServe_ServesFrontendFromWebDirAlongsideAPI(t *testing.T) {
 		if resp.StatusCode != http.StatusOK || !strings.Contains(string(b), want) {
 			t.Fatalf("GET %s = %d %q, want 200 containing %q", path, resp.StatusCode, b, want)
 		}
+	}
+}
+
+func TestServe_FailsWhenTheDatabaseCannotBeOpened(t *testing.T) {
+	blocker := filepath.Join(t.TempDir(), "blocker")
+	if err := os.WriteFile(blocker, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := serve(t.Context(), serveConfig{addr: "127.0.0.1:0", dbPath: filepath.Join(blocker, "test.db")}, func(string) {
+		t.Error("serve started listening without a database")
+	})
+
+	if err == nil {
+		t.Fatal("serve returned nil, want error")
+	}
+}
+
+func TestServe_CreatesTheDatabaseFolderOnFirstRun(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "new", "nested", "test.db")
+	ctx, cancel := context.WithCancel(t.Context())
+	started := make(chan struct{})
+	done := make(chan error, 1)
+
+	go func() {
+		done <- serve(ctx, serveConfig{addr: "127.0.0.1:0", dbPath: dbPath}, func(string) { close(started) })
+	}()
+
+	select {
+	case <-started:
+	case err := <-done:
+		t.Fatalf("serve failed: %v", err)
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatalf("serve: %v", err)
+	}
+	if _, err := os.Stat(dbPath); err != nil {
+		t.Fatalf("database file not created: %v", err)
 	}
 }
