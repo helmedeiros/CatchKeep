@@ -9,14 +9,19 @@
     "typecheck": "tsc -b --noEmit",
     "lint": "oxlint --deny-warnings src",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run lint && npm run test",
-    "preview": "vite preview"
+    "check": "npm run api:check && npm run typecheck && npm run lint && npm run test",
+    "preview": "vite preview",
+    "api:generate": "openapi-typescript ../api/openapi.yaml -o src/api/schema.gen.ts",
+    "api:check": "openapi-typescript ../api/openapi.yaml -o src/api/schema.gen.ts --check"
   },
   "dependencies": {
+    "@tanstack/react-query": "5.107.1",
+    "openapi-fetch": "0.17.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "4.3.5",
     "@testing-library/dom": "10.4.2",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
@@ -26,8 +31,10 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
     "jsdom": "31.0.1",
+    "openapi-typescript": "7.13.0",
     "oxlint": "1.90.0",
-    "typescript": "7.0.2",
+    "tailwindcss": "4.3.5",
+    "typescript": "5.9.3",
     "vite": "8.3.6",
     "vitest": "5.1.0"
   },
