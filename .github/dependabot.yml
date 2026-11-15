@@ -28,6 +28,9 @@ updates:
       # @types/node follows the Node.js major in .nvmrc; bump both together.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # openapi-typescript needs the TypeScript 5 compiler API.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: chore
       include: scope
