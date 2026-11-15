@@ -19,30 +19,3 @@ func MightBeSameCatch(a, b Snapshot) bool {
 	}
 	return true
 }
-
-// ClassifyImport splits rows into new Pokémon and rows that might already be
-// in the collection or repeat an earlier row of the same import. Possible
-// matches are held back, never merged (spec V1-IMP-07).
-func ClassifyImport(existing []Pokemon, rows []ImportRow) (fresh []ImportRow, possibleMatches int) {
-	seen := make([]Snapshot, 0, len(existing)+len(rows))
-	for _, p := range existing {
-		seen = append(seen, p.Current())
-	}
-	for _, row := range rows {
-		snap := Pokemon{Observations: row.Observations}.Current()
-		matched := false
-		for _, s := range seen {
-			if MightBeSameCatch(s, snap) {
-				matched = true
-				break
-			}
-		}
-		if matched {
-			possibleMatches++
-			continue
-		}
-		fresh = append(fresh, row)
-		seen = append(seen, snap)
-	}
-	return fresh, possibleMatches
-}
