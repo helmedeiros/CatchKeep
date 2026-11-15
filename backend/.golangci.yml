@@ -7,6 +7,7 @@ linters:
   default: standard
   enable:
     - bodyclose
+    - depguard
     - errorlint
     - gocritic
     - gosec
@@ -15,6 +16,41 @@ linters:
     - revive
     - unparam
     - usestdlibvars
+  settings:
+    depguard:
+      rules:
+        domain-is-pure:
+          list-mode: strict
+          files:
+            - "**/internal/domain/**"
+            - "!$test"
+          allow:
+            - $gostd
+            - github.com/helmedeiros/catchkeep/backend/internal/domain
+        ports-depend-on-domain-only:
+          list-mode: strict
+          files:
+            - "**/internal/ports/**"
+          allow:
+            - $gostd
+            - github.com/helmedeiros/catchkeep/backend/internal/domain
+        app-depends-on-domain-and-ports:
+          list-mode: strict
+          files:
+            - "**/internal/app/**"
+            - "!$test"
+          allow:
+            - $gostd
+            - github.com/helmedeiros/catchkeep/backend/internal/domain
+            - github.com/helmedeiros/catchkeep/backend/internal/ports
+        only-cmd-wires-adapters:
+          list-mode: lax
+          files:
+            - "**/internal/**"
+            - "!**/internal/adapters/**"
+          deny:
+            - pkg: github.com/helmedeiros/catchkeep/backend/internal/adapters
+              desc: only cmd/ may depend on adapters
 
 formatters:
   enable:
