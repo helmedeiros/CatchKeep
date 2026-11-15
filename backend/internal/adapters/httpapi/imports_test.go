@@ -187,3 +187,48 @@ func TestImport_InvalidAnswersAreRejected(t *testing.T) {
 	}
 	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/unknown/answers", `{"answers":[{"row":2,"answer":"different"}]}`), http.StatusNotFound)
 }
+
+func TestCollection_ConfirmAbsentForOneSpecies(t *testing.T) {
+	api := signedIn(t, "Ash")
+	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
+
+	rec := api.do(http.MethodPost, "/api/v1/collection/confirmations", `{"species":"Charizard","form":"Normal","features":["shiny","costume"]}`)
+	wantStatus(t, rec, http.StatusOK)
+	if got := decode[struct{ Updated int }](t, rec.Body.Bytes()); got.Updated != 1 {
+		t.Fatalf("updated = %d, want 1", got.Updated)
+	}
+
+	coll := decode[struct {
+		Pokemon []struct {
+			Species    string
+			Attributes map[string]string
+		}
+	}](t, api.do(http.MethodGet, "/api/v1/collection", "").Body.Bytes())
+	for _, p := range coll.Pokemon {
+		want := "unknown"
+		if p.Species == "Charizard" {
+			want = "no"
+		}
+		if p.Attributes["shiny"] != want || p.Attributes["costume"] != want || p.Attributes["background"] != "unknown" {
+			t.Fatalf("%s attributes = %v", p.Species, p.Attributes)
+		}
+	}
+}
+
+func TestCollection_ConfirmAbsentRejectsInvalidRequests(t *testing.T) {
+	wantStatus(t, newAPI(t).do(http.MethodPost, "/api/v1/collection/confirmations", `{"species":"Pidgey","form":"Normal","features":["shiny"]}`), http.StatusUnauthorized)
+
+	api := signedIn(t, "Ash")
+	for name, body := range map[string]string{
+		"no features":     `{"species":"Pidgey","form":"Normal","features":[]}`,
+		"unknown feature": `{"species":"Pidgey","form":"Normal","features":["cp"]}`,
+		"no species":      `{"species":"","form":"Normal","features":["shiny"]}`,
+	} {
+		rec := api.do(http.MethodPost, "/api/v1/collection/confirmations", body)
+		wantStatus(t, rec, http.StatusUnprocessableEntity)
+		if code := errorCode(t, rec); code != "VALIDATION_FAILED" {
+			t.Errorf("%s: code = %q", name, code)
+		}
+	}
+}

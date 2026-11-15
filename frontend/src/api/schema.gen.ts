@@ -174,6 +174,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/collection/confirmations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm that none of a species' Pokémon have some features.
+         * @description Records the trainer's word, for every Pokémon of one species and form, that the listed features are absent. Only unknown values change; features already known either way are kept.
+         */
+        post: operations["confirmAbsent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -313,6 +333,19 @@ export interface components {
             answer: "same" | "different";
             /** @description Required when the answer is "same"; a candidate's pokemon id. */
             sameAs?: string;
+        };
+        AbsenceConfirmation: {
+            /** @example Pidgey */
+            species: string;
+            /** @example Normal */
+            form: string;
+            features: components["schemas"]["ConfirmableFeature"][];
+        };
+        /** @enum {string} */
+        ConfirmableFeature: "shiny" | "costume" | "background" | "dynamax" | "gigantamax";
+        ConfirmationResult: {
+            /** @description Pokémon that had at least one of the features unknown. */
+            updated: number;
         };
         InvalidRow: {
             /** @description 1-based line number in the file, counting the header. */
@@ -629,6 +662,33 @@ export interface operations {
                 };
             };
             401: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    confirmAbsent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AbsenceConfirmation"];
+            };
+        };
+        responses: {
+            /** @description Confirmed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfirmationResult"];
+                };
+            };
+            401: components["responses"]["Error"];
+            422: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };
     };
