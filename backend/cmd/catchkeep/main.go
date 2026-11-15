@@ -135,7 +135,7 @@ func newRootHandler(cfg serveConfig, store *sqlite.Store) http.Handler {
 		Profiles:   app.NewProfiles(trainers, hasher, ulids, clock),
 		Sessions:   app.NewSessions(trainers, sqlite.NewSessions(store), hasher, ids.Tokens{}, clock),
 		Imports:    app.NewImports(csvimport.NewPokeGenie(time.Local), collection, collection, ulids, clock),
-		Collection: app.NewCollection(collection),
+		Collection: app.NewCollection(collection, collection, clock),
 	})
 	if cfg.webDir == "" {
 		return api

@@ -25,6 +25,13 @@ type ImportBatches interface {
 	Commit(ctx context.Context, b domain.ImportBatch, add []domain.Pokemon, update []domain.PokemonUpdate) error
 }
 
+// CollectionWriter changes a trainer's Pokémon.
+type CollectionWriter interface {
+	// AddObservations atomically adds observations to the trainer's active
+	// Pokémon; it fails without changes if any Pokémon is not theirs.
+	AddObservations(ctx context.Context, trainer domain.TrainerID, updates []domain.PokemonUpdate) error
+}
+
 // CollectionReader reads a trainer's Pokémon.
 type CollectionReader interface {
 	// ListPokemon returns the trainer's active Pokémon with all observations.

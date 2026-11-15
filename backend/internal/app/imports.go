@@ -181,14 +181,33 @@ func previewOf(b domain.ImportBatch) ImportPreview {
 	}
 }
 
-// Collection reads a trainer's Pokémon.
+// Collection reads and confirms a trainer's Pokémon.
 type Collection struct {
 	reader ports.CollectionReader
+	writer ports.CollectionWriter
+	clock  ports.Clock
 }
 
 // NewCollection wires the collection use cases.
-func NewCollection(reader ports.CollectionReader) *Collection {
-	return &Collection{reader: reader}
+func NewCollection(reader ports.CollectionReader, writer ports.CollectionWriter, clock ports.Clock) *Collection {
+	return &Collection{reader: reader, writer: writer, clock: clock}
+}
+
+// ConfirmAbsent records that none of the trainer's Pokémon of one species
+// and form has the given features, and returns how many Pokémon changed.
+func (c *Collection) ConfirmAbsent(ctx context.Context, trainer domain.TrainerID, species, form string, fields []domain.Field) (int, error) {
+	list, err := c.reader.ListPokemon(ctx, trainer)
+	if err != nil {
+		return 0, err
+	}
+	updates, err := domain.ConfirmAbsent(list, species, form, fields, c.clock.Now())
+	if err != nil || len(updates) == 0 {
+		return 0, err
+	}
+	if err := c.writer.AddObservations(ctx, trainer, updates); err != nil {
+		return 0, fmt.Errorf("confirm features: %w", err)
+	}
+	return len(updates), nil
 }
 
 // List returns the trainer's Pokémon, highest CP first, unknown CP last.

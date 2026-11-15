@@ -20,6 +20,7 @@ type Collection struct {
 var (
 	_ ports.ImportBatches    = (*Collection)(nil)
 	_ ports.CollectionReader = (*Collection)(nil)
+	_ ports.CollectionWriter = (*Collection)(nil)
 )
 
 // NewCollection returns a collection store backed by store.
@@ -133,9 +134,7 @@ func (c *Collection) Commit(ctx context.Context, b domain.ImportBatch, add []dom
 		return fmt.Errorf("prepare: %w", err)
 	}
 	defer func() { _ = insertPokemon.Close() }()
-	insertObs, err := tx.PrepareContext(ctx, `
-		INSERT INTO observations (pokemon_id, field, value, source, source_ref, observed_at, recorded_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`)
+	insertObs, err := tx.PrepareContext(ctx, insertObservation)
 	if err != nil {
 		return fmt.Errorf("prepare: %w", err)
 	}
@@ -151,25 +150,66 @@ func (c *Collection) Commit(ctx context.Context, b domain.ImportBatch, add []dom
 			}
 		}
 	}
-	for _, u := range update {
-		var owned bool
-		if err = tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM pokemon WHERE id = ? AND trainer_id = ? AND status = 'active')`,
-			string(u.PokemonID), string(b.TrainerID)).Scan(&owned); err != nil {
-			return fmt.Errorf("check pokemon: %w", err)
-		}
-		if !owned {
-			err = fmt.Errorf("update pokemon %s: not in the trainer's collection", u.PokemonID)
-			return err
-		}
-		for _, o := range u.Observations {
-			if _, err = insertObs.ExecContext(ctx, string(u.PokemonID), string(o.Field), o.Value, string(o.Source),
-				o.SourceRef, formatTime(o.ObservedAt), recordedAt); err != nil {
-				return fmt.Errorf("insert observation: %w", err)
-			}
-		}
+	if err = addObservations(ctx, tx, insertObs, b.TrainerID, update, recordedAt); err != nil {
+		return err
 	}
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("commit: %w", err)
+	}
+	return nil
+}
+
+// AddObservations implements ports.CollectionWriter in a single transaction.
+func (c *Collection) AddObservations(ctx context.Context, trainer domain.TrainerID, updates []domain.PokemonUpdate) (err error) {
+	tx, err := c.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	insertObs, err := tx.PrepareContext(ctx, insertObservation)
+	if err != nil {
+		return fmt.Errorf("prepare: %w", err)
+	}
+	defer func() { _ = insertObs.Close() }()
+	if err = addObservations(ctx, tx, insertObs, trainer, updates, ""); err != nil {
+		return err
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+	return nil
+}
+
+const insertObservation = `
+	INSERT INTO observations (pokemon_id, field, value, source, source_ref, observed_at, recorded_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?)`
+
+// addObservations adds observations to the trainer's active Pokémon, failing
+// if any is not theirs. An empty recordedAt records each at its ObservedAt.
+func addObservations(ctx context.Context, tx *sql.Tx, insertObs *sql.Stmt, trainer domain.TrainerID, updates []domain.PokemonUpdate, recordedAt string) error {
+	for _, u := range updates {
+		var owned bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM pokemon WHERE id = ? AND trainer_id = ? AND status = 'active')`,
+			string(u.PokemonID), string(trainer)).Scan(&owned); err != nil {
+			return fmt.Errorf("check pokemon: %w", err)
+		}
+		if !owned {
+			return fmt.Errorf("update pokemon %s: not in the trainer's collection", u.PokemonID)
+		}
+		for _, o := range u.Observations {
+			at := recordedAt
+			if at == "" {
+				at = formatTime(o.ObservedAt)
+			}
+			if _, err := insertObs.ExecContext(ctx, string(u.PokemonID), string(o.Field), o.Value, string(o.Source),
+				o.SourceRef, formatTime(o.ObservedAt), at); err != nil {
+				return fmt.Errorf("insert observation: %w", err)
+			}
+		}
 	}
 	return nil
 }

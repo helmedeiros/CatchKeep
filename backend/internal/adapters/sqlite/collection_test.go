@@ -192,3 +192,37 @@ func TestImportBatches_CommitRefusesToUpdateAnotherTrainersPokemon(t *testing.T)
 		t.Fatalf("status = %s after refused commit, want staged", got.Status)
 	}
 }
+
+func TestCollection_AddObservationsIsAllOrNothingAndScopedToTheTrainer(t *testing.T) {
+	store, _ := openTemp(t)
+	withTrainers(t, store, "ash", "misty")
+	coll := sqlite.NewCollection(store)
+	b := stagedBatch()
+	if err := coll.Save(t.Context(), b); err != nil {
+		t.Fatal(err)
+	}
+	b.Status = domain.ImportCommitted
+	if err := coll.Commit(t.Context(), b, []domain.Pokemon{{ID: "P1", TrainerID: "ash", Observations: b.Parsed.Rows[0].Observations}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	notShiny := []domain.Observation{{Field: domain.FieldShiny, Value: "false", Source: domain.SourceManual, SourceRef: "bulk confirmation", ObservedAt: at}}
+
+	if err := coll.AddObservations(t.Context(), "misty", []domain.PokemonUpdate{{PokemonID: "P1", Observations: notShiny}}); err == nil {
+		t.Fatal("misty changed ash's Pokémon")
+	}
+	err := coll.AddObservations(t.Context(), "ash", []domain.PokemonUpdate{{PokemonID: "P1", Observations: notShiny}, {PokemonID: "P9", Observations: notShiny}})
+	if err == nil {
+		t.Fatal("update naming a missing Pokémon succeeded")
+	}
+	if list, _ := coll.ListPokemon(t.Context(), "ash"); list[0].Current().Tri(domain.FieldShiny) != domain.Unknown {
+		t.Fatal("failed update left a change behind")
+	}
+
+	if err := coll.AddObservations(t.Context(), "ash", []domain.PokemonUpdate{{PokemonID: "P1", Observations: notShiny}}); err != nil {
+		t.Fatalf("AddObservations: %v", err)
+	}
+	list, _ := coll.ListPokemon(t.Context(), "ash")
+	if o := list[0].Observations[len(list[0].Observations)-1]; list[0].Current().Tri(domain.FieldShiny) != domain.No || o.Source != domain.SourceManual {
+		t.Fatalf("observations = %+v", list[0].Observations)
+	}
+}
