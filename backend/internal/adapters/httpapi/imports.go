@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -157,6 +158,37 @@ func (s *server) ListCollection(ctx context.Context, _ ListCollectionRequestObje
 		out.Pokemon = append(out.Pokemon, toPokemon(p))
 	}
 	return ListCollection200JSONResponse(out), nil
+}
+
+func (s *server) ConfirmAbsent(ctx context.Context, req ConfirmAbsentRequestObject) (ConfirmAbsentResponseObject, error) {
+	trainer, err := s.trainer(ctx)
+	if errors.Is(err, errNotSignedIn) {
+		return ConfirmAbsent401JSONResponse{unauthenticated()}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	invalid := func(msg string) ConfirmAbsentResponseObject {
+		return ConfirmAbsent422JSONResponse(errorBody(codeValidationFailed, msg))
+	}
+	if strings.TrimSpace(req.Body.Species) == "" || strings.TrimSpace(req.Body.Form) == "" {
+		return invalid("Name the species and form to confirm."), nil
+	}
+	fields := make([]domain.Field, 0, len(req.Body.Features))
+	for _, f := range req.Body.Features {
+		if !f.Valid() {
+			return invalid(domain.ErrNotConfirmable.Error()), nil
+		}
+		fields = append(fields, domain.Field(f))
+	}
+	n, err := s.services.Collection.ConfirmAbsent(ctx, trainer, req.Body.Species, req.Body.Form, fields)
+	if errors.Is(err, domain.ErrNotConfirmable) {
+		return invalid(err.Error()), nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return ConfirmAbsent200JSONResponse{Updated: n}, nil
 }
 
 func toPreview(p app.ImportPreview) ImportPreview {

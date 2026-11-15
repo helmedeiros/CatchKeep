@@ -17,6 +17,33 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for ConfirmableFeature.
+const (
+	Background ConfirmableFeature = "background"
+	Costume    ConfirmableFeature = "costume"
+	Dynamax    ConfirmableFeature = "dynamax"
+	Gigantamax ConfirmableFeature = "gigantamax"
+	Shiny      ConfirmableFeature = "shiny"
+)
+
+// Valid indicates whether the value is a known member of the ConfirmableFeature enum.
+func (e ConfirmableFeature) Valid() bool {
+	switch e {
+	case Background:
+		return true
+	case Costume:
+		return true
+	case Dynamax:
+		return true
+	case Gigantamax:
+		return true
+	case Shiny:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatus.
 const (
 	Ok HealthStatus = "ok"
@@ -161,6 +188,17 @@ func (e TriState) Valid() bool {
 	}
 }
 
+// AbsenceConfirmation defines model for AbsenceConfirmation.
+type AbsenceConfirmation struct {
+	Features []ConfirmableFeature `json:"features"`
+
+	// Form Examples: Normal
+	Form string `json:"form"`
+
+	// Species Examples: Pidgey
+	Species string `json:"species"`
+}
+
 // Attributes defines model for Attributes.
 type Attributes struct {
 	// Background Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
@@ -195,6 +233,15 @@ type Attributes struct {
 type Collection struct {
 	Pokemon []Pokemon `json:"pokemon"`
 	Total   int       `json:"total"`
+}
+
+// ConfirmableFeature defines model for ConfirmableFeature.
+type ConfirmableFeature string
+
+// ConfirmationResult defines model for ConfirmationResult.
+type ConfirmationResult struct {
+	// Updated Pokémon that had at least one of the features unknown.
+	Updated int `json:"updated"`
 }
 
 // DisplayName Examples: Ash
@@ -418,6 +465,9 @@ type TriState string
 // ImportId defines model for ImportId.
 type ImportId = string
 
+// ConfirmAbsentJSONRequestBody defines body for ConfirmAbsent for application/json ContentType.
+type ConfirmAbsentJSONRequestBody = AbsenceConfirmation
+
 // AnswerPossibleMatchesJSONRequestBody defines body for AnswerPossibleMatches for application/json ContentType.
 type AnswerPossibleMatchesJSONRequestBody = MatchAnswers
 
@@ -432,6 +482,9 @@ type ServerInterface interface {
 	// ListCollection Every active Pokémon of the signed-in trainer.
 	// (GET /collection)
 	ListCollection(w http.ResponseWriter, r *http.Request)
+	// ConfirmAbsent Confirm that none of a species' Pokémon have some features.
+	// (POST /collection/confirmations)
+	ConfirmAbsent(w http.ResponseWriter, r *http.Request)
 	// GetHealth Report whether the API is up.
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -478,6 +531,20 @@ func (siw *ServerInterfaceWrapper) ListCollection(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListCollection(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConfirmAbsent operation middleware
+func (siw *ServerInterfaceWrapper) ConfirmAbsent(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfirmAbsent(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -794,6 +861,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{importId}/commit", wrapper.CommitImport)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{importId}/answers", wrapper.AnswerPossibleMatches)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/collection", wrapper.ListCollection)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/collection/confirmations", wrapper.ConfirmAbsent)
 
 	return m
 }
@@ -841,6 +909,73 @@ type ListCollectiondefaultJSONResponse struct {
 }
 
 func (response ListCollectiondefaultJSONResponse) VisitListCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmAbsentRequestObject struct {
+	Body *ConfirmAbsentJSONRequestBody
+}
+
+type ConfirmAbsentResponseObject interface {
+	VisitConfirmAbsentResponse(w http.ResponseWriter) error
+}
+
+type ConfirmAbsent200JSONResponse ConfirmationResult
+
+func (response ConfirmAbsent200JSONResponse) VisitConfirmAbsentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmAbsent401JSONResponse struct{ ErrorJSONResponse }
+
+func (response ConfirmAbsent401JSONResponse) VisitConfirmAbsentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmAbsent422JSONResponse Error
+
+func (response ConfirmAbsent422JSONResponse) VisitConfirmAbsentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmAbsentdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ConfirmAbsentdefaultJSONResponse) VisitConfirmAbsentResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -1522,6 +1657,9 @@ type StrictServerInterface interface {
 	// ListCollection Every active Pokémon of the signed-in trainer.
 	// (GET /collection)
 	ListCollection(ctx context.Context, request ListCollectionRequestObject) (ListCollectionResponseObject, error)
+	// ConfirmAbsent Confirm that none of a species' Pokémon have some features.
+	// (POST /collection/confirmations)
+	ConfirmAbsent(ctx context.Context, request ConfirmAbsentRequestObject) (ConfirmAbsentResponseObject, error)
 	// GetHealth Report whether the API is up.
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -1610,6 +1748,37 @@ func (sh *strictHandler) ListCollection(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListCollectionResponseObject); ok {
 		if err := validResponse.VisitListCollectionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ConfirmAbsent operation middleware
+func (sh *strictHandler) ConfirmAbsent(w http.ResponseWriter, r *http.Request) {
+	var request ConfirmAbsentRequestObject
+
+	var body ConfirmAbsentJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ConfirmAbsent(ctx, request.(ConfirmAbsentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConfirmAbsent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConfirmAbsentResponseObject); ok {
+		if err := validResponse.VisitConfirmAbsentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

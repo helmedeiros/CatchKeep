@@ -275,6 +275,36 @@ paths:
           $ref: "#/components/responses/Error"
         default:
           $ref: "#/components/responses/Error"
+  /collection/confirmations:
+    post:
+      tags: [collection]
+      operationId: confirmAbsent
+      summary: Confirm that none of a species' Pokémon have some features.
+      description: >-
+        Records the trainer's word, for every Pokémon of one species and form,
+        that the listed features are absent. Only unknown values change;
+        features already known either way are kept.
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AbsenceConfirmation"
+      responses:
+        "200":
+          description: Confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfirmationResult"
+        "401":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
 components:
   parameters:
     ImportId:
@@ -588,6 +618,37 @@ components:
         sameAs:
           type: string
           description: Required when the answer is "same"; a candidate's pokemon id.
+    AbsenceConfirmation:
+      type: object
+      additionalProperties: false
+      required: [species, form, features]
+      properties:
+        species:
+          type: string
+          minLength: 1
+          examples: [Pidgey]
+        form:
+          type: string
+          minLength: 1
+          examples: [Normal]
+        features:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ConfirmableFeature"
+    ConfirmableFeature:
+      type: string
+      enum: [shiny, costume, background, dynamax, gigantamax]
+    ConfirmationResult:
+      type: object
+      additionalProperties: false
+      required: [updated]
+      properties:
+        updated:
+          type: integer
+          minimum: 0
+          description: Pokémon that had at least one of the features unknown.
     InvalidRow:
       type: object
       additionalProperties: false
