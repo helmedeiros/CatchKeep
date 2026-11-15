@@ -1,0 +1,99 @@
+package domain_test
+
+import (
+	"errors"
+	"testing"
+
+	"github.com/helmedeiros/catchkeep/backend/internal/domain"
+)
+
+// known returns a Pokémon whose variant is fully known (not shiny etc.).
+func known(id, species string, ivs ...string) domain.Pokemon {
+	kv := []string{"species", species, "form", "Normal", "shiny", "false", "costume", "false", "background", "false", "dynamax", "false", "gigantamax", "false"}
+	if len(ivs) == 3 {
+		kv = append(kv, "iv_attack", ivs[0], "iv_defense", ivs[1], "iv_stamina", ivs[2])
+	}
+	return mon(id, kv...)
+}
+
+func TestSetup_Validate(t *testing.T) {
+	for name, s := range map[string]domain.Setup{
+		"no goals":        {Capacity: 300},
+		"repeated goal":   {Capacity: 300, Goals: []domain.Goal{domain.GoalCollecting, domain.GoalCollecting}},
+		"unknown goal":    {Capacity: 300, Goals: []domain.Goal{"hoarding"}},
+		"zero capacity":   {Capacity: 0, Goals: []domain.Goal{domain.GoalCollecting}},
+		"absurd capacity": {Capacity: 100000, Goals: []domain.Goal{domain.GoalCollecting}},
+	} {
+		if err := s.Validate(); !errors.Is(err, domain.ErrInvalidSetup) {
+			t.Errorf("%s: err = %v, want ErrInvalidSetup", name, err)
+		}
+	}
+	if err := (domain.Setup{Capacity: 2700, Goals: []domain.Goal{domain.GoalBattling, domain.GoalCollecting}}).Validate(); err != nil {
+		t.Fatalf("valid setup rejected: %v", err)
+	}
+}
+
+func TestOrdinaryMinimum_ScalesWithCapacity(t *testing.T) {
+	if small := domain.OrdinaryMinimum(350); small != 1 {
+		t.Fatalf("small bag minimum = %d, want 1", small)
+	}
+	if big := domain.OrdinaryMinimum(2700); big != 2 {
+		t.Fatalf("2,700 slots minimum = %d, want 2", big)
+	}
+}
+
+func TestSummarizeKeeps_KeepsTheBestCopiesUpToTheMinimum(t *testing.T) {
+	pokemon := []domain.Pokemon{
+		known("P1", "Pidgey", "1", "1", "1"),
+		known("P2", "Pidgey", "15", "15", "15"),
+		known("P3", "Pidgey", "10", "10", "10"),
+		known("P4", "Mewtwo", "15", "14", "13"),
+	}
+
+	s := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 2700, Goals: []domain.Goal{domain.GoalCollecting}})
+
+	if s.Total != 4 || s.Kept != 3 || s.Surplus != 1 || s.NeedsConfirmation != 0 || s.Minimum != 2 {
+		t.Fatalf("summary = %+v", s)
+	}
+	pidgey := s.Groups[0]
+	if pidgey.Species != "Pidgey" || pidgey.Count != 3 || pidgey.Keep != 2 || len(pidgey.SurplusIDs) != 1 || pidgey.SurplusIDs[0] != "P1" {
+		t.Fatalf("pidgey group = %+v; want the 1/1/1 copy as surplus", pidgey)
+	}
+}
+
+func TestSummarizeKeeps_UnknownVariantFeaturesWaitForConfirmation(t *testing.T) {
+	pokemon := []domain.Pokemon{
+		known("P1", "Pidgey"),
+		mon("P2", "species", "Pidgey", "form", "Normal"),
+	}
+
+	s := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}})
+
+	if s.NeedsConfirmation != 1 || s.Kept != 1 || s.Surplus != 0 {
+		t.Fatalf("summary = %+v; the unconfirmed Pidgey must never be surplus", s)
+	}
+}
+
+func TestSummarizeKeeps_DistinctVariantsAreKeptSeparately(t *testing.T) {
+	shiny := mon("P2", "species", "Pidgey", "form", "Normal", "shiny", "true", "costume", "false", "background", "false", "dynamax", "false", "gigantamax", "false")
+
+	s := domain.SummarizeKeeps([]domain.Pokemon{known("P1", "Pidgey"), shiny}, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}})
+
+	if len(s.Groups) != 2 || s.Surplus != 0 {
+		t.Fatalf("summary = %+v; a shiny is its own variant", s)
+	}
+}
+
+func TestSummarizeKeeps_TradingKeepsAnExtraSpecialVariant(t *testing.T) {
+	shiny := func(id string) domain.Pokemon {
+		return mon(id, "species", "Pidgey", "form", "Normal", "shiny", "true", "costume", "false", "background", "false", "dynamax", "false", "gigantamax", "false")
+	}
+	pokemon := []domain.Pokemon{shiny("P1"), shiny("P2"), shiny("P3")}
+
+	collecting := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}})
+	trading := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting, domain.GoalTrading}})
+
+	if collecting.Surplus != 2 || trading.Surplus != 1 {
+		t.Fatalf("surplus collecting=%d trading=%d, want 2 and 1", collecting.Surplus, trading.Surplus)
+	}
+}
