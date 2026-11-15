@@ -27,7 +27,13 @@ main_status=$(gh run list --branch main --workflow CI --limit 1 --json headSha,c
 npm run --silent check
 
 git switch -q -c "$branch"
-git commit -q -m "$subject"
+if ! git commit -q -m "$subject"; then
+  # Local gates failed in the commit hooks: go back to main with the change
+  # still staged so it can be fixed and shipped again.
+  git switch -q main
+  git branch -q -D "$branch"
+  die "commit hooks failed; back on main with changes staged"
+fi
 head_sha=$(git rev-parse HEAD)
 git push -q -u origin "$branch"
 
