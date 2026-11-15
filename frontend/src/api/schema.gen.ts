@@ -184,8 +184,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Confirm that none of a species' Pokémon have some features.
-         * @description Records the trainer's word, for every Pokémon of one species and form, that the listed features are absent. Only unknown values change; features already known either way are kept.
+         * Confirm that none of a species' (or any) Pokémon have some features.
+         * @description Records the trainer's word, for every Pokémon of one species and form (or of the whole collection when neither is given), that the listed features are absent. Only unknown values change; features already known either way are kept.
          */
         post: operations["confirmAbsent"];
         delete?: never;
@@ -334,11 +334,12 @@ export interface components {
             /** @description Required when the answer is "same"; a candidate's pokemon id. */
             sameAs?: string;
         };
+        /** @description Give species and form together, or neither for the whole collection. */
         AbsenceConfirmation: {
             /** @example Pidgey */
-            species: string;
+            species?: string;
             /** @example Normal */
-            form: string;
+            form?: string;
             features: components["schemas"]["ConfirmableFeature"][];
         };
         /** @enum {string} */

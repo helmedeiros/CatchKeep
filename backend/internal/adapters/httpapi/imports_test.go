@@ -223,12 +223,25 @@ func TestCollection_ConfirmAbsentRejectsInvalidRequests(t *testing.T) {
 	for name, body := range map[string]string{
 		"no features":     `{"species":"Pidgey","form":"Normal","features":[]}`,
 		"unknown feature": `{"species":"Pidgey","form":"Normal","features":["cp"]}`,
-		"no species":      `{"species":"","form":"Normal","features":["shiny"]}`,
+		"form only":       `{"form":"Normal","features":["shiny"]}`,
+		"blank species":   `{"species":" ","form":"Normal","features":["shiny"]}`,
 	} {
 		rec := api.do(http.MethodPost, "/api/v1/collection/confirmations", body)
 		wantStatus(t, rec, http.StatusUnprocessableEntity)
 		if code := errorCode(t, rec); code != "VALIDATION_FAILED" {
 			t.Errorf("%s: code = %q", name, code)
 		}
+	}
+}
+
+func TestCollection_ConfirmAbsentForTheWholeCollection(t *testing.T) {
+	api := signedIn(t, "Ash")
+	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
+
+	rec := api.do(http.MethodPost, "/api/v1/collection/confirmations", `{"features":["background"]}`)
+	wantStatus(t, rec, http.StatusOK)
+	if got := decode[struct{ Updated int }](t, rec.Body.Bytes()); got.Updated != 4 {
+		t.Fatalf("updated = %d, want all 4", got.Updated)
 	}
 }

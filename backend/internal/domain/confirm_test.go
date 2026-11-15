@@ -50,3 +50,17 @@ func TestConfirmAbsent_OnlyFeaturesATrainerCanSeeInGame(t *testing.T) {
 		}
 	}
 }
+
+func TestConfirmAbsent_NoSpeciesMeansTheWholeCollection(t *testing.T) {
+	pokemon := []domain.Pokemon{
+		mon("P1", "species", "Pidgey"),
+		mon("P2", "species", "Rattata", "form", "Alola"),
+		mon("P3", "species", "Mewtwo", "shiny", "true"),
+	}
+
+	updates, err := domain.ConfirmAbsent(pokemon, "", "", []domain.Field{domain.FieldShiny}, confirmedAt)
+
+	if err != nil || len(updates) != 2 || updates[0].PokemonID != "P1" || updates[1].PokemonID != "P2" {
+		t.Fatalf("updates = %+v, err = %v; want P1 and P2 only", updates, err)
+	}
+}
