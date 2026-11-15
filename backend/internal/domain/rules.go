@@ -7,8 +7,11 @@ import (
 	"slices"
 )
 
-// ErrInvalidSetup means a trainer's setup cannot be used.
-var ErrInvalidSetup = errors.New("invalid setup")
+// Setup errors.
+var (
+	ErrInvalidSetup  = errors.New("invalid setup")
+	ErrSetupNotFound = errors.New("setup not done yet")
+)
 
 // Goal is what a trainer keeps Pokémon for (spec V1-SET-01).
 type Goal string
