@@ -127,3 +127,15 @@ func TestReviewImport_RowAnsweredDifferentIsACandidateForLaterRows(t *testing.T)
 		t.Fatalf("later row candidates = %+v", r.Matches[1].Candidates)
 	}
 }
+
+func TestReviewImport_GenderlessPokemonCanStillBeAnExactMatch(t *testing.T) {
+	genderless := []string{"species", "Mewtwo", "form", "Normal", "iv_attack", "15", "iv_defense", "15", "iv_stamina", "15", "catch_date", "2026-01-02"}
+	gendered := append(append([]string(nil), genderless...), "gender", "male")
+
+	if r := domain.ReviewImport([]domain.Pokemon{mon("P1", genderless...)}, []domain.ImportRow{row(2, genderless...)}, nil); !r.Matches[0].Exact {
+		t.Fatal("genderless on both sides not exact")
+	}
+	if r := domain.ReviewImport([]domain.Pokemon{mon("P1", gendered...)}, []domain.ImportRow{row(2, genderless...)}, nil); r.Matches[0].Exact {
+		t.Fatal("gender known on one side only marked exact")
+	}
+}

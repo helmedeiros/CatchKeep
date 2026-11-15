@@ -540,7 +540,8 @@ components:
           type: boolean
           description: >-
             One candidate, with species, form, gender, IVs and catch date all
-            known and equal. Safe to confirm in bulk.
+            known and equal (genderless on both sides counts as equal). Safe
+            to confirm in bulk.
         answer:
           type: string
           enum: [pending, same, different]
