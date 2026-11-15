@@ -1,8 +1,16 @@
-.PHONY: check fmt-check vet lint test build
+.PHONY: check generate generate-check fmt-check vet lint test build
 
 GO ?= go
 
-check: fmt-check vet lint test
+check: generate-check fmt-check vet lint test
+
+generate:
+	$(GO) generate ./...
+
+# Fails if generated code is out of date with api/openapi.yaml.
+generate-check: generate
+	@if ! git diff --quiet -- '*.gen.go' || [ -n "$$(git ls-files --others --exclude-standard -- '*.gen.go')" ]; then \
+		echo "generated code is stale or uncommitted: run make generate and stage it"; exit 1; fi
 
 fmt-check:
 	@out=$$($(GO) tool golangci-lint fmt --diff ./... 2>&1); \
