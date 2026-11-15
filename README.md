@@ -1,12 +1,11 @@
 # CatchKeep
 
-A family web app, hosted on a MacBook and used from iPhone Safari on home Wi-Fi, that recommends which Pokémon GO Pokémon to keep or transfer to reach a storage target. All transfers happen manually in the game.
+A self-hosted web app that recommends which Pokémon GO Pokémon to keep or transfer to reach a storage target. All transfers happen manually in the game.
 
 ## Status
 
 Specification phase. See [`spec/`](spec/):
 
-- [`brainstorming-handoff.md`](spec/brainstorming-handoff.md) — product handoff from brainstorming.
 - [`developer-spec.md`](spec/developer-spec.md) — implementation contract: architecture, data model, planner, API, security, error handling, testing plan, open decisions.
 
 ## Development
