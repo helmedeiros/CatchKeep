@@ -265,6 +265,8 @@ export interface operations {
             /** @description Signed out; the session cookie is cleared. */
             204: {
                 headers: {
+                    /** @description Expires the session cookie. */
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;

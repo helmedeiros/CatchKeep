@@ -44,16 +44,3 @@ func TestUnknownRoute_ReturnsNotFound(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 	}
 }
-
-func TestPendingOperations_AnswerNotImplementedWithErrorEnvelope(t *testing.T) {
-	handler := httpapi.NewHandler(httpapi.Services{Health: app.NewHealth("1.2.3")})
-
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/profiles", http.NoBody)
-	handler.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNotImplemented {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotImplemented)
-	}
-	assertMatchesContract(t, req, rec)
-}

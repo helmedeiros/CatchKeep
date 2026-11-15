@@ -112,6 +112,11 @@ paths:
       responses:
         "204":
           description: Signed out; the session cookie is cleared.
+          headers:
+            Set-Cookie:
+              description: Expires the session cookie.
+              schema:
+                type: string
         "401":
           $ref: "#/components/responses/Error"
         default:
