@@ -15,6 +15,10 @@ tags:
     description: Trainer profiles on this host.
   - name: session
     description: Signing in to a profile with its PIN.
+  - name: imports
+    description: Bringing a collection in from an export, previewed before it is applied.
+  - name: collection
+    description: The signed-in trainer's Pokémon.
 paths:
   /health:
     get:
@@ -139,7 +143,110 @@ paths:
           $ref: "#/components/responses/Error"
         default:
           $ref: "#/components/responses/Error"
+  /imports:
+    post:
+      tags: [imports]
+      operationId: stageImport
+      summary: Upload a Poke Genie CSV export and get a preview. Nothing changes until it is committed.
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema:
+              type: string
+      responses:
+        "201":
+          description: Staged. Review the preview, then commit it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportPreview"
+        "401":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+  /imports/{importId}:
+    parameters:
+      - $ref: "#/components/parameters/ImportId"
+    get:
+      tags: [imports]
+      operationId: getImport
+      summary: The preview of a staged or committed import.
+      security:
+        - session: []
+      responses:
+        "200":
+          description: The import.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportPreview"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+  /imports/{importId}/commit:
+    parameters:
+      - $ref: "#/components/parameters/ImportId"
+    post:
+      tags: [imports]
+      operationId: commitImport
+      summary: Add the staged Pokémon to the collection.
+      description: >-
+        Adds every new row. Rows that might be Pokémon already in the
+        collection are held back for review and never merged automatically.
+      security:
+        - session: []
+      responses:
+        "200":
+          description: Committed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportPreview"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+  /collection:
+    get:
+      tags: [collection]
+      operationId: listCollection
+      summary: Every active Pokémon of the signed-in trainer.
+      security:
+        - session: []
+      responses:
+        "200":
+          description: The collection, strongest first (CP descending).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Collection"
+        "401":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
 components:
+  parameters:
+    ImportId:
+      name: importId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
   securitySchemes:
     session:
       type: apiKey
@@ -209,6 +316,171 @@ components:
           type: string
           description: Backend build version.
           examples: [0.1.0]
+    TriState:
+      type: string
+      description: >-
+        Whether a feature is known to be present, known to be absent, or not
+        established by any source yet. Unknown is never treated as absent.
+      enum: [yes, no, unknown]
+    Pokemon:
+      type: object
+      additionalProperties: false
+      required: [id, species, form, attributes]
+      properties:
+        id:
+          type: string
+          description: Stable record id (ULID).
+        species:
+          type: string
+          examples: [Metagross]
+        form:
+          type: string
+          description: Form name; "Normal" for the default form.
+          examples: [Normal]
+        dexNumber:
+          type: integer
+          minimum: 1
+        gender:
+          type: string
+          enum: [male, female]
+        cp:
+          type: integer
+          minimum: 0
+        hp:
+          type: integer
+          minimum: 0
+        level:
+          type: number
+        iv:
+          $ref: "#/components/schemas/IVs"
+        catchDate:
+          type: string
+          format: date
+        attributes:
+          $ref: "#/components/schemas/Attributes"
+    IVs:
+      type: object
+      additionalProperties: false
+      required: [attack, defense, stamina]
+      properties:
+        attack:
+          type: integer
+          minimum: 0
+          maximum: 15
+        defense:
+          type: integer
+          minimum: 0
+          maximum: 15
+        stamina:
+          type: integer
+          minimum: 0
+          maximum: 15
+    Attributes:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          shiny,
+          lucky,
+          shadow,
+          purified,
+          favorite,
+          costume,
+          background,
+          dynamax,
+          gigantamax,
+        ]
+      properties:
+        shiny:
+          $ref: "#/components/schemas/TriState"
+        lucky:
+          $ref: "#/components/schemas/TriState"
+        shadow:
+          $ref: "#/components/schemas/TriState"
+        purified:
+          $ref: "#/components/schemas/TriState"
+        favorite:
+          $ref: "#/components/schemas/TriState"
+        costume:
+          $ref: "#/components/schemas/TriState"
+        background:
+          $ref: "#/components/schemas/TriState"
+        dynamax:
+          $ref: "#/components/schemas/TriState"
+        gigantamax:
+          $ref: "#/components/schemas/TriState"
+    Collection:
+      type: object
+      additionalProperties: false
+      required: [total, pokemon]
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        pokemon:
+          type: array
+          items:
+            $ref: "#/components/schemas/Pokemon"
+    ImportPreview:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          status,
+          source,
+          totalRows,
+          newCount,
+          possibleMatchCount,
+          invalidRows,
+          ignoredColumns,
+          unknownFields,
+        ]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [staged, committed]
+        source:
+          type: string
+          enum: [poke-genie]
+        totalRows:
+          type: integer
+          minimum: 0
+        newCount:
+          type: integer
+          minimum: 0
+          description: Rows that will be added (or were added, once committed).
+        possibleMatchCount:
+          type: integer
+          minimum: 0
+          description: Rows that might be Pokémon already in the collection; held for review.
+        invalidRows:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvalidRow"
+        ignoredColumns:
+          type: array
+          description: Columns this importer does not use.
+          items:
+            type: string
+        unknownFields:
+          type: array
+          description: Features this export cannot establish; they stay unknown.
+          items:
+            type: string
+    InvalidRow:
+      type: object
+      additionalProperties: false
+      required: [row, message]
+      properties:
+        row:
+          type: integer
+          minimum: 1
+          description: 1-based line number in the file, counting the header.
+        message:
+          type: string
     Error:
       type: object
       additionalProperties: false

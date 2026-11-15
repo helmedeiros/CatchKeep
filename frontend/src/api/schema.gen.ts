@@ -77,6 +77,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload a Poke Genie CSV export and get a preview. Nothing changes until it is committed. */
+        post: operations["stageImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/imports/{importId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: components["parameters"]["ImportId"];
+            };
+            cookie?: never;
+        };
+        /** The preview of a staged or committed import. */
+        get: operations["getImport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/imports/{importId}/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: components["parameters"]["ImportId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add the staged Pokémon to the collection.
+         * @description Adds every new row. Rows that might be Pokémon already in the collection are held back for review and never merged automatically.
+         */
+        post: operations["commitImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/collection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every active Pokémon of the signed-in trainer. */
+        get: operations["listCollection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -118,6 +193,74 @@ export interface components {
              */
             version: string;
         };
+        /**
+         * @description Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
+         * @enum {string}
+         */
+        TriState: "yes" | "no" | "unknown";
+        Pokemon: {
+            /** @description Stable record id (ULID). */
+            id: string;
+            /** @example Metagross */
+            species: string;
+            /**
+             * @description Form name; "Normal" for the default form.
+             * @example Normal
+             */
+            form: string;
+            dexNumber?: number;
+            /** @enum {string} */
+            gender?: "male" | "female";
+            cp?: number;
+            hp?: number;
+            level?: number;
+            iv?: components["schemas"]["IVs"];
+            /** Format: date */
+            catchDate?: string;
+            attributes: components["schemas"]["Attributes"];
+        };
+        IVs: {
+            attack: number;
+            defense: number;
+            stamina: number;
+        };
+        Attributes: {
+            shiny: components["schemas"]["TriState"];
+            lucky: components["schemas"]["TriState"];
+            shadow: components["schemas"]["TriState"];
+            purified: components["schemas"]["TriState"];
+            favorite: components["schemas"]["TriState"];
+            costume: components["schemas"]["TriState"];
+            background: components["schemas"]["TriState"];
+            dynamax: components["schemas"]["TriState"];
+            gigantamax: components["schemas"]["TriState"];
+        };
+        Collection: {
+            total: number;
+            pokemon: components["schemas"]["Pokemon"][];
+        };
+        ImportPreview: {
+            id: string;
+            /** @enum {string} */
+            status: "staged" | "committed";
+            /** @enum {string} */
+            source: "poke-genie";
+            totalRows: number;
+            /** @description Rows that will be added (or were added, once committed). */
+            newCount: number;
+            /** @description Rows that might be Pokémon already in the collection; held for review. */
+            possibleMatchCount: number;
+            invalidRows: components["schemas"]["InvalidRow"][];
+            /** @description Columns this importer does not use. */
+            ignoredColumns: string[];
+            /** @description Features this export cannot establish; they stay unknown. */
+            unknownFields: string[];
+        };
+        InvalidRow: {
+            /** @description 1-based line number in the file, counting the header. */
+            row: number;
+            message: string;
+        };
         Error: {
             error: components["schemas"]["ErrorDetail"];
         };
@@ -147,7 +290,9 @@ export interface components {
             };
         };
     };
-    parameters: never;
+    parameters: {
+        ImportId: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -291,6 +436,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Me"];
+                };
+            };
+            401: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    stageImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+            };
+        };
+        responses: {
+            /** @description Staged. Review the preview, then commit it. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            401: components["responses"]["Error"];
+            413: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: components["parameters"]["ImportId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The import. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    commitImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: components["parameters"]["ImportId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Committed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The collection, strongest first (CP descending). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
                 };
             };
             401: components["responses"]["Error"];
