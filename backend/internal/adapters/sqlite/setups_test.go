@@ -34,3 +34,18 @@ func TestSetups_SaveReplaceAndGetPerTrainer(t *testing.T) {
 		t.Fatalf("misty: err = %v", err)
 	}
 }
+
+func TestSetups_KeepSpeciesRules(t *testing.T) {
+	store, _ := openTemp(t)
+	withTrainers(t, store, "ash")
+	setups := sqlite.NewSetups(store)
+	rules := []domain.SpeciesRule{{Species: "Kyurem", Minimum: 10}, {Species: "Eevee", Favorite: true}}
+	if err := setups.SaveSetup(t.Context(), "ash", domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}, Species: rules}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := setups.GetSetup(t.Context(), "ash")
+	if err != nil || !slices.Equal(got.Species, rules) {
+		t.Fatalf("Species = %+v, %v", got.Species, err)
+	}
+}

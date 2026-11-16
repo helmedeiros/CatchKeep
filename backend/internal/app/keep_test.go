@@ -60,3 +60,30 @@ func TestKeep_SavesSetupAndSummarizesTheCollection(t *testing.T) {
 		t.Fatalf("summary = %+v; Rattata is rare in this test", s)
 	}
 }
+
+func TestKeep_SpeciesRulesNeedSetupAndSurviveSetupChanges(t *testing.T) {
+	keep := app.NewKeep(apptest.NewSetups(), apptest.NewCollectionStore(), apptest.RareSpecies{})
+	rules := []domain.SpeciesRule{{Species: "Kyurem", Minimum: 10}}
+	if err := keep.SaveSpeciesRules(t.Context(), ash, rules); !errors.Is(err, domain.ErrSetupNotFound) {
+		t.Fatalf("before setup: err = %v", err)
+	}
+	setup := domain.Setup{Capacity: 2700, Goals: []domain.Goal{domain.GoalCollecting}}
+	if err := keep.SaveSetup(t.Context(), ash, setup); err != nil {
+		t.Fatal(err)
+	}
+	if err := keep.SaveSpeciesRules(t.Context(), ash, []domain.SpeciesRule{{Species: "Kyurem"}}); !errors.Is(err, domain.ErrInvalidSetup) {
+		t.Fatalf("invalid rule: err = %v", err)
+	}
+	if err := keep.SaveSpeciesRules(t.Context(), ash, rules); err != nil {
+		t.Fatal(err)
+	}
+
+	setup.Capacity = 5000
+	if err := keep.SaveSetup(t.Context(), ash, setup); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := keep.Setup(t.Context(), ash)
+	if got.Capacity != 5000 || len(got.Species) != 1 || got.Species[0] != rules[0] {
+		t.Fatalf("setup = %+v; changing storage keeps the species rules", got)
+	}
+}
