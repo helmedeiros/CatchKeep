@@ -80,10 +80,31 @@ describe("keep rules", () => {
     await waitFor(() =>
       expect(keep).toHaveTextContent(/2\s*possible transfers/),
     );
-    expect(keep).toHaveTextContent("Keeping the best 1 of each variant");
+    expect(keep).toHaveTextContent(
+      "Keeping the best 1 of each variant and 2 of legendary",
+    );
     const pidgey = within(keep).getByRole("listitem");
     expect(pidgey).toHaveTextContent("Pidgey");
     expect(pidgey).toHaveTextContent("3 · keep 1 · 2 extra");
+  });
+
+  it("keeps more copies of rare species", async () => {
+    const user = await withCollection([
+      "1,Mewtwo,,150,,4000,180",
+      "2,Mewtwo,,150,,4100,181",
+      "3,Mewtwo,,150,,4200,182",
+    ]);
+    const setup = await saveSetup(user, "350", ["Collecting"]);
+    await user.click(within(setup).getByRole("button", { name: "Save" }));
+    const confirm = await screen.findByRole("region", {
+      name: "Confirm what the export can't tell",
+    });
+    await user.click(within(confirm).getByRole("button", { name: "Confirm" }));
+
+    const keep = screen.getByRole("region", { name: "Your keep rules" });
+    const mewtwo = await within(keep).findByRole("listitem");
+    expect(mewtwo).toHaveTextContent("Mewtwo · rare");
+    expect(mewtwo).toHaveTextContent("3 · keep 2 · 1 extra");
   });
 
   it("lets the trainer change the setup later", async () => {

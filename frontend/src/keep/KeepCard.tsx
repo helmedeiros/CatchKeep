@@ -168,8 +168,9 @@ function Numbers({ summary: s }: { summary: KeepSummary }) {
   return (
     <>
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        Keeping the best {s.minimum} of each variant (species, form, shiny,
-        costume, background, Dynamax, Gigantamax).
+        Keeping the best {s.minimum} of each variant and {s.rareMinimum} of
+        legendary, mythical and Ultra Beast ones. Shiny, lucky, shadow and other
+        variants each count on their own.
       </p>
       <div className="grid grid-cols-3 gap-2 text-center">
         <Stat value={s.kept} label="kept" />
@@ -186,15 +187,12 @@ function Numbers({ summary: s }: { summary: KeepSummary }) {
         <ul className="flex flex-col divide-y divide-slate-100 text-sm dark:divide-slate-800">
           {top.map((g) => (
             <li
-              key={[g.species, g.form, g.shiny, g.costume, g.background].join(
-                "|",
-              )}
+              key={variantKey(g)}
               className="flex justify-between gap-3 py-1.5"
             >
               <span className="truncate font-medium">
                 {g.species}
-                {g.form !== "Normal" && ` · ${g.form}`}
-                {g.shiny && " · shiny"}
+                {variantLabels(g).map((l) => ` · ${l}`)}
               </span>
               <span className="shrink-0 tabular-nums text-slate-500">
                 {g.count} · keep {g.keep} · {g.surplusIds.length} extra
@@ -205,6 +203,31 @@ function Numbers({ summary: s }: { summary: KeepSummary }) {
       )}
     </>
   );
+}
+
+type Group = KeepSummary["groups"][number];
+
+const FLAGS = [
+  "shiny",
+  "lucky",
+  "shadow",
+  "purified",
+  "costume",
+  "background",
+  "dynamax",
+  "gigantamax",
+] as const;
+
+function variantKey(g: Group): string {
+  return [g.species, g.form, ...FLAGS.map((f) => g[f])].join("|");
+}
+
+function variantLabels(g: Group): string[] {
+  return [
+    ...(g.form !== "Normal" ? [g.form] : []),
+    ...FLAGS.filter((f) => g[f]),
+    ...(g.rare ? ["rare"] : []),
+  ];
 }
 
 function Stat({ value, label }: { value: number; label: string }) {
