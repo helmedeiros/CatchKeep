@@ -11,7 +11,7 @@ import (
 )
 
 func TestKeep_SummaryNeedsSetupFirst(t *testing.T) {
-	keep := app.NewKeep(apptest.NewSetups(), apptest.NewCollectionStore())
+	keep := app.NewKeep(apptest.NewSetups(), apptest.NewCollectionStore(), apptest.RareSpecies{})
 
 	if _, err := keep.Summary(t.Context(), ash); !errors.Is(err, domain.ErrSetupNotFound) {
 		t.Fatalf("err = %v, want ErrSetupNotFound", err)
@@ -27,7 +27,7 @@ func TestKeep_SavesSetupAndSummarizesTheCollection(t *testing.T) {
 	if _, err := f.imports.Commit(t.Context(), ash, preview.ID); err != nil {
 		t.Fatal(err)
 	}
-	keep := app.NewKeep(apptest.NewSetups(), f.store)
+	keep := app.NewKeep(apptest.NewSetups(), f.store, apptest.RareSpecies{"Rattata"})
 
 	if err := keep.SaveSetup(t.Context(), ash, domain.Setup{Capacity: 300}); !errors.Is(err, domain.ErrInvalidSetup) {
 		t.Fatalf("invalid setup: err = %v", err)
@@ -46,5 +46,17 @@ func TestKeep_SavesSetupAndSummarizesTheCollection(t *testing.T) {
 	}
 	if s.Total != 2 || s.NeedsConfirmation != 2 {
 		t.Fatalf("summary = %+v; imported Pokémon have unknown variant features", s)
+	}
+
+	if _, err := f.collection.ConfirmAbsent(t.Context(), ash, "", "", domain.ConfirmableFields); err != nil {
+		t.Fatal(err)
+	}
+	s, _ = keep.Summary(t.Context(), ash)
+	rare := map[string]bool{}
+	for _, g := range s.Groups {
+		rare[g.Species] = g.Rare
+	}
+	if !rare["Rattata"] || rare["Pidgey"] || s.RareMinimum != 2 {
+		t.Fatalf("summary = %+v; Rattata is rare in this test", s)
 	}
 }

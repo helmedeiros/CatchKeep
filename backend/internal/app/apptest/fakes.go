@@ -276,3 +276,9 @@ func (s *Setups) SaveSetup(_ context.Context, trainer domain.TrainerID, setup do
 	s.setups[trainer] = setup
 	return nil
 }
+
+// RareSpecies is a ports.Species fake naming the rare species.
+type RareSpecies []string
+
+// Rare reports whether species is listed.
+func (r RareSpecies) Rare(species string) bool { return slices.Contains(r, species) }
