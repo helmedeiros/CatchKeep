@@ -157,3 +157,87 @@ func TestSummarizeKeeps_RareSpeciesKeepMoreCopies(t *testing.T) {
 		t.Fatalf("trading kept %d, want one more legendary for trades", s.Kept)
 	}
 }
+
+func TestSetup_ValidateSpeciesRules(t *testing.T) {
+	base := domain.Setup{Capacity: 2700, Goals: []domain.Goal{domain.GoalCollecting}}
+	for name, rules := range map[string][]domain.SpeciesRule{
+		"no species":       {{Minimum: 2}},
+		"nothing set":      {{Species: "Kyurem"}},
+		"negative minimum": {{Species: "Kyurem", Minimum: -1}},
+		"absurd minimum":   {{Species: "Kyurem", Minimum: 100000}},
+		"repeated":         {{Species: "Kyurem", Minimum: 2}, {Species: "Kyurem", Favorite: true}},
+	} {
+		s := base
+		s.Species = rules
+		if err := s.Validate(); !errors.Is(err, domain.ErrInvalidSetup) {
+			t.Errorf("%s: err = %v, want ErrInvalidSetup", name, err)
+		}
+	}
+	base.Species = []domain.SpeciesRule{{Species: "Kyurem", Minimum: 10}, {Species: "Eevee", Favorite: true}}
+	if err := base.Validate(); err != nil {
+		t.Fatalf("valid species rules rejected: %v", err)
+	}
+}
+
+// keptOf counts the kept copies of a species and returns its groups' rule.
+func keptOf(s domain.KeepSummary, species string) (int, domain.Rule) {
+	kept, rule := 0, domain.Rule("")
+	for _, g := range s.Groups {
+		if g.Species == species {
+			kept += g.Keep
+			rule = g.Rule
+		}
+	}
+	return kept, rule
+}
+
+func TestSummarizeKeeps_SpeciesMinimumCountsAcrossVariantsAndCanLowerTheDefault(t *testing.T) {
+	var pokemon []domain.Pokemon
+	for i, iv := range []string{"1", "2", "3", "4", "5", "15"} {
+		pokemon = append(pokemon, known("K"+string(rune('1'+i)), "Kyurem", iv, iv, iv))
+	}
+	pokemon = append(pokemon,
+		mon("S1", append(knownVariant("Kyurem"), "shadow", "true", "iv_attack", "0", "iv_defense", "0", "iv_stamina", "0")...),
+		mon("S2", append(knownVariant("Kyurem"), "shadow", "true", "iv_attack", "14", "iv_defense", "14", "iv_stamina", "14")...),
+	)
+	rare := func(string) bool { return true }
+	setup := domain.Setup{Capacity: 2700, Goals: []domain.Goal{domain.GoalCollecting}}
+
+	if kept, rule := keptOf(domain.SummarizeKeeps(pokemon, setup, rare), "Kyurem"); kept != 6 || rule != domain.RuleRare {
+		t.Fatalf("default kept %d by %q, want 4 plain + 2 shadow by the rare rule", kept, rule)
+	}
+
+	setup.Species = []domain.SpeciesRule{{Species: "Kyurem", Minimum: 3}}
+	s := domain.SummarizeKeeps(pokemon, setup, rare)
+	kept, rule := keptOf(s, "Kyurem")
+	if kept != 3 || rule != domain.RuleSpecies {
+		t.Fatalf("kept %d by %q, want 3 by the species rule", kept, rule)
+	}
+	for _, g := range s.Groups {
+		if g.Shadow && (g.Keep != 1 || g.KeptIDs[0] != "S2") {
+			t.Fatalf("shadow group %+v: one of each variant, then the best copies overall", g)
+		}
+		if !g.Shadow && (g.Keep != 2 || g.KeptIDs[1] != "K5") {
+			t.Fatalf("plain group %+v: the 5/5/5 copy beats the 0/0/0 shadow for the third slot", g)
+		}
+	}
+
+	setup.Species = []domain.SpeciesRule{{Species: "Kyurem", Minimum: 7}}
+	if kept, _ := keptOf(domain.SummarizeKeeps(pokemon, setup, rare), "Kyurem"); kept != 7 {
+		t.Fatalf("kept %d, want 7", kept)
+	}
+}
+
+func TestSummarizeKeeps_FavoriteSpeciesKeepEveryCopy(t *testing.T) {
+	pokemon := []domain.Pokemon{known("P1", "Eevee"), known("P2", "Eevee"), known("P3", "Eevee"), known("P4", "Pidgey"), known("P5", "Pidgey")}
+	setup := domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}, Species: []domain.SpeciesRule{{Species: "Eevee", Minimum: 1, Favorite: true}}}
+
+	s := domain.SummarizeKeeps(pokemon, setup, nil)
+
+	if kept, rule := keptOf(s, "Eevee"); kept != 3 || rule != domain.RuleFavorite {
+		t.Fatalf("Eevee kept %d by %q, want all 3 as a favorite", kept, rule)
+	}
+	if s.Surplus != 1 {
+		t.Fatalf("surplus = %d, want one extra Pidgey", s.Surplus)
+	}
+}

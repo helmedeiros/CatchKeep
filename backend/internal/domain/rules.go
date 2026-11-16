@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 )
 
 // Setup errors.
@@ -26,10 +27,20 @@ const (
 // maxCapacity bounds storage well above the game's own limit.
 const maxCapacity = 20000
 
-// Setup is step 1 of setup: storage capacity and goals in priority order.
+// Setup is storage capacity and goals in priority order (step 1), plus
+// optional per-species rules (spec V1-SET-02, V1-SET-03).
 type Setup struct {
 	Capacity int
 	Goals    []Goal
+	Species  []SpeciesRule
+}
+
+// SpeciesRule overrides the generated minimums of one species. Minimum
+// counts copies across all of its variants; a favorite keeps every copy.
+type SpeciesRule struct {
+	Species  string
+	Minimum  int
+	Favorite bool
 }
 
 // Validate checks capacity and that goals are known and not repeated.
@@ -49,6 +60,20 @@ func (s Setup) Validate() error {
 			return fmt.Errorf("%w: goal %q is listed twice", ErrInvalidSetup, g)
 		}
 		seen[g] = true
+	}
+	species := map[string]bool{}
+	for _, r := range s.Species {
+		switch {
+		case strings.TrimSpace(r.Species) == "":
+			return fmt.Errorf("%w: a species rule needs a species", ErrInvalidSetup)
+		case r.Minimum < 0 || r.Minimum > maxCapacity:
+			return fmt.Errorf("%w: minimum for %s must be between 0 and %d", ErrInvalidSetup, r.Species, maxCapacity)
+		case r.Minimum == 0 && !r.Favorite:
+			return fmt.Errorf("%w: set a minimum or mark %s as a favorite", ErrInvalidSetup, r.Species)
+		case species[r.Species]:
+			return fmt.Errorf("%w: %s has two rules", ErrInvalidSetup, r.Species)
+		}
+		species[r.Species] = true
 	}
 	return nil
 }
@@ -98,12 +123,24 @@ type Variant struct {
 
 func (v Variant) special() bool { return v.Shiny || v.Costume || v.Background }
 
-// VariantGroup is the trainer's copies of one variant and what the default
-// rule keeps.
+// Rule is what decided a group's minimum.
+type Rule string
+
+// Rules, from generated defaults to the trainer's own.
+const (
+	RuleDefault  Rule = "default"
+	RuleRare     Rule = "rare"
+	RuleSpecies  Rule = "species"
+	RuleFavorite Rule = "favorite"
+)
+
+// VariantGroup is the trainer's copies of one variant and what the keep
+// rules keep.
 type VariantGroup struct {
 	Variant
 	// Rare is set for legendary, mythical and Ultra Beast species.
 	Rare                 bool
+	Rule                 Rule
 	Count, Minimum, Keep int
 	// KeptIDs are the best copies, SurplusIDs the rest, best first.
 	KeptIDs, SurplusIDs []PokemonID
@@ -120,19 +157,17 @@ type KeepSummary struct {
 	Groups []VariantGroup
 }
 
-// SummarizeKeeps applies the default rules (spec V1-RUL-01..03, V1-RUL-06):
-// keep the best Minimum copies of each variant (RareMinimum for rare
-// species), one more of rare, shiny, costume or background variants when
-// trading is a goal. Pokémon with an unknown
-// variant feature could belong to an under-filled variant, so they are kept
-// and counted as needing confirmation (spec §7.3).
+// SummarizeKeeps applies the keep rules (spec V1-RUL-01..06): keep the best
+// Minimum copies of each variant (RareMinimum for rare species), one more of
+// rare, shiny, costume or background variants when trading is a goal. A
+// species rule replaces those defaults for its species: one copy of each
+// variant, then the best copies overall up to its minimum, or every copy of
+// a favorite. Pokémon with an unknown variant feature could belong to an
+// under-filled variant, so they are kept and counted as needing
+// confirmation (spec §7.3).
 func SummarizeKeeps(pokemon []Pokemon, setup Setup, rare Rarity) KeepSummary {
 	band := bandFor(setup.Capacity)
 	out := KeepSummary{Total: len(pokemon), Minimum: band.Ordinary, RareMinimum: band.Rare}
-	type member struct {
-		id    PokemonID
-		score [2]int
-	}
 	groups := map[Variant][]member{}
 	var order []Variant
 	for _, p := range pokemon {
@@ -147,20 +182,27 @@ func SummarizeKeeps(pokemon []Pokemon, setup Setup, rare Rarity) KeepSummary {
 		}
 		groups[v] = append(groups[v], member{p.ID, rank(cur)})
 	}
+	built := map[Variant]*VariantGroup{}
+	bySpecies := map[string][]*VariantGroup{}
 	for _, v := range order {
-		members := groups[v]
-		slices.SortStableFunc(members, func(a, b member) int {
-			return cmp.Or(cmp.Compare(b.score[0], a.score[0]), cmp.Compare(b.score[1], a.score[1]), cmp.Compare(a.id, b.id))
-		})
-		g := VariantGroup{Variant: v, Rare: rare != nil && rare(v.Species), Count: len(members), Minimum: out.Minimum}
+		slices.SortStableFunc(groups[v], member.compare)
+		g := &VariantGroup{Variant: v, Rare: rare != nil && rare(v.Species), Rule: RuleDefault, Count: len(groups[v]), Minimum: out.Minimum}
 		if g.Rare {
-			g.Minimum = out.RareMinimum
+			g.Rule, g.Minimum = RuleRare, out.RareMinimum
 		}
 		if setup.has(GoalTrading) && (g.Rare || v.special()) {
 			g.Minimum++
 		}
 		g.Keep = min(g.Minimum, g.Count)
-		for i, m := range members {
+		built[v] = g
+		bySpecies[v.Species] = append(bySpecies[v.Species], g)
+	}
+	for _, r := range setup.Species {
+		applySpeciesRule(r, bySpecies[r.Species], groups)
+	}
+	for _, v := range order {
+		g := built[v]
+		for i, m := range groups[v] {
 			if i < g.Keep {
 				g.KeptIDs = append(g.KeptIDs, m.id)
 			} else {
@@ -169,12 +211,50 @@ func SummarizeKeeps(pokemon []Pokemon, setup Setup, rare Rarity) KeepSummary {
 		}
 		out.Kept += g.Keep
 		out.Surplus += len(g.SurplusIDs)
-		out.Groups = append(out.Groups, g)
+		out.Groups = append(out.Groups, *g)
 	}
 	slices.SortStableFunc(out.Groups, func(a, b VariantGroup) int {
 		return cmp.Or(cmp.Compare(len(b.SurplusIDs), len(a.SurplusIDs)), cmp.Compare(a.Species, b.Species))
 	})
 	return out
+}
+
+type member struct {
+	id    PokemonID
+	score [2]int
+}
+
+// compare orders the better copy first, then by ID for stability.
+func (a member) compare(b member) int {
+	return cmp.Or(cmp.Compare(b.score[0], a.score[0]), cmp.Compare(b.score[1], a.score[1]), cmp.Compare(a.id, b.id))
+}
+
+// applySpeciesRule replaces the defaults of one species' groups.
+func applySpeciesRule(r SpeciesRule, species []*VariantGroup, members map[Variant][]member) {
+	if r.Favorite {
+		for _, g := range species {
+			g.Rule, g.Minimum, g.Keep = RuleFavorite, g.Count, g.Count
+		}
+		return
+	}
+	for _, g := range species {
+		g.Rule, g.Keep = RuleSpecies, 1
+	}
+	for left := r.Minimum - len(species); left > 0; left-- {
+		var best *VariantGroup
+		for _, g := range species {
+			if g.Keep < g.Count && (best == nil || members[g.Variant][g.Keep].compare(members[best.Variant][best.Keep]) < 0) {
+				best = g
+			}
+		}
+		if best == nil {
+			break
+		}
+		best.Keep++
+	}
+	for _, g := range species {
+		g.Minimum = g.Keep
+	}
 }
 
 // variantOf returns the variant if every variant feature is known.
