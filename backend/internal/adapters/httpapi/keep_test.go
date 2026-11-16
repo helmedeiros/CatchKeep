@@ -27,6 +27,7 @@ func TestKeep_SetupThenSummary(t *testing.T) {
 			Species       string
 			Rare          bool
 			Minimum, Keep int
+			KeptIDs       []string `json:"keptIds"`
 			SurplusIDs    []string `json:"surplusIds"`
 		}
 	}](t, api.do(http.MethodGet, "/api/v1/keep-summary", "").Body.Bytes())
@@ -34,6 +35,9 @@ func TestKeep_SetupThenSummary(t *testing.T) {
 		t.Fatalf("summary = %+v", summary)
 	}
 	for _, g := range summary.Groups {
+		if len(g.KeptIDs) != g.Keep {
+			t.Errorf("group %+v: keptIds must list the %d kept copies", g, g.Keep)
+		}
 		if rare := g.Species == "Mewtwo"; g.Rare != rare || (rare && g.Minimum != summary.RareMinimum) {
 			t.Errorf("group %+v: Mewtwo is the rare species here, with minimum %d", g, summary.RareMinimum)
 		}

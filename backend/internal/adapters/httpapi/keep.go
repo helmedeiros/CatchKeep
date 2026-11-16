@@ -71,7 +71,10 @@ func (s *server) GetKeepSummary(ctx context.Context, _ GetKeepSummaryRequestObje
 			Species: g.Species, Form: g.Form, Shiny: g.Shiny, Costume: g.Costume, Background: g.Background,
 			Dynamax: g.Dynamax, Gigantamax: g.Gigantamax, Lucky: g.Lucky, Shadow: g.Shadow, Purified: g.Purified,
 			Rare: g.Rare, Count: g.Count, Minimum: g.Minimum, Keep: g.Keep,
-			SurplusIds: make([]string, 0, len(g.SurplusIDs)),
+			KeptIds: make([]string, 0, len(g.KeptIDs)), SurplusIds: make([]string, 0, len(g.SurplusIDs)),
+		}
+		for _, id := range g.KeptIDs {
+			vg.KeptIds = append(vg.KeptIds, string(id))
 		}
 		for _, id := range g.SurplusIDs {
 			vg.SurplusIds = append(vg.SurplusIds, string(id))
