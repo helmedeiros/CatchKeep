@@ -10,7 +10,9 @@ interface Profile {
 type Schemas = components["schemas"];
 interface Row {
   species: string;
+  dexNumber: number;
   cp: number;
+  hp: number;
   lucky: boolean;
   /** Features confirmed absent. */
   absent?: string[];
@@ -31,7 +33,10 @@ const toPokemon = (id: string, p: Row): Schemas["Pokemon"] => {
     id,
     species: p.species,
     form: "Normal",
+    dexNumber: p.dexNumber,
     cp: p.cp,
+    hp: p.hp,
+    level: 20,
     iv: { attack: 15, defense: 14, stamina: 13 },
     attributes: {
       shiny: tri("shiny"),
@@ -140,7 +145,13 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
       }
       const rows = lines.map((l) => {
         const c = l.split(",");
-        return { species: c[1] ?? "", cp: Number(c[5]), lucky: c[21] === "1" };
+        return {
+          species: c[1] ?? "",
+          dexNumber: Number(c[3]),
+          cp: Number(c[5]),
+          hp: Number(c[6]),
+          lucky: c[21] === "1",
+        };
       });
       const id =
         `01JD2Z8Q4M8V7Y6X5W4T3S2I${String(imports.size).padStart(2, "0")}`.replace(

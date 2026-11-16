@@ -68,7 +68,7 @@ describe("re-importing an updated export", () => {
     ).toBeInTheDocument();
     const list = await screen.findByRole("list", { name: "Collection" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(3);
-    expect(within(list).getByText("CP 300")).toBeInTheDocument();
+    expect(list).toHaveTextContent("CP 300");
   });
 
   it("shows each possible duplicate side by side and records the answer", async () => {
