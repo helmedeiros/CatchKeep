@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/helmedeiros/catchkeep/backend/internal/domain"
@@ -25,8 +26,30 @@ func (k *Keep) Setup(ctx context.Context, trainer domain.TrainerID) (domain.Setu
 	return k.setups.GetSetup(ctx, trainer)
 }
 
-// SaveSetup validates and stores the trainer's setup.
+// SaveSetup validates and stores the trainer's storage and goals, keeping
+// any species rules they already have.
 func (k *Keep) SaveSetup(ctx context.Context, trainer domain.TrainerID, s domain.Setup) error {
+	current, err := k.setups.GetSetup(ctx, trainer)
+	switch {
+	case err == nil:
+		s.Species = current.Species
+	case !errors.Is(err, domain.ErrSetupNotFound):
+		return err
+	}
+	return k.save(ctx, trainer, s)
+}
+
+// SaveSpeciesRules replaces the trainer's species rules. It needs a setup.
+func (k *Keep) SaveSpeciesRules(ctx context.Context, trainer domain.TrainerID, rules []domain.SpeciesRule) error {
+	s, err := k.setups.GetSetup(ctx, trainer)
+	if err != nil {
+		return err
+	}
+	s.Species = rules
+	return k.save(ctx, trainer, s)
+}
+
+func (k *Keep) save(ctx context.Context, trainer domain.TrainerID, s domain.Setup) error {
 	if err := s.Validate(); err != nil {
 		return err
 	}
