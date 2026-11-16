@@ -19,6 +19,7 @@ import (
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/httpapi"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/ids"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/pinhash"
+	"github.com/helmedeiros/catchkeep/backend/internal/adapters/refdata"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/sqlite"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/web"
 	"github.com/helmedeiros/catchkeep/backend/internal/app"
@@ -136,7 +137,7 @@ func newRootHandler(cfg serveConfig, store *sqlite.Store) http.Handler {
 		Sessions:   app.NewSessions(trainers, sqlite.NewSessions(store), hasher, ids.Tokens{}, clock),
 		Imports:    app.NewImports(csvimport.NewPokeGenie(time.Local), collection, collection, ulids, clock),
 		Collection: app.NewCollection(collection, collection, clock),
-		Keep:       app.NewKeep(sqlite.NewSetups(store), collection),
+		Keep:       app.NewKeep(sqlite.NewSetups(store), collection, refdata.NewSpecies()),
 	})
 	if cfg.webDir == "" {
 		return api

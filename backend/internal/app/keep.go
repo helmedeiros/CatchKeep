@@ -12,11 +12,12 @@ import (
 type Keep struct {
 	setups     ports.Setups
 	collection ports.CollectionReader
+	species    ports.Species
 }
 
 // NewKeep wires the keep-rule use cases.
-func NewKeep(setups ports.Setups, collection ports.CollectionReader) *Keep {
-	return &Keep{setups: setups, collection: collection}
+func NewKeep(setups ports.Setups, collection ports.CollectionReader, species ports.Species) *Keep {
+	return &Keep{setups: setups, collection: collection, species: species}
 }
 
 // Setup returns the trainer's setup, or domain.ErrSetupNotFound.
@@ -45,5 +46,5 @@ func (k *Keep) Summary(ctx context.Context, trainer domain.TrainerID) (domain.Ke
 	if err != nil {
 		return domain.KeepSummary{}, err
 	}
-	return domain.SummarizeKeeps(pokemon, setup, nil), nil
+	return domain.SummarizeKeeps(pokemon, setup, k.species.Rare), nil
 }
