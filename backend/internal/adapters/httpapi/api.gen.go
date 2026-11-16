@@ -209,6 +209,30 @@ func (e TriState) Valid() bool {
 	}
 }
 
+// Defines values for VariantGroupRule.
+const (
+	Default  VariantGroupRule = "default"
+	Favorite VariantGroupRule = "favorite"
+	Rare     VariantGroupRule = "rare"
+	Species  VariantGroupRule = "species"
+)
+
+// Valid indicates whether the value is a known member of the VariantGroupRule enum.
+func (e VariantGroupRule) Valid() bool {
+	switch e {
+	case Default:
+		return true
+	case Favorite:
+		return true
+	case Rare:
+		return true
+	case Species:
+		return true
+	default:
+		return false
+	}
+}
+
 // AbsenceConfirmation Give species and form together, or neither for the whole collection.
 type AbsenceConfirmation struct {
 	Features []ConfirmableFeature `json:"features"`
@@ -514,6 +538,23 @@ type SignIn struct {
 	ProfileId ProfileId `json:"profileId"`
 }
 
+// SpeciesRule defines model for SpeciesRule.
+type SpeciesRule struct {
+	// Favorite A favorite species keeps every copy.
+	Favorite bool `json:"favorite"`
+
+	// Minimum Copies kept across all variants of the species; 0 when only a favorite.
+	Minimum int `json:"minimum"`
+
+	// Species Examples: Kyurem
+	Species string `json:"species"`
+}
+
+// SpeciesRules defines model for SpeciesRules.
+type SpeciesRules struct {
+	Rules []SpeciesRule `json:"rules"`
+}
+
 // TriState Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
 type TriState string
 
@@ -534,14 +575,20 @@ type VariantGroup struct {
 	Purified bool     `json:"purified"`
 
 	// Rare Legendary, mythical or Ultra Beast species.
-	Rare    bool   `json:"rare"`
-	Shadow  bool   `json:"shadow"`
-	Shiny   bool   `json:"shiny"`
-	Species string `json:"species"`
+	Rare bool `json:"rare"`
+
+	// Rule The rule that decided this group's minimum.
+	Rule    VariantGroupRule `json:"rule"`
+	Shadow  bool             `json:"shadow"`
+	Shiny   bool             `json:"shiny"`
+	Species string           `json:"species"`
 
 	// SurplusIds Pokémon beyond the minimum, best first.
 	SurplusIds []string `json:"surplusIds"`
 }
+
+// VariantGroupRule The rule that decided this group's minimum.
+type VariantGroupRule string
 
 // ImportId defines model for ImportId.
 type ImportId = string
@@ -560,6 +607,9 @@ type SignInJSONRequestBody = SignIn
 
 // SaveSetupJSONRequestBody defines body for SaveSetup for application/json ContentType.
 type SaveSetupJSONRequestBody = Setup
+
+// SaveSpeciesRulesJSONRequestBody defines body for SaveSpeciesRules for application/json ContentType.
+type SaveSpeciesRulesJSONRequestBody = SpeciesRules
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -608,6 +658,12 @@ type ServerInterface interface {
 	// SaveSetup Save storage capacity and goals in priority order.
 	// (PUT /setup)
 	SaveSetup(w http.ResponseWriter, r *http.Request)
+	// GetSpeciesRules The trainer's per-species keep rules.
+	// (GET /species-rules)
+	GetSpeciesRules(w http.ResponseWriter, r *http.Request)
+	// SaveSpeciesRules Replace the per-species keep rules. They replace the generated minimums for their species (V1-RUL-04).
+	// (PUT /species-rules)
+	SaveSpeciesRules(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -865,6 +921,34 @@ func (siw *ServerInterfaceWrapper) SaveSetup(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// GetSpeciesRules operation middleware
+func (siw *ServerInterfaceWrapper) GetSpeciesRules(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSpeciesRules(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SaveSpeciesRules operation middleware
+func (siw *ServerInterfaceWrapper) SaveSpeciesRules(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SaveSpeciesRules(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -999,6 +1083,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/collection/confirmations", wrapper.ConfirmAbsent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/setup", wrapper.GetSetup)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/setup", wrapper.SaveSetup)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/species-rules", wrapper.GetSpeciesRules)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/species-rules", wrapper.SaveSpeciesRules)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/keep-summary", wrapper.GetKeepSummary)
 
 	return m
@@ -1989,6 +2075,153 @@ func (response SaveSetupdefaultJSONResponse) VisitSaveSetupResponse(w http.Respo
 	return err
 }
 
+type GetSpeciesRulesRequestObject struct {
+}
+
+type GetSpeciesRulesResponseObject interface {
+	VisitGetSpeciesRulesResponse(w http.ResponseWriter) error
+}
+
+type GetSpeciesRules200JSONResponse SpeciesRules
+
+func (response GetSpeciesRules200JSONResponse) VisitGetSpeciesRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSpeciesRules401JSONResponse struct{ ErrorJSONResponse }
+
+func (response GetSpeciesRules401JSONResponse) VisitGetSpeciesRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSpeciesRules409JSONResponse Error
+
+func (response GetSpeciesRules409JSONResponse) VisitGetSpeciesRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSpeciesRulesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetSpeciesRulesdefaultJSONResponse) VisitGetSpeciesRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSpeciesRulesRequestObject struct {
+	Body *SaveSpeciesRulesJSONRequestBody
+}
+
+type SaveSpeciesRulesResponseObject interface {
+	VisitSaveSpeciesRulesResponse(w http.ResponseWriter) error
+}
+
+type SaveSpeciesRules200JSONResponse SpeciesRules
+
+func (response SaveSpeciesRules200JSONResponse) VisitSaveSpeciesRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSpeciesRules401JSONResponse struct{ ErrorJSONResponse }
+
+func (response SaveSpeciesRules401JSONResponse) VisitSaveSpeciesRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSpeciesRules409JSONResponse Error
+
+func (response SaveSpeciesRules409JSONResponse) VisitSaveSpeciesRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSpeciesRules422JSONResponse Error
+
+func (response SaveSpeciesRules422JSONResponse) VisitSaveSpeciesRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveSpeciesRulesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response SaveSpeciesRulesdefaultJSONResponse) VisitSaveSpeciesRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// ListCollection Every active Pokémon of the signed-in trainer.
@@ -2036,6 +2269,12 @@ type StrictServerInterface interface {
 	// SaveSetup Save storage capacity and goals in priority order.
 	// (PUT /setup)
 	SaveSetup(ctx context.Context, request SaveSetupRequestObject) (SaveSetupResponseObject, error)
+	// GetSpeciesRules The trainer's per-species keep rules.
+	// (GET /species-rules)
+	GetSpeciesRules(ctx context.Context, request GetSpeciesRulesRequestObject) (GetSpeciesRulesResponseObject, error)
+	// SaveSpeciesRules Replace the per-species keep rules. They replace the generated minimums for their species (V1-RUL-04).
+	// (PUT /species-rules)
+	SaveSpeciesRules(ctx context.Context, request SaveSpeciesRulesRequestObject) (SaveSpeciesRulesResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -2473,6 +2712,61 @@ func (sh *strictHandler) SaveSetup(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SaveSetupResponseObject); ok {
 		if err := validResponse.VisitSaveSetupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSpeciesRules operation middleware
+func (sh *strictHandler) GetSpeciesRules(w http.ResponseWriter, r *http.Request) {
+	var request GetSpeciesRulesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSpeciesRules(ctx, request.(GetSpeciesRulesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSpeciesRules")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSpeciesRulesResponseObject); ok {
+		if err := validResponse.VisitGetSpeciesRulesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SaveSpeciesRules operation middleware
+func (sh *strictHandler) SaveSpeciesRules(w http.ResponseWriter, r *http.Request) {
+	var request SaveSpeciesRulesRequestObject
+
+	var body SaveSpeciesRulesJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SaveSpeciesRules(ctx, request.(SaveSpeciesRulesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SaveSpeciesRules")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SaveSpeciesRulesResponseObject); ok {
+		if err := validResponse.VisitSaveSpeciesRulesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

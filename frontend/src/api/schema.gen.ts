@@ -212,6 +212,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/species-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The trainer's per-species keep rules. */
+        get: operations["getSpeciesRules"];
+        /** Replace the per-species keep rules. They replace the generated minimums for their species (V1-RUL-04). */
+        put: operations["saveSpeciesRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/keep-summary": {
         parameters: {
             query?: never;
@@ -395,6 +413,17 @@ export interface components {
             /** @description Goals, most important first. */
             goals: ("collecting" | "trading" | "battling")[];
         };
+        SpeciesRules: {
+            rules: components["schemas"]["SpeciesRule"][];
+        };
+        SpeciesRule: {
+            /** @example Kyurem */
+            species: string;
+            /** @description Copies kept across all variants of the species; 0 when only a favorite. */
+            minimum: number;
+            /** @description A favorite species keeps every copy. */
+            favorite: boolean;
+        };
         KeepSummary: {
             total: number;
             kept: number;
@@ -422,6 +451,11 @@ export interface components {
             purified: boolean;
             /** @description Legendary, mythical or Ultra Beast species. */
             rare: boolean;
+            /**
+             * @description The rule that decided this group's minimum.
+             * @enum {string}
+             */
+            rule: "default" | "rare" | "species" | "favorite";
             count: number;
             minimum: number;
             keep: number;
@@ -821,6 +855,65 @@ export interface operations {
                 };
             };
             401: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getSpeciesRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The species rules; empty until the trainer sets one. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpeciesRules"];
+                };
+            };
+            401: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    saveSpeciesRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeciesRules"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpeciesRules"];
+                };
+            };
+            401: components["responses"]["Error"];
+            /** @description Storage and goals are not set up yet (SETUP_REQUIRED). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             422: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };

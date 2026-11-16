@@ -353,6 +353,59 @@ paths:
           $ref: "#/components/responses/Error"
         default:
           $ref: "#/components/responses/Error"
+  /species-rules:
+    get:
+      tags: [keep]
+      operationId: getSpeciesRules
+      summary: The trainer's per-species keep rules.
+      security:
+        - session: []
+      responses:
+        "200":
+          description: The species rules; empty until the trainer sets one.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpeciesRules"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      tags: [keep]
+      operationId: saveSpeciesRules
+      summary: >-
+        Replace the per-species keep rules. They replace the generated
+        minimums for their species (V1-RUL-04).
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpeciesRules"
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpeciesRules"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: Storage and goals are not set up yet (SETUP_REQUIRED).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
   /keep-summary:
     get:
       tags: [keep]
@@ -742,6 +795,33 @@ components:
           items:
             type: string
             enum: [collecting, trading, battling]
+    SpeciesRules:
+      type: object
+      additionalProperties: false
+      required: [rules]
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpeciesRule"
+    SpeciesRule:
+      type: object
+      additionalProperties: false
+      required: [species, minimum, favorite]
+      properties:
+        species:
+          type: string
+          examples: [Kyurem]
+        minimum:
+          type: integer
+          minimum: 0
+          maximum: 20000
+          description: >-
+            Copies kept across all variants of the species; 0 when only a
+            favorite.
+        favorite:
+          type: boolean
+          description: A favorite species keeps every copy.
     KeepSummary:
       type: object
       additionalProperties: false
@@ -793,6 +873,7 @@ components:
           shadow,
           purified,
           rare,
+          rule,
           count,
           minimum,
           keep,
@@ -823,6 +904,10 @@ components:
         rare:
           type: boolean
           description: Legendary, mythical or Ultra Beast species.
+        rule:
+          type: string
+          enum: [default, rare, species, favorite]
+          description: The rule that decided this group's minimum.
         count:
           type: integer
           minimum: 1

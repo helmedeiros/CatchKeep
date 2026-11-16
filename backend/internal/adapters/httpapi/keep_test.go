@@ -62,3 +62,37 @@ func TestKeep_RejectsInvalidSetupAndAnonymousRequests(t *testing.T) {
 		}
 	}
 }
+
+func TestKeep_SpeciesRules(t *testing.T) {
+	api := signedIn(t, "Ash")
+	rules := `{"rules":[{"species":"Mewtwo","minimum":1,"favorite":false}]}`
+	wantStatus(t, api.do(http.MethodGet, "/api/v1/species-rules", ""), http.StatusConflict)
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/species-rules", rules), http.StatusConflict)
+
+	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/collection/confirmations", `{"features":["shiny","costume","background","dynamax","gigantamax"]}`), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/setup", `{"capacity":350,"goals":["collecting"]}`), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/species-rules", `{"rules":[{"species":"Mewtwo","minimum":0,"favorite":false}]}`), http.StatusUnprocessableEntity)
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/species-rules", rules), http.StatusOK)
+
+	got := decode[struct {
+		Rules []struct {
+			Species string
+			Minimum int
+		}
+	}](t, api.do(http.MethodGet, "/api/v1/species-rules", "").Body.Bytes())
+	if len(got.Rules) != 1 || got.Rules[0].Species != "Mewtwo" || got.Rules[0].Minimum != 1 {
+		t.Fatalf("rules = %+v", got)
+	}
+	summary := decode[struct {
+		Groups []struct {
+			Species, Rule string
+		}
+	}](t, api.do(http.MethodGet, "/api/v1/keep-summary", "").Body.Bytes())
+	for _, g := range summary.Groups {
+		if g.Species == "Mewtwo" && g.Rule != "species" {
+			t.Fatalf("Mewtwo group rule = %q, want species", g.Rule)
+		}
+	}
+}
