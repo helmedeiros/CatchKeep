@@ -64,6 +64,7 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
   let failures = 0;
   let next = 0;
   let setup: Schemas["Setup"] | null = null;
+  let speciesRules: Schemas["SpeciesRule"][] = [];
   const collection: Stored[] = [];
   const imports = new Map<string, FakeImport>();
   const err = (status: number, code: string, message: string) =>
@@ -198,6 +199,14 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
         ? jsonResponse(200, setup)
         : err(404, "NOT_FOUND", "setup not done yet");
     }
+    if (path === "/species-rules") {
+      if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
+      if (!setup) return err(409, "SETUP_REQUIRED", "Set up first.");
+      if (req.method === "PUT") {
+        speciesRules = (body as Schemas["SpeciesRules"]).rules;
+      }
+      return jsonResponse(200, { rules: speciesRules });
+    }
     if (path === "/keep-summary") {
       if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
       if (!setup) return err(409, "SETUP_REQUIRED", "Set up first.");
@@ -286,7 +295,21 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
     const out = [...groups.entries()].map(([species, members]) => {
       const best = [...members].sort((a, b) => b.cp - a.cp);
       const rare = species === "Mewtwo";
-      const minimum = rare ? rareMinimum : ordinary;
+      const own = speciesRules.find((r) => r.species === species);
+      const minimum = own?.favorite
+        ? members.length
+        : own
+          ? own.minimum
+          : rare
+            ? rareMinimum
+            : ordinary;
+      const rule: Schemas["VariantGroup"]["rule"] = own?.favorite
+        ? "favorite"
+        : own
+          ? "species"
+          : rare
+            ? "rare"
+            : "default";
       return {
         species,
         form: "Normal",
@@ -299,6 +322,7 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
         shadow: false,
         purified: false,
         rare,
+        rule,
         count: members.length,
         minimum,
         keep: Math.min(minimum, members.length),

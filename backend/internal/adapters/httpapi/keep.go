@@ -70,7 +70,7 @@ func (s *server) GetKeepSummary(ctx context.Context, _ GetKeepSummaryRequestObje
 		vg := VariantGroup{
 			Species: g.Species, Form: g.Form, Shiny: g.Shiny, Costume: g.Costume, Background: g.Background,
 			Dynamax: g.Dynamax, Gigantamax: g.Gigantamax, Lucky: g.Lucky, Shadow: g.Shadow, Purified: g.Purified,
-			Rare: g.Rare, Count: g.Count, Minimum: g.Minimum, Keep: g.Keep,
+			Rare: g.Rare, Rule: VariantGroupRule(g.Rule), Count: g.Count, Minimum: g.Minimum, Keep: g.Keep,
 			KeptIds: make([]string, 0, len(g.KeptIDs)), SurplusIds: make([]string, 0, len(g.SurplusIDs)),
 		}
 		for _, id := range g.KeptIDs {
@@ -88,6 +88,56 @@ func toSetup(s domain.Setup) Setup {
 	out := Setup{Capacity: s.Capacity, Goals: make([]SetupGoals, 0, len(s.Goals))}
 	for _, g := range s.Goals {
 		out.Goals = append(out.Goals, SetupGoals(g))
+	}
+	return out
+}
+
+func (s *server) GetSpeciesRules(ctx context.Context, _ GetSpeciesRulesRequestObject) (GetSpeciesRulesResponseObject, error) {
+	trainer, err := s.trainer(ctx)
+	if errors.Is(err, errNotSignedIn) {
+		return GetSpeciesRules401JSONResponse{unauthenticated()}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	setup, err := s.services.Keep.Setup(ctx, trainer)
+	if errors.Is(err, domain.ErrSetupNotFound) {
+		return GetSpeciesRules409JSONResponse(errorBody(codeSetupRequired, "Set up your storage and goals first.")), nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return GetSpeciesRules200JSONResponse(toSpeciesRules(setup.Species)), nil
+}
+
+func (s *server) SaveSpeciesRules(ctx context.Context, req SaveSpeciesRulesRequestObject) (SaveSpeciesRulesResponseObject, error) {
+	trainer, err := s.trainer(ctx)
+	if errors.Is(err, errNotSignedIn) {
+		return SaveSpeciesRules401JSONResponse{unauthenticated()}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	rules := make([]domain.SpeciesRule, 0, len(req.Body.Rules))
+	for _, r := range req.Body.Rules {
+		rules = append(rules, domain.SpeciesRule{Species: r.Species, Minimum: r.Minimum, Favorite: r.Favorite})
+	}
+	err = s.services.Keep.SaveSpeciesRules(ctx, trainer, rules)
+	switch {
+	case errors.Is(err, domain.ErrSetupNotFound):
+		return SaveSpeciesRules409JSONResponse(errorBody(codeSetupRequired, "Set up your storage and goals first.")), nil
+	case errors.Is(err, domain.ErrInvalidSetup):
+		return SaveSpeciesRules422JSONResponse(errorBody(codeValidationFailed, err.Error())), nil
+	case err != nil:
+		return nil, err
+	}
+	return SaveSpeciesRules200JSONResponse(toSpeciesRules(rules)), nil
+}
+
+func toSpeciesRules(rules []domain.SpeciesRule) SpeciesRules {
+	out := SpeciesRules{Rules: make([]SpeciesRule, 0, len(rules))}
+	for _, r := range rules {
+		out.Rules = append(out.Rules, SpeciesRule{Species: r.Species, Minimum: r.Minimum, Favorite: r.Favorite})
 	}
 	return out
 }
