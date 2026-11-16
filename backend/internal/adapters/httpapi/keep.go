@@ -64,12 +64,13 @@ func (s *server) GetKeepSummary(ctx context.Context, _ GetKeepSummaryRequestObje
 	}
 	out := KeepSummary{
 		Total: sum.Total, Kept: sum.Kept, Surplus: sum.Surplus, NeedsConfirmation: sum.NeedsConfirmation,
-		Minimum: sum.Minimum, Groups: make([]VariantGroup, 0, len(sum.Groups)),
+		Minimum: sum.Minimum, RareMinimum: sum.RareMinimum, Groups: make([]VariantGroup, 0, len(sum.Groups)),
 	}
 	for _, g := range sum.Groups {
 		vg := VariantGroup{
 			Species: g.Species, Form: g.Form, Shiny: g.Shiny, Costume: g.Costume, Background: g.Background,
-			Dynamax: g.Dynamax, Gigantamax: g.Gigantamax, Count: g.Count, Minimum: g.Minimum, Keep: g.Keep,
+			Dynamax: g.Dynamax, Gigantamax: g.Gigantamax, Lucky: g.Lucky, Shadow: g.Shadow, Purified: g.Purified,
+			Rare: g.Rare, Count: g.Count, Minimum: g.Minimum, Keep: g.Keep,
 			SurplusIds: make([]string, 0, len(g.SurplusIDs)),
 		}
 		for _, id := range g.SurplusIDs {

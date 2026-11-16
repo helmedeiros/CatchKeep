@@ -255,9 +255,14 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
     return { add, update, matches, pending };
   }
 
-  /** Groups by species once all five variant features are confirmed. */
+  /**
+   * Groups by species once all five variant features are confirmed. Only
+   * Mewtwo is rare here.
+   */
   function keepSummary(s: Schemas["Setup"]): Schemas["KeepSummary"] {
-    const minimum = s.capacity <= 1000 ? 1 : s.capacity <= 4000 ? 2 : 3;
+    const band = s.capacity <= 1000 ? 1 : s.capacity <= 4000 ? 2 : 3;
+    const ordinary = band;
+    const rareMinimum = band * 2;
     const groups = new Map<string, Stored[]>();
     let needsConfirmation = 0;
     for (const p of collection) {
@@ -269,6 +274,8 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
     }
     const out = [...groups.entries()].map(([species, members]) => {
       const best = [...members].sort((a, b) => b.cp - a.cp);
+      const rare = species === "Mewtwo";
+      const minimum = rare ? rareMinimum : ordinary;
       return {
         species,
         form: "Normal",
@@ -277,6 +284,10 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
         background: false,
         dynamax: false,
         gigantamax: false,
+        lucky: false,
+        shadow: false,
+        purified: false,
+        rare,
         count: members.length,
         minimum,
         keep: Math.min(minimum, members.length),
@@ -290,7 +301,8 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
       kept: collection.length - surplus - needsConfirmation,
       surplus,
       needsConfirmation,
-      minimum,
+      minimum: ordinary,
+      rareMinimum,
       groups: out,
     };
   }

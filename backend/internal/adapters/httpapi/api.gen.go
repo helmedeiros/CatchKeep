@@ -361,6 +361,9 @@ type KeepSummary struct {
 	// NeedsConfirmation Kept until unknown features (shiny, costume…) are confirmed.
 	NeedsConfirmation int `json:"needsConfirmation"`
 
+	// RareMinimum Copies of each variant of a legendary, mythical or Ultra Beast species kept by default for this capacity.
+	RareMinimum int `json:"rareMinimum"`
+
 	// Surplus Pokémon beyond the keep rules; possible transfers.
 	Surplus int `json:"surplus"`
 	Total   int `json:"total"`
@@ -523,9 +526,15 @@ type VariantGroup struct {
 	Form       string `json:"form"`
 	Gigantamax bool   `json:"gigantamax"`
 	Keep       int    `json:"keep"`
+	Lucky      bool   `json:"lucky"`
 	Minimum    int    `json:"minimum"`
-	Shiny      bool   `json:"shiny"`
-	Species    string `json:"species"`
+	Purified   bool   `json:"purified"`
+
+	// Rare Legendary, mythical or Ultra Beast species.
+	Rare    bool   `json:"rare"`
+	Shadow  bool   `json:"shadow"`
+	Shiny   bool   `json:"shiny"`
+	Species string `json:"species"`
 
 	// SurplusIds Pokémon beyond the minimum, best first.
 	SurplusIds []string `json:"surplusIds"`

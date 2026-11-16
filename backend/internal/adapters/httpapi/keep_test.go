@@ -22,15 +22,21 @@ func TestKeep_SetupThenSummary(t *testing.T) {
 	wantStatus(t, api.do(http.MethodPost, "/api/v1/collection/confirmations", `{"features":["shiny","costume","background","dynamax","gigantamax"]}`), http.StatusOK)
 
 	summary := decode[struct {
-		Total, Kept, Surplus, NeedsConfirmation, Minimum int
-		Groups                                           []struct {
-			Species    string
-			Keep       int
-			SurplusIDs []string `json:"surplusIds"`
+		Total, Kept, Surplus, NeedsConfirmation, Minimum, RareMinimum int
+		Groups                                                        []struct {
+			Species       string
+			Rare          bool
+			Minimum, Keep int
+			SurplusIDs    []string `json:"surplusIds"`
 		}
 	}](t, api.do(http.MethodGet, "/api/v1/keep-summary", "").Body.Bytes())
 	if summary.Total != 4 || summary.Minimum != 1 || summary.NeedsConfirmation != 0 || summary.Kept+summary.Surplus != 4 || len(summary.Groups) == 0 {
 		t.Fatalf("summary = %+v", summary)
+	}
+	for _, g := range summary.Groups {
+		if rare := g.Species == "Mewtwo"; g.Rare != rare || (rare && g.Minimum != summary.RareMinimum) {
+			t.Errorf("group %+v: Mewtwo is the rare species here, with minimum %d", g, summary.RareMinimum)
+		}
 	}
 }
 
