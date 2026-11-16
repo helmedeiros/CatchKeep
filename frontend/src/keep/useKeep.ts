@@ -48,3 +48,29 @@ export function useKeepSummary(enabled: boolean) {
     queryFn: async () => unwrap(await api.GET("/keep-summary")),
   });
 }
+
+export type SpeciesRule = components["schemas"]["SpeciesRule"];
+const speciesRulesKey = ["setup", "species-rules"] as const;
+
+export function useSpeciesRules(enabled: boolean) {
+  const api = useApi();
+  return useQuery({
+    queryKey: speciesRulesKey,
+    enabled,
+    queryFn: async () => unwrap(await api.GET("/species-rules")).rules,
+  });
+}
+
+/** Replaces every species rule; the keep summary follows. */
+export function useSaveSpeciesRules() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (rules: SpeciesRule[]) =>
+      unwrap(await api.PUT("/species-rules", { body: { rules } })).rules,
+    onSuccess: (saved) => {
+      queryClient.setQueryData(speciesRulesKey, saved);
+      return queryClient.invalidateQueries({ queryKey: summaryKey });
+    },
+  });
+}

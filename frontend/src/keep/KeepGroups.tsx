@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { PokemonRow } from "../collection/PokemonRow";
 import type { Pokemon } from "../collection/useCollection";
 import { Sprite } from "../ui/Sprite";
+import { SpeciesRuleEditor } from "./SpeciesRules";
 import { secondaryButton } from "../ui/styles";
 import type { KeepSummary } from "./useKeep";
 
@@ -96,9 +97,11 @@ function GroupRow({
         />
         <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
         <span className="shrink-0 text-sm tabular-nums text-slate-500">
-          {g.count} · keep {g.keep} · {g.surplusIds.length} extra
+          {g.count} · keep {g.keep}
+          {g.rule === "species" && " (your rule)"} · {g.surplusIds.length} extra
         </span>
       </button>
+      {open && <SpeciesRuleEditor species={g.species} />}
       {open && (
         <ul
           aria-label={`${name} copies`}
