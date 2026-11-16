@@ -9,11 +9,16 @@ import (
 
 // known returns a Pokémon whose variant is fully known (not shiny etc.).
 func known(id, species string, ivs ...string) domain.Pokemon {
-	kv := []string{"species", species, "form", "Normal", "shiny", "false", "costume", "false", "background", "false", "dynamax", "false", "gigantamax", "false"}
+	kv := knownVariant(species)
 	if len(ivs) == 3 {
 		kv = append(kv, "iv_attack", ivs[0], "iv_defense", ivs[1], "iv_stamina", ivs[2])
 	}
 	return mon(id, kv...)
+}
+
+// knownVariant is a species with every variant feature confirmed absent.
+func knownVariant(species string) []string {
+	return []string{"species", species, "form", "Normal", "shiny", "false", "costume", "false", "background", "false", "dynamax", "false", "gigantamax", "false"}
 }
 
 func TestSetup_Validate(t *testing.T) {
@@ -95,5 +100,38 @@ func TestSummarizeKeeps_TradingKeepsAnExtraSpecialVariant(t *testing.T) {
 
 	if collecting.Surplus != 2 || trading.Surplus != 1 {
 		t.Fatalf("surplus collecting=%d trading=%d, want 2 and 1", collecting.Surplus, trading.Surplus)
+	}
+}
+
+func TestSummarizeKeeps_LuckyShadowAndPurifiedCopiesAreTheirOwnVariants(t *testing.T) {
+	kyurem := func(id string, kv ...string) domain.Pokemon {
+		return mon(id, append(knownVariant("Kyurem"), kv...)...)
+	}
+	pokemon := []domain.Pokemon{
+		kyurem("P1"), kyurem("P2"),
+		kyurem("P3", "lucky", "true"),
+		kyurem("P4", "shadow", "true"),
+		kyurem("P5", "purified", "true"),
+	}
+
+	s := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}})
+
+	if len(s.Groups) != 4 || s.Surplus != 1 || s.NeedsConfirmation != 0 {
+		t.Fatalf("summary = %+v; want plain, lucky, shadow and purified groups and one plain extra", s)
+	}
+	if g := s.Groups[0]; g.Lucky || g.Shadow || g.Purified || g.Count != 2 {
+		t.Fatalf("largest surplus group = %+v, want the two plain copies", g)
+	}
+}
+
+func TestSummarizeKeeps_UnestablishedLuckyOrShadowDoesNotWaitForConfirmation(t *testing.T) {
+	// The export only says "1" for lucky and shadow; anything else is not
+	// established and groups with the ordinary copies, as §5.3 alone would.
+	pokemon := []domain.Pokemon{known("P1", "Pidgey"), known("P2", "Pidgey")}
+
+	s := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}})
+
+	if s.NeedsConfirmation != 0 || s.Surplus != 1 {
+		t.Fatalf("summary = %+v", s)
 	}
 }

@@ -310,6 +310,8 @@ variant_key = (species, form, shiny, costume, background, dynamax, gigantamax)
 
 Each component may be unknown. A record with any unknown component has a _set_ of possible variant keys; §7.3 defines how that affects planning.
 
+**Keep grouping (decided in M3):** the keep rules also separate `lucky`, `shadow` and `purified` copies, so a lucky or shadow Pokémon is never transferred in place of an ordinary one. The export only establishes these as present (§6.5), so a copy without them established groups with the ordinary copies, exactly as the key above alone would; they never make a record wait for confirmation.
+
 ---
 
 ## 6. V1 functional requirements
