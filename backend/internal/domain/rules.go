@@ -76,10 +76,12 @@ func OrdinaryMinimum(capacity int) int {
 // variantFields complete a variant key with species and form (spec §5.3).
 var variantFields = []Field{FieldShiny, FieldCostume, FieldBackground, FieldDynamax, FieldGigantamax}
 
-// Variant is a fully known variant key.
+// Variant is a fully known variant key. Lucky, Shadow and Purified extend
+// §5.3 so those copies are never transferred in place of ordinary ones.
 type Variant struct {
 	Species, Form                                   string
 	Shiny, Costume, Background, Dynamax, Gigantamax bool
+	Lucky, Shadow, Purified                         bool
 }
 
 func (v Variant) special() bool { return v.Shiny || v.Costume || v.Background }
@@ -168,6 +170,9 @@ func variantOf(s Snapshot) (Variant, bool) {
 			return Variant{}, false
 		}
 	}
+	// The export only establishes these as present, so anything else groups
+	// with the ordinary copies, exactly as §5.3 alone would.
+	v.Lucky, v.Shadow, v.Purified = s.Tri(FieldLucky) == Yes, s.Tri(FieldShadow) == Yes, s.Tri(FieldPurified) == Yes
 	return v, true
 }
 
