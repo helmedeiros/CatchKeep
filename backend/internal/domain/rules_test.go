@@ -38,12 +38,15 @@ func TestSetup_Validate(t *testing.T) {
 	}
 }
 
-func TestOrdinaryMinimum_ScalesWithCapacity(t *testing.T) {
+func TestMinimums_ScaleWithCapacity(t *testing.T) {
 	if small := domain.OrdinaryMinimum(350); small != 1 {
 		t.Fatalf("small bag minimum = %d, want 1", small)
 	}
 	if big := domain.OrdinaryMinimum(2700); big != 2 {
 		t.Fatalf("2,700 slots minimum = %d, want 2", big)
+	}
+	if rare := domain.RareMinimum(2700); rare != 4 {
+		t.Fatalf("2,700 slots rare minimum = %d, want 4", rare)
 	}
 }
 
@@ -55,7 +58,7 @@ func TestSummarizeKeeps_KeepsTheBestCopiesUpToTheMinimum(t *testing.T) {
 		known("P4", "Mewtwo", "15", "14", "13"),
 	}
 
-	s := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 2700, Goals: []domain.Goal{domain.GoalCollecting}})
+	s := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 2700, Goals: []domain.Goal{domain.GoalCollecting}}, nil)
 
 	if s.Total != 4 || s.Kept != 3 || s.Surplus != 1 || s.NeedsConfirmation != 0 || s.Minimum != 2 {
 		t.Fatalf("summary = %+v", s)
@@ -72,7 +75,7 @@ func TestSummarizeKeeps_UnknownVariantFeaturesWaitForConfirmation(t *testing.T) 
 		mon("P2", "species", "Pidgey", "form", "Normal"),
 	}
 
-	s := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}})
+	s := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}}, nil)
 
 	if s.NeedsConfirmation != 1 || s.Kept != 1 || s.Surplus != 0 {
 		t.Fatalf("summary = %+v; the unconfirmed Pidgey must never be surplus", s)
@@ -82,7 +85,7 @@ func TestSummarizeKeeps_UnknownVariantFeaturesWaitForConfirmation(t *testing.T) 
 func TestSummarizeKeeps_DistinctVariantsAreKeptSeparately(t *testing.T) {
 	shiny := mon("P2", "species", "Pidgey", "form", "Normal", "shiny", "true", "costume", "false", "background", "false", "dynamax", "false", "gigantamax", "false")
 
-	s := domain.SummarizeKeeps([]domain.Pokemon{known("P1", "Pidgey"), shiny}, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}})
+	s := domain.SummarizeKeeps([]domain.Pokemon{known("P1", "Pidgey"), shiny}, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}}, nil)
 
 	if len(s.Groups) != 2 || s.Surplus != 0 {
 		t.Fatalf("summary = %+v; a shiny is its own variant", s)
@@ -95,8 +98,8 @@ func TestSummarizeKeeps_TradingKeepsAnExtraSpecialVariant(t *testing.T) {
 	}
 	pokemon := []domain.Pokemon{shiny("P1"), shiny("P2"), shiny("P3")}
 
-	collecting := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}})
-	trading := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting, domain.GoalTrading}})
+	collecting := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}}, nil)
+	trading := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting, domain.GoalTrading}}, nil)
 
 	if collecting.Surplus != 2 || trading.Surplus != 1 {
 		t.Fatalf("surplus collecting=%d trading=%d, want 2 and 1", collecting.Surplus, trading.Surplus)
@@ -114,7 +117,7 @@ func TestSummarizeKeeps_LuckyShadowAndPurifiedCopiesAreTheirOwnVariants(t *testi
 		kyurem("P5", "purified", "true"),
 	}
 
-	s := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}})
+	s := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}}, nil)
 
 	if len(s.Groups) != 4 || s.Surplus != 1 || s.NeedsConfirmation != 0 {
 		t.Fatalf("summary = %+v; want plain, lucky, shadow and purified groups and one plain extra", s)
@@ -129,9 +132,28 @@ func TestSummarizeKeeps_UnestablishedLuckyOrShadowDoesNotWaitForConfirmation(t *
 	// established and groups with the ordinary copies, as §5.3 alone would.
 	pokemon := []domain.Pokemon{known("P1", "Pidgey"), known("P2", "Pidgey")}
 
-	s := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}})
+	s := domain.SummarizeKeeps(pokemon, domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}}, nil)
 
 	if s.NeedsConfirmation != 0 || s.Surplus != 1 {
 		t.Fatalf("summary = %+v", s)
+	}
+}
+
+func TestSummarizeKeeps_RareSpeciesKeepMoreCopies(t *testing.T) {
+	var pokemon []domain.Pokemon
+	for _, id := range []string{"K1", "K2", "K3", "K4", "K5", "K6"} {
+		pokemon = append(pokemon, known(id, "Kyurem"))
+	}
+	rare := func(species string) bool { return species == "Kyurem" }
+	collecting := domain.Setup{Capacity: 2700, Goals: []domain.Goal{domain.GoalCollecting}}
+
+	s := domain.SummarizeKeeps(pokemon, collecting, rare)
+
+	if s.RareMinimum != 4 || s.Kept != 4 || s.Surplus != 2 || !s.Groups[0].Rare {
+		t.Fatalf("summary = %+v; want 4 Kyurem kept as a rare species", s)
+	}
+	trading := domain.Setup{Capacity: 2700, Goals: []domain.Goal{domain.GoalTrading}}
+	if s := domain.SummarizeKeeps(pokemon, trading, rare); s.Kept != 5 {
+		t.Fatalf("trading kept %d, want one more legendary for trades", s.Kept)
 	}
 }

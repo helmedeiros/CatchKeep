@@ -55,23 +55,35 @@ func (s Setup) Validate() error {
 
 func (s Setup) has(g Goal) bool { return slices.Contains(s.Goals, g) }
 
+type capacityBand struct{ UpTo, Ordinary, Rare int }
+
 // capacityBands are placeholder defaults until OD-01 is decided: up to
-// UpTo slots, keep Ordinary copies of each variant (spec V1-RUL-02).
-var capacityBands = []struct{ UpTo, Ordinary int }{
-	{UpTo: 1000, Ordinary: 1},
-	{UpTo: 4000, Ordinary: 2},
-	{UpTo: maxCapacity, Ordinary: 3},
+// UpTo slots, keep Ordinary copies of each variant, Rare of rare species
+// (spec V1-RUL-02).
+var capacityBands = []capacityBand{
+	{UpTo: 1000, Ordinary: 1, Rare: 2},
+	{UpTo: 4000, Ordinary: 2, Rare: 4},
+	{UpTo: maxCapacity, Ordinary: 3, Rare: 6},
+}
+
+func bandFor(capacity int) capacityBand {
+	for _, b := range capacityBands {
+		if capacity <= b.UpTo {
+			return b
+		}
+	}
+	return capacityBands[len(capacityBands)-1]
 }
 
 // OrdinaryMinimum is how many copies of each variant are kept by default.
-func OrdinaryMinimum(capacity int) int {
-	for _, b := range capacityBands {
-		if capacity <= b.UpTo {
-			return b.Ordinary
-		}
-	}
-	return capacityBands[len(capacityBands)-1].Ordinary
-}
+func OrdinaryMinimum(capacity int) int { return bandFor(capacity).Ordinary }
+
+// RareMinimum is how many copies of each variant of a rare species
+// (legendary, mythical, Ultra Beast) are kept by default.
+func RareMinimum(capacity int) int { return bandFor(capacity).Rare }
+
+// Rarity reports whether a species is rare. A nil Rarity treats none as rare.
+type Rarity func(species string) bool
 
 // variantFields complete a variant key with species and form (spec §5.3).
 var variantFields = []Field{FieldShiny, FieldCostume, FieldBackground, FieldDynamax, FieldGigantamax}
@@ -90,6 +102,8 @@ func (v Variant) special() bool { return v.Shiny || v.Costume || v.Background }
 // rule keeps.
 type VariantGroup struct {
 	Variant
+	// Rare is set for legendary, mythical and Ultra Beast species.
+	Rare                 bool
 	Count, Minimum, Keep int
 	// KeptIDs are the best copies, SurplusIDs the rest, best first.
 	KeptIDs, SurplusIDs []PokemonID
@@ -99,19 +113,22 @@ type VariantGroup struct {
 // Kept + Surplus + NeedsConfirmation = Total.
 type KeepSummary struct {
 	Total, Kept, Surplus, NeedsConfirmation int
-	// Minimum is the ordinary per-variant minimum for the setup's capacity.
-	Minimum int
+	// Minimum and RareMinimum are the per-variant minimums for the setup's
+	// capacity.
+	Minimum, RareMinimum int
 	// Groups are sorted by surplus, largest first.
 	Groups []VariantGroup
 }
 
 // SummarizeKeeps applies the default rules (spec V1-RUL-01..03, V1-RUL-06):
-// keep the best Minimum copies of each variant, one more of shiny, costume
-// or background variants when trading is a goal. Pokémon with an unknown
+// keep the best Minimum copies of each variant (RareMinimum for rare
+// species), one more of rare, shiny, costume or background variants when
+// trading is a goal. Pokémon with an unknown
 // variant feature could belong to an under-filled variant, so they are kept
 // and counted as needing confirmation (spec §7.3).
-func SummarizeKeeps(pokemon []Pokemon, setup Setup) KeepSummary {
-	out := KeepSummary{Total: len(pokemon), Minimum: OrdinaryMinimum(setup.Capacity)}
+func SummarizeKeeps(pokemon []Pokemon, setup Setup, rare Rarity) KeepSummary {
+	band := bandFor(setup.Capacity)
+	out := KeepSummary{Total: len(pokemon), Minimum: band.Ordinary, RareMinimum: band.Rare}
 	type member struct {
 		id    PokemonID
 		score [2]int
@@ -135,8 +152,11 @@ func SummarizeKeeps(pokemon []Pokemon, setup Setup) KeepSummary {
 		slices.SortStableFunc(members, func(a, b member) int {
 			return cmp.Or(cmp.Compare(b.score[0], a.score[0]), cmp.Compare(b.score[1], a.score[1]), cmp.Compare(a.id, b.id))
 		})
-		g := VariantGroup{Variant: v, Count: len(members), Minimum: out.Minimum}
-		if setup.has(GoalTrading) && v.special() {
+		g := VariantGroup{Variant: v, Rare: rare != nil && rare(v.Species), Count: len(members), Minimum: out.Minimum}
+		if g.Rare {
+			g.Minimum = out.RareMinimum
+		}
+		if setup.has(GoalTrading) && (g.Rare || v.special()) {
 			g.Minimum++
 		}
 		g.Keep = min(g.Minimum, g.Count)

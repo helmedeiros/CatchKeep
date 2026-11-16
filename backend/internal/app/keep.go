@@ -45,5 +45,5 @@ func (k *Keep) Summary(ctx context.Context, trainer domain.TrainerID) (domain.Ke
 	if err != nil {
 		return domain.KeepSummary{}, err
 	}
-	return domain.SummarizeKeeps(pokemon, setup), nil
+	return domain.SummarizeKeeps(pokemon, setup, nil), nil
 }
