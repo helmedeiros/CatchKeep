@@ -302,6 +302,7 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
         count: members.length,
         minimum,
         keep: Math.min(minimum, members.length),
+        keptIds: best.slice(0, minimum).map((p) => p.id),
         surplusIds: best.slice(minimum).map((p) => p.id),
       };
     });

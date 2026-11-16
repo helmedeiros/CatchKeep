@@ -526,9 +526,12 @@ type VariantGroup struct {
 	Form       string `json:"form"`
 	Gigantamax bool   `json:"gigantamax"`
 	Keep       int    `json:"keep"`
-	Lucky      bool   `json:"lucky"`
-	Minimum    int    `json:"minimum"`
-	Purified   bool   `json:"purified"`
+
+	// KeptIds Pokémon the rules keep, best first.
+	KeptIds  []string `json:"keptIds"`
+	Lucky    bool     `json:"lucky"`
+	Minimum  int      `json:"minimum"`
+	Purified bool     `json:"purified"`
 
 	// Rare Legendary, mythical or Ultra Beast species.
 	Rare    bool   `json:"rare"`

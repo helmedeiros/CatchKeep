@@ -796,6 +796,7 @@ components:
           count,
           minimum,
           keep,
+          keptIds,
           surplusIds,
         ]
       properties:
@@ -831,6 +832,11 @@ components:
         keep:
           type: integer
           minimum: 0
+        keptIds:
+          type: array
+          description: Pokémon the rules keep, best first.
+          items:
+            type: string
         surplusIds:
           type: array
           description: Pokémon beyond the minimum, best first.

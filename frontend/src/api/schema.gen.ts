@@ -425,6 +425,8 @@ export interface components {
             count: number;
             minimum: number;
             keep: number;
+            /** @description Pokémon the rules keep, best first. */
+            keptIds: string[];
             /** @description Pokémon beyond the minimum, best first. */
             surplusIds: string[];
         };
