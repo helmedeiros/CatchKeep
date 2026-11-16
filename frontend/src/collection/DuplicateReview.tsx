@@ -1,4 +1,5 @@
 import { secondaryButton } from "../ui/styles";
+import { Sprite } from "../ui/Sprite";
 import type { MatchAnswer, Pokemon, PossibleMatch } from "./useCollection";
 
 /** One pending possible duplicate, shown beside what it might already be. */
@@ -104,12 +105,19 @@ function Side({
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
         {label}
       </p>
-      <p className="font-semibold">
-        {p.species}
-        {p.form !== "Normal" && (
-          <span className="font-normal text-slate-500"> · {p.form}</span>
-        )}
-      </p>
+      <div className="flex items-center gap-2">
+        <Sprite
+          species={p.species}
+          dexNumber={p.dexNumber}
+          shiny={p.attributes.shiny === "yes"}
+        />
+        <p className="font-semibold">
+          {p.species}
+          {p.form !== "Normal" && (
+            <span className="font-normal text-slate-500"> · {p.form}</span>
+          )}
+        </p>
+      </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
         {facts.map(([name, value, other]) => (
           <div key={name} className="contents">

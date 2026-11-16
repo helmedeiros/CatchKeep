@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Sprite } from "../ui/Sprite";
 import { alert, card, secondaryButton } from "../ui/styles";
 import {
   type ConfirmableFeature,
@@ -19,6 +20,7 @@ const INITIAL_GROUPS = 12;
 interface Group {
   species: string;
   form: string;
+  dexNumber: number | undefined;
   unknown: number;
 }
 
@@ -116,7 +118,12 @@ export function ConfirmFeatures({ pokemon }: { pokemon: Pokemon[] }) {
                   aria-label={name}
                   className="flex items-center justify-between gap-3 py-2"
                 >
-                  <p className="min-w-0 truncate">
+                  <Sprite
+                    size="sm"
+                    species={g.species}
+                    dexNumber={g.dexNumber}
+                  />
+                  <p className="min-w-0 flex-1 truncate">
                     <span className="font-medium">{name}</span>{" "}
                     <span className="text-sm text-slate-500">
                       {g.unknown} Pokémon
@@ -197,6 +204,7 @@ function unknownGroups(pokemon: Pokemon[], chosen: ConfirmableFeature[]) {
     const g = byKey.get(key) ?? {
       species: p.species,
       form: p.form,
+      dexNumber: p.dexNumber,
       unknown: 0,
     };
     g.unknown += 1;
