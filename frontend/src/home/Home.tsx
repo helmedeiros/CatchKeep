@@ -30,7 +30,7 @@ export function Home({ displayName }: { displayName: string }) {
         <>
           <ImportCard hasPokemon={pokemon.length > 0} />
           <ConfirmFeatures pokemon={pokemon} />
-          {pokemon.length > 0 && <KeepCard />}
+          {pokemon.length > 0 && <KeepCard pokemon={pokemon} />}
           <CollectionView pokemon={pokemon} />
         </>
       )}

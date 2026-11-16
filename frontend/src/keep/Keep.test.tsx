@@ -83,9 +83,25 @@ describe("keep rules", () => {
     expect(keep).toHaveTextContent(
       "Keeping the best 1 of each variant and 2 of legendary",
     );
-    const pidgey = within(keep).getByRole("listitem");
-    expect(pidgey).toHaveTextContent("Pidgey");
+    const groups = within(keep).getByRole("list", {
+      name: "Possible transfers by species",
+    });
+    const pidgey = within(groups).getByRole("button", { name: /Pidgey/ });
     expect(pidgey).toHaveTextContent("3 · keep 1 · 2 extra");
+    expect(pidgey.querySelector("img")).toHaveAttribute(
+      "src",
+      expect.stringMatching(/\/16\.png$/),
+    );
+
+    await user.click(pidgey);
+    const copies = within(
+      within(keep).getByRole("list", { name: "Pidgey copies" }),
+    ).getAllByRole("listitem");
+    expect(copies.map((c) => c.textContent)).toEqual([
+      expect.stringMatching(/CP 140.*Keep/),
+      expect.stringMatching(/CP 130.*Possible transfer/),
+      expect.stringMatching(/CP 120.*Possible transfer/),
+    ]);
   });
 
   it("keeps more copies of rare species", async () => {
@@ -102,8 +118,9 @@ describe("keep rules", () => {
     await user.click(within(confirm).getByRole("button", { name: "Confirm" }));
 
     const keep = screen.getByRole("region", { name: "Your keep rules" });
-    const mewtwo = await within(keep).findByRole("listitem");
-    expect(mewtwo).toHaveTextContent("Mewtwo · rare");
+    const mewtwo = await within(keep).findByRole("button", {
+      name: /Mewtwo · rare/,
+    });
     expect(mewtwo).toHaveTextContent("3 · keep 2 · 1 extra");
   });
 

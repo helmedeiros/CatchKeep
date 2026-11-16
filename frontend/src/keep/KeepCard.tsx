@@ -6,6 +6,8 @@ import {
   primaryButton,
   secondaryButton,
 } from "../ui/styles";
+import type { Pokemon } from "../collection/useCollection";
+import { KeepGroups } from "./KeepGroups";
 import {
   type Goal,
   type KeepSummary,
@@ -22,10 +24,9 @@ const GOALS: Array<[Goal, string]> = [
 ];
 const label = (g: Goal) => GOALS.find(([x]) => x === g)?.[1] ?? g;
 const priority = (goals: Goal[]) => goals.map(label).join(", then ");
-const TOP_GROUPS = 8;
 
 /** Setup step 1 (storage and goals) and what the keep rules do with it. */
-export function KeepCard() {
+export function KeepCard({ pokemon }: { pokemon: Pokemon[] }) {
   const setup = useSetup();
   const [editing, setEditing] = useState(false);
 
@@ -42,7 +43,13 @@ export function KeepCard() {
       />
     );
   }
-  return <Summary setup={setup.data} onChange={() => setEditing(true)} />;
+  return (
+    <Summary
+      setup={setup.data}
+      pokemon={pokemon}
+      onChange={() => setEditing(true)}
+    />
+  );
 }
 
 function SetupForm({
@@ -135,7 +142,15 @@ function SetupForm({
   );
 }
 
-function Summary({ setup, onChange }: { setup: Setup; onChange: () => void }) {
+function Summary({
+  setup,
+  pokemon,
+  onChange,
+}: {
+  setup: Setup;
+  pokemon: Pokemon[];
+  onChange: () => void;
+}) {
   const summary = useKeepSummary(true);
   return (
     <section
@@ -156,15 +171,18 @@ function Summary({ setup, onChange }: { setup: Setup; onChange: () => void }) {
       {summary.isError && (
         <p className={alert}>Couldn't work out your keep rules.</p>
       )}
-      {summary.data && <Numbers summary={summary.data} />}
+      {summary.data && <Numbers summary={summary.data} pokemon={pokemon} />}
     </section>
   );
 }
 
-function Numbers({ summary: s }: { summary: KeepSummary }) {
-  const top = s.groups
-    .filter((g) => g.surplusIds.length > 0)
-    .slice(0, TOP_GROUPS);
+function Numbers({
+  summary: s,
+  pokemon,
+}: {
+  summary: KeepSummary;
+  pokemon: Pokemon[];
+}) {
   return (
     <>
       <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -183,51 +201,9 @@ function Numbers({ summary: s }: { summary: KeepSummary }) {
           to see what you can let go.
         </p>
       )}
-      {top.length > 0 && (
-        <ul className="flex flex-col divide-y divide-slate-100 text-sm dark:divide-slate-800">
-          {top.map((g) => (
-            <li
-              key={variantKey(g)}
-              className="flex justify-between gap-3 py-1.5"
-            >
-              <span className="truncate font-medium">
-                {g.species}
-                {variantLabels(g).map((l) => ` · ${l}`)}
-              </span>
-              <span className="shrink-0 tabular-nums text-slate-500">
-                {g.count} · keep {g.keep} · {g.surplusIds.length} extra
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <KeepGroups groups={s.groups} pokemon={pokemon} />
     </>
   );
-}
-
-type Group = KeepSummary["groups"][number];
-
-const FLAGS = [
-  "shiny",
-  "lucky",
-  "shadow",
-  "purified",
-  "costume",
-  "background",
-  "dynamax",
-  "gigantamax",
-] as const;
-
-function variantKey(g: Group): string {
-  return [g.species, g.form, ...FLAGS.map((f) => g[f])].join("|");
-}
-
-function variantLabels(g: Group): string[] {
-  return [
-    ...(g.form !== "Normal" ? [g.form] : []),
-    ...FLAGS.filter((f) => g[f]),
-    ...(g.rare ? ["rare"] : []),
-  ];
 }
 
 function Stat({ value, label }: { value: number; label: string }) {
