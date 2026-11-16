@@ -48,6 +48,13 @@ describe("importing a collection", () => {
     const items = within(list).getAllByRole("listitem");
     expect(items[0]).toHaveTextContent("Mewtwo");
     expect(items[0]).toHaveTextContent("CP 4178");
+    expect(items[0]?.querySelector("img")).toHaveAttribute(
+      "src",
+      expect.stringMatching(/\/150\.png$/),
+    );
+    expect(
+      within(items[0] as HTMLElement).getByLabelText("93% IVs"),
+    ).toBeInTheDocument();
     expect(screen.getByText("3 Pokémon")).toBeInTheDocument();
     expect(within(list).getByText("Lucky")).toBeInTheDocument();
   });
