@@ -8,6 +8,7 @@ import {
 } from "../ui/styles";
 import type { Pokemon } from "../collection/useCollection";
 import { KeepGroups } from "./KeepGroups";
+import { SpeciesRuleList } from "./SpeciesRules";
 import {
   type Goal,
   type KeepSummary,
@@ -201,6 +202,7 @@ function Numbers({
           to see what you can let go.
         </p>
       )}
+      <SpeciesRuleList pokemon={pokemon} />
       <KeepGroups groups={s.groups} pokemon={pokemon} />
     </>
   );
