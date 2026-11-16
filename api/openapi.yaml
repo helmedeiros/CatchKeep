@@ -745,7 +745,8 @@ components:
     KeepSummary:
       type: object
       additionalProperties: false
-      required: [total, kept, surplus, needsConfirmation, minimum, groups]
+      required:
+        [total, kept, surplus, needsConfirmation, minimum, rareMinimum, groups]
       properties:
         total:
           type: integer
@@ -765,6 +766,12 @@ components:
           type: integer
           minimum: 1
           description: Copies of each variant kept by default for this capacity.
+        rareMinimum:
+          type: integer
+          minimum: 1
+          description: >-
+            Copies of each variant of a legendary, mythical or Ultra Beast
+            species kept by default for this capacity.
         groups:
           type: array
           description: One per fully known variant, largest surplus first.
@@ -782,6 +789,10 @@ components:
           background,
           dynamax,
           gigantamax,
+          lucky,
+          shadow,
+          purified,
+          rare,
           count,
           minimum,
           keep,
@@ -802,6 +813,15 @@ components:
           type: boolean
         gigantamax:
           type: boolean
+        lucky:
+          type: boolean
+        shadow:
+          type: boolean
+        purified:
+          type: boolean
+        rare:
+          type: boolean
+          description: Legendary, mythical or Ultra Beast species.
         count:
           type: integer
           minimum: 1

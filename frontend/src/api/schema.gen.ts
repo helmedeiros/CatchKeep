@@ -404,6 +404,8 @@ export interface components {
             needsConfirmation: number;
             /** @description Copies of each variant kept by default for this capacity. */
             minimum: number;
+            /** @description Copies of each variant of a legendary, mythical or Ultra Beast species kept by default for this capacity. */
+            rareMinimum: number;
             /** @description One per fully known variant, largest surplus first. */
             groups: components["schemas"]["VariantGroup"][];
         };
@@ -415,6 +417,11 @@ export interface components {
             background: boolean;
             dynamax: boolean;
             gigantamax: boolean;
+            lucky: boolean;
+            shadow: boolean;
+            purified: boolean;
+            /** @description Legendary, mythical or Ultra Beast species. */
+            rare: boolean;
             count: number;
             minimum: number;
             keep: number;
