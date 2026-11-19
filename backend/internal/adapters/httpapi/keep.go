@@ -63,7 +63,7 @@ func (s *server) GetKeepSummary(ctx context.Context, _ GetKeepSummaryRequestObje
 		return nil, err
 	}
 	out := KeepSummary{
-		Total: sum.Total, Kept: sum.Kept, Surplus: sum.Surplus, NeedsConfirmation: sum.NeedsConfirmation,
+		Total: sum.Total, Kept: sum.Kept, Surplus: sum.Surplus, NeedsConfirmation: sum.NeedsConfirmation, Protected: sum.Protected,
 		Minimum: sum.Minimum, RareMinimum: sum.RareMinimum, Groups: make([]VariantGroup, 0, len(sum.Groups)),
 	}
 	for _, g := range sum.Groups {
@@ -72,6 +72,10 @@ func (s *server) GetKeepSummary(ctx context.Context, _ GetKeepSummaryRequestObje
 			Dynamax: g.Dynamax, Gigantamax: g.Gigantamax, Lucky: g.Lucky, Shadow: g.Shadow, Purified: g.Purified,
 			Rare: g.Rare, Rule: VariantGroupRule(g.Rule), Count: g.Count, Minimum: g.Minimum, Keep: g.Keep,
 			KeptIds: make([]string, 0, len(g.KeptIDs)), SurplusIds: make([]string, 0, len(g.SurplusIDs)),
+			ProtectedIds: make([]string, 0, len(g.ProtectedIDs)),
+		}
+		for _, id := range g.ProtectedIDs {
+			vg.ProtectedIds = append(vg.ProtectedIds, string(id))
 		}
 		for _, id := range g.KeptIDs {
 			vg.KeptIds = append(vg.KeptIds, string(id))

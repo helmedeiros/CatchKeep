@@ -277,6 +277,40 @@ paths:
           $ref: "#/components/responses/Error"
         default:
           $ref: "#/components/responses/Error"
+  /collection/{pokemonId}/protection:
+    put:
+      tags: [collection]
+      operationId: setProtection
+      summary: >-
+        Protect one Pokémon so it is never suggested for transfer, or remove
+        that protection (V1-SET-03).
+      security:
+        - session: []
+      parameters:
+        - name: pokemonId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Protection"
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Protection"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
   /collection/confirmations:
     post:
       tags: [collection]
@@ -517,7 +551,7 @@ components:
     Pokemon:
       type: object
       additionalProperties: false
-      required: [id, species, form, attributes]
+      required: [id, species, form, protected, attributes]
       properties:
         id:
           type: string
@@ -534,6 +568,9 @@ components:
         dexNumber:
           type: integer
           minimum: 1
+        protected:
+          type: boolean
+          description: The trainer protected it, so it is never transferred.
         gender:
           type: string
           enum: [male, female]
@@ -795,6 +832,13 @@ components:
           items:
             type: string
             enum: [collecting, trading, battling]
+    Protection:
+      type: object
+      additionalProperties: false
+      required: [protected]
+      properties:
+        protected:
+          type: boolean
     SpeciesRules:
       type: object
       additionalProperties: false
@@ -826,7 +870,16 @@ components:
       type: object
       additionalProperties: false
       required:
-        [total, kept, surplus, needsConfirmation, minimum, rareMinimum, groups]
+        [
+          total,
+          kept,
+          surplus,
+          needsConfirmation,
+          protected,
+          minimum,
+          rareMinimum,
+          groups,
+        ]
       properties:
         total:
           type: integer
@@ -842,6 +895,10 @@ components:
           type: integer
           minimum: 0
           description: Kept until unknown features (shiny, costume…) are confirmed.
+        protected:
+          type: integer
+          minimum: 0
+          description: Kept Pokémon the trainer protected.
         minimum:
           type: integer
           minimum: 1
@@ -879,6 +936,7 @@ components:
           keep,
           keptIds,
           surplusIds,
+          protectedIds,
         ]
       properties:
         species:
@@ -925,6 +983,11 @@ components:
         surplusIds:
           type: array
           description: Pokémon beyond the minimum, best first.
+          items:
+            type: string
+        protectedIds:
+          type: array
+          description: Kept copies the trainer protected.
           items:
             type: string
     InvalidRow:

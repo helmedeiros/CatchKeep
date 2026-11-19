@@ -14,6 +14,7 @@ interface Row {
   cp: number;
   hp: number;
   lucky: boolean;
+  protected?: boolean;
   /** Features confirmed absent. */
   absent?: string[];
 }
@@ -34,6 +35,7 @@ const toPokemon = (id: string, p: Row): Schemas["Pokemon"] => {
     species: p.species,
     form: "Normal",
     dexNumber: p.dexNumber,
+    protected: p.protected ?? false,
     cp: p.cp,
     hp: p.hp,
     level: 20,
@@ -199,6 +201,14 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
         ? jsonResponse(200, setup)
         : err(404, "NOT_FOUND", "setup not done yet");
     }
+    const protect = /^\/collection\/([^/]+)\/protection$/.exec(path);
+    if (protect && req.method === "PUT") {
+      if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
+      const p = collection.find((x) => x.id === protect[1]);
+      if (!p) return err(404, "NOT_FOUND", "not in your collection");
+      p.protected = (body as Schemas["Protection"]).protected;
+      return jsonResponse(200, { protected: p.protected });
+    }
     if (path === "/species-rules") {
       if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
       if (!setup) return err(409, "SETUP_REQUIRED", "Set up first.");
@@ -293,7 +303,12 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
       groups.set(p.species, [...(groups.get(p.species) ?? []), p]);
     }
     const out = [...groups.entries()].map(([species, members]) => {
-      const best = [...members].sort((a, b) => b.cp - a.cp);
+      const best = [...members].sort(
+        (a, b) =>
+          Number(b.protected ?? false) - Number(a.protected ?? false) ||
+          b.cp - a.cp,
+      );
+      const protectedIds = best.filter((p) => p.protected).map((p) => p.id);
       const rare = species === "Mewtwo";
       const own = speciesRules.find((r) => r.species === species);
       const minimum = own?.favorite
@@ -325,9 +340,14 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
         rule,
         count: members.length,
         minimum,
-        keep: Math.min(minimum, members.length),
-        keptIds: best.slice(0, minimum).map((p) => p.id),
-        surplusIds: best.slice(minimum).map((p) => p.id),
+        keep: Math.min(Math.max(minimum, protectedIds.length), members.length),
+        keptIds: best
+          .slice(0, Math.max(minimum, protectedIds.length))
+          .map((p) => p.id),
+        surplusIds: best
+          .slice(Math.max(minimum, protectedIds.length))
+          .map((p) => p.id),
+        protectedIds,
       };
     });
     out.sort((a, b) => b.surplusIds.length - a.surplusIds.length);
@@ -337,6 +357,7 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
       kept: collection.length - surplus - needsConfirmation,
       surplus,
       needsConfirmation,
+      protected: out.reduce((n, g) => n + g.protectedIds.length, 0),
       minimum: ordinary,
       rareMinimum,
       groups: out,

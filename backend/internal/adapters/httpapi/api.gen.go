@@ -385,6 +385,9 @@ type KeepSummary struct {
 	// NeedsConfirmation Kept until unknown features (shiny, costume…) are confirmed.
 	NeedsConfirmation int `json:"needsConfirmation"`
 
+	// Protected Kept Pokémon the trainer protected.
+	Protected int `json:"protected"`
+
 	// RareMinimum Copies of each variant of a legendary, mythical or Ultra Beast species kept by default for this capacity.
 	RareMinimum int `json:"rareMinimum"`
 
@@ -469,6 +472,9 @@ type Pokemon struct {
 	Iv    *IVs     `json:"iv,omitempty"`
 	Level *float32 `json:"level,omitempty"`
 
+	// Protected The trainer protected it, so it is never transferred.
+	Protected bool `json:"protected"`
+
 	// Species Examples: Metagross
 	Species string `json:"species"`
 }
@@ -509,6 +515,11 @@ type ProfileSummary struct {
 	//
 	// Examples: 01JD2Z8Q4M8V7Y6X5W4T3S2R1P
 	Id ProfileId `json:"id"`
+}
+
+// Protection defines model for Protection.
+type Protection struct {
+	Protected bool `json:"protected"`
 }
 
 // Setup defines model for Setup.
@@ -569,10 +580,13 @@ type VariantGroup struct {
 	Keep       int    `json:"keep"`
 
 	// KeptIds Pokémon the rules keep, best first.
-	KeptIds  []string `json:"keptIds"`
-	Lucky    bool     `json:"lucky"`
-	Minimum  int      `json:"minimum"`
-	Purified bool     `json:"purified"`
+	KeptIds []string `json:"keptIds"`
+	Lucky   bool     `json:"lucky"`
+	Minimum int      `json:"minimum"`
+
+	// ProtectedIds Kept copies the trainer protected.
+	ProtectedIds []string `json:"protectedIds"`
+	Purified     bool     `json:"purified"`
 
 	// Rare Legendary, mythical or Ultra Beast species.
 	Rare bool `json:"rare"`
@@ -595,6 +609,9 @@ type ImportId = string
 
 // ConfirmAbsentJSONRequestBody defines body for ConfirmAbsent for application/json ContentType.
 type ConfirmAbsentJSONRequestBody = AbsenceConfirmation
+
+// SetProtectionJSONRequestBody defines body for SetProtection for application/json ContentType.
+type SetProtectionJSONRequestBody = Protection
 
 // AnswerPossibleMatchesJSONRequestBody defines body for AnswerPossibleMatches for application/json ContentType.
 type AnswerPossibleMatchesJSONRequestBody = MatchAnswers
@@ -619,6 +636,9 @@ type ServerInterface interface {
 	// ConfirmAbsent Confirm that none of a species' (or any) Pokémon have some features.
 	// (POST /collection/confirmations)
 	ConfirmAbsent(w http.ResponseWriter, r *http.Request)
+	// SetProtection Protect one Pokémon so it is never suggested for transfer, or remove that protection (V1-SET-03).
+	// (PUT /collection/{pokemonId}/protection)
+	SetProtection(w http.ResponseWriter, r *http.Request, pokemonId string)
 	// GetHealth Report whether the API is up.
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -694,6 +714,32 @@ func (siw *ServerInterfaceWrapper) ConfirmAbsent(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ConfirmAbsent(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetProtection operation middleware
+func (siw *ServerInterfaceWrapper) SetProtection(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "pokemonId" -------------
+	var pokemonId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pokemonId", r.PathValue("pokemonId"), &pokemonId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pokemonId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetProtection(w, r, pokemonId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1080,6 +1126,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{importId}/commit", wrapper.CommitImport)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{importId}/answers", wrapper.AnswerPossibleMatches)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/collection", wrapper.ListCollection)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/collection/{pokemonId}/protection", wrapper.SetProtection)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/collection/confirmations", wrapper.ConfirmAbsent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/setup", wrapper.GetSetup)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/setup", wrapper.SaveSetup)
@@ -1200,6 +1247,74 @@ type ConfirmAbsentdefaultJSONResponse struct {
 }
 
 func (response ConfirmAbsentdefaultJSONResponse) VisitConfirmAbsentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetProtectionRequestObject struct {
+	PokemonId string `json:"pokemonId"`
+	Body      *SetProtectionJSONRequestBody
+}
+
+type SetProtectionResponseObject interface {
+	VisitSetProtectionResponse(w http.ResponseWriter) error
+}
+
+type SetProtection200JSONResponse Protection
+
+func (response SetProtection200JSONResponse) VisitSetProtectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetProtection401JSONResponse struct{ ErrorJSONResponse }
+
+func (response SetProtection401JSONResponse) VisitSetProtectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetProtection404JSONResponse Error
+
+func (response SetProtection404JSONResponse) VisitSetProtectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetProtectiondefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response SetProtectiondefaultJSONResponse) VisitSetProtectionResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -2230,6 +2345,9 @@ type StrictServerInterface interface {
 	// ConfirmAbsent Confirm that none of a species' (or any) Pokémon have some features.
 	// (POST /collection/confirmations)
 	ConfirmAbsent(ctx context.Context, request ConfirmAbsentRequestObject) (ConfirmAbsentResponseObject, error)
+	// SetProtection Protect one Pokémon so it is never suggested for transfer, or remove that protection (V1-SET-03).
+	// (PUT /collection/{pokemonId}/protection)
+	SetProtection(ctx context.Context, request SetProtectionRequestObject) (SetProtectionResponseObject, error)
 	// GetHealth Report whether the API is up.
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -2364,6 +2482,39 @@ func (sh *strictHandler) ConfirmAbsent(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ConfirmAbsentResponseObject); ok {
 		if err := validResponse.VisitConfirmAbsentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetProtection operation middleware
+func (sh *strictHandler) SetProtection(w http.ResponseWriter, r *http.Request, pokemonId string) {
+	var request SetProtectionRequestObject
+
+	request.PokemonId = pokemonId
+
+	var body SetProtectionJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetProtection(ctx, request.(SetProtectionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetProtection")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetProtectionResponseObject); ok {
+		if err := validResponse.VisitSetProtectionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
