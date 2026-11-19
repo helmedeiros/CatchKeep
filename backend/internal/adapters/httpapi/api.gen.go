@@ -593,9 +593,12 @@ type TriState string
 
 // VariantGroup defines model for VariantGroup.
 type VariantGroup struct {
-	Background bool   `json:"background"`
-	Costume    bool   `json:"costume"`
-	Count      int    `json:"count"`
+	Background bool `json:"background"`
+	Costume    bool `json:"costume"`
+	Count      int  `json:"count"`
+
+	// Default Minimum generated from storage and goals, before any species rule or favorite replaced it.
+	Default    int    `json:"default"`
 	Dynamax    bool   `json:"dynamax"`
 	Form       string `json:"form"`
 	Gigantamax bool   `json:"gigantamax"`
@@ -621,6 +624,9 @@ type VariantGroup struct {
 
 	// SurplusIds Pokémon beyond the minimum, best first.
 	SurplusIds []string `json:"surplusIds"`
+
+	// TradeBonus The trading goal added one to the generated minimum.
+	TradeBonus bool `json:"tradeBonus"`
 }
 
 // VariantGroupRule The rule that decided this group's minimum.

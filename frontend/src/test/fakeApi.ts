@@ -351,13 +351,13 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
       const protectedIds = best.filter(isProtected).map((p) => p.id);
       const rare = species === "Mewtwo";
       const own = speciesRules.find((r) => r.species === species);
+      const tradeBonus = rare && s.goals.includes("trading");
+      const generated = (rare ? rareMinimum : ordinary) + Number(tradeBonus);
       const minimum = own?.favorite
         ? members.length
         : own
           ? own.minimum
-          : rare
-            ? rareMinimum
-            : ordinary;
+          : generated;
       const rule: Schemas["VariantGroup"]["rule"] = own?.favorite
         ? "favorite"
         : own
@@ -377,6 +377,8 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
         shadow: false,
         purified: false,
         rare,
+        default: generated,
+        tradeBonus,
         rule,
         count: members.length,
         minimum,

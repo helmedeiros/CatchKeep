@@ -88,11 +88,12 @@ func TestKeep_SpeciesRules(t *testing.T) {
 	summary := decode[struct {
 		Groups []struct {
 			Species, Rule string
+			Default       int
 		}
 	}](t, api.do(http.MethodGet, "/api/v1/keep-summary", "").Body.Bytes())
 	for _, g := range summary.Groups {
-		if g.Species == "Mewtwo" && g.Rule != "species" {
-			t.Fatalf("Mewtwo group rule = %q, want species", g.Rule)
+		if g.Species == "Mewtwo" && (g.Rule != "species" || g.Default != 2) {
+			t.Fatalf("Mewtwo group rule = %q replacing default %d, want species replacing the rare 2", g.Rule, g.Default)
 		}
 	}
 }
