@@ -342,6 +342,24 @@ paths:
           $ref: "#/components/responses/Error"
         default:
           $ref: "#/components/responses/Error"
+  /capacity-bands:
+    get:
+      tags: [keep]
+      operationId: getCapacityBands
+      summary: How many copies the default keep rules keep for each storage size.
+      security:
+        - session: []
+      responses:
+        "200":
+          description: The bands, smallest storage first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CapacityBands"
+        "401":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
   /setup:
     get:
       tags: [keep]
@@ -1056,6 +1074,32 @@ components:
           description: One per fully known variant, largest surplus first.
           items:
             $ref: "#/components/schemas/VariantGroup"
+    CapacityBands:
+      type: object
+      additionalProperties: false
+      required: [bands]
+      properties:
+        bands:
+          type: array
+          items:
+            $ref: "#/components/schemas/CapacityBand"
+    CapacityBand:
+      type: object
+      additionalProperties: false
+      required: [upTo, ordinary, rare]
+      properties:
+        upTo:
+          type: integer
+          minimum: 1
+          description: Largest storage, in slots, this band covers.
+        ordinary:
+          type: integer
+          minimum: 1
+          description: Copies kept of each variant.
+        rare:
+          type: integer
+          minimum: 1
+          description: Copies kept of each variant of a rare species.
     VariantGroup:
       type: object
       additionalProperties: false

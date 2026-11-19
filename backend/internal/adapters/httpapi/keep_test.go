@@ -123,3 +123,14 @@ func TestKeep_ProtectingAPokemon(t *testing.T) {
 		t.Fatalf("protected = %d; unconfirmed Pokémon are not in a group yet", summary.Protected)
 	}
 }
+
+func TestKeep_CapacityBands(t *testing.T) {
+	wantStatus(t, newAPI(t).do(http.MethodGet, "/api/v1/capacity-bands", ""), http.StatusUnauthorized)
+
+	got := decode[struct {
+		Bands []struct{ UpTo, Ordinary, Rare int }
+	}](t, signedIn(t, "Ash").do(http.MethodGet, "/api/v1/capacity-bands", "").Body.Bytes())
+	if len(got.Bands) != 3 || got.Bands[0].UpTo != 1000 || got.Bands[0].Ordinary != 1 || got.Bands[0].Rare != 2 {
+		t.Fatalf("bands = %+v", got.Bands)
+	}
+}

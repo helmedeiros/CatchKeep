@@ -96,6 +96,19 @@ func toSetup(s domain.Setup) Setup {
 	return out
 }
 
+func (s *server) GetCapacityBands(ctx context.Context, _ GetCapacityBandsRequestObject) (GetCapacityBandsResponseObject, error) {
+	if _, err := s.trainer(ctx); errors.Is(err, errNotSignedIn) {
+		return GetCapacityBands401JSONResponse{unauthenticated()}, nil
+	} else if err != nil {
+		return nil, err
+	}
+	out := CapacityBands{Bands: []CapacityBand{}}
+	for _, b := range s.services.Keep.CapacityBands() {
+		out.Bands = append(out.Bands, CapacityBand{UpTo: b.UpTo, Ordinary: b.Ordinary, Rare: b.Rare})
+	}
+	return GetCapacityBands200JSONResponse(out), nil
+}
+
 func (s *server) GetSpeciesRules(ctx context.Context, _ GetSpeciesRulesRequestObject) (GetSpeciesRulesResponseObject, error) {
 	trainer, err := s.trainer(ctx)
 	if errors.Is(err, errNotSignedIn) {

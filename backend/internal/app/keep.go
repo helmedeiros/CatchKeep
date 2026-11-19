@@ -22,6 +22,9 @@ func NewKeep(setups ports.Setups, collection ports.CollectionReader, species por
 	return &Keep{setups: setups, collection: collection, species: species, teams: teams}
 }
 
+// CapacityBands are the default minimums for each storage size.
+func (k *Keep) CapacityBands() []domain.CapacityBand { return domain.CapacityBands() }
+
 // Setup returns the trainer's setup, or domain.ErrSetupNotFound.
 func (k *Keep) Setup(ctx context.Context, trainer domain.TrainerID) (domain.Setup, error) {
 	return k.setups.GetSetup(ctx, trainer)
