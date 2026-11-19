@@ -7,9 +7,11 @@ import type { Pokemon } from "./useCollection";
 export function PokemonRow({
   pokemon: p,
   children,
+  action,
 }: {
   pokemon: Pokemon;
   children?: React.ReactNode;
+  action?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center gap-3">
@@ -46,6 +48,7 @@ export function PokemonRow({
           {children}
         </p>
       </div>
+      {action}
       <IvRing percent={ivPercent(p)} />
     </div>
   );

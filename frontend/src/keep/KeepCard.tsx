@@ -196,6 +196,11 @@ function Numbers({
         <Stat value={s.surplus} label="possible transfers" />
         <Stat value={s.needsConfirmation} label="waiting for confirmation" />
       </div>
+      {s.protected > 0 && (
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          {s.protected} protected by you, always kept.
+        </p>
+      )}
       {s.needsConfirmation > 0 && (
         <p className="text-sm text-slate-600 dark:text-slate-400">
           Pokémon with unconfirmed features are always kept. Confirm them above

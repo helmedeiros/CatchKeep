@@ -77,3 +77,19 @@ export function useConfirmAbsent() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: collectionKey }),
   });
 }
+
+/** Protects or unprotects one Pokémon; the collection and keep summary follow. */
+export function useProtect() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, protect }: { id: string; protect: boolean }) =>
+      unwrap(
+        await api.PUT("/collection/{pokemonId}/protection", {
+          params: { path: { pokemonId: id } },
+          body: { protected: protect },
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: collectionKey }),
+  });
+}

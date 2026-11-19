@@ -2,6 +2,7 @@ import { forwardRef, type HTMLAttributes } from "react";
 import { Virtuoso } from "react-virtuoso";
 import { card } from "../ui/styles";
 import { PokemonRow } from "./PokemonRow";
+import { ProtectButton } from "./ProtectButton";
 import type { Pokemon } from "./useCollection";
 
 const INITIAL_ROWS = 30;
@@ -19,7 +20,9 @@ export function CollectionView({ pokemon }: { pokemon: Pokemon[] }) {
         initialItemCount={Math.min(INITIAL_ROWS, pokemon.length)}
         components={{ List, Item }}
         computeItemKey={(_, p) => p.id}
-        itemContent={(_, p) => <PokemonRow pokemon={p} />}
+        itemContent={(_, p) => (
+          <PokemonRow pokemon={p} action={<ProtectButton pokemon={p} />} />
+        )}
       />
     </section>
   );
