@@ -267,7 +267,7 @@ func toPokemon(p domain.Pokemon) Pokemon {
 		return nil
 	}
 	out := Pokemon{
-		Id: string(p.ID), Species: cur.String(domain.FieldSpecies), Form: cur.String(domain.FieldForm),
+		Id: string(p.ID), Species: cur.String(domain.FieldSpecies), Form: cur.String(domain.FieldForm), Protected: p.Protected,
 		Cp: intPtr(domain.FieldCP), Hp: intPtr(domain.FieldHP), DexNumber: intPtr(domain.FieldDexNumber),
 		Attributes: Attributes{
 			Shiny: tri(domain.FieldShiny), Lucky: tri(domain.FieldLucky), Shadow: tri(domain.FieldShadow),
@@ -297,4 +297,22 @@ func toPokemon(p domain.Pokemon) Pokemon {
 		out.CatchDate = &openapi_types.Date{Time: d}
 	}
 	return out
+}
+
+func (s *server) SetProtection(ctx context.Context, req SetProtectionRequestObject) (SetProtectionResponseObject, error) {
+	trainer, err := s.trainer(ctx)
+	if errors.Is(err, errNotSignedIn) {
+		return SetProtection401JSONResponse{unauthenticated()}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	err = s.services.Collection.Protect(ctx, trainer, domain.PokemonID(req.PokemonId), req.Body.Protected)
+	if errors.Is(err, domain.ErrPokemonNotFound) {
+		return SetProtection404JSONResponse(errorBody(codeNotFound, "That Pokémon is not in your collection.")), nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return SetProtection200JSONResponse(*req.Body), nil
 }

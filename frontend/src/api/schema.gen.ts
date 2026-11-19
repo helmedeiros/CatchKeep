@@ -174,6 +174,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/collection/{pokemonId}/protection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Protect one Pokémon so it is never suggested for transfer, or remove that protection (V1-SET-03). */
+        put: operations["setProtection"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/collection/confirmations": {
         parameters: {
             query?: never;
@@ -307,6 +324,8 @@ export interface components {
              */
             form: string;
             dexNumber?: number;
+            /** @description The trainer protected it, so it is never transferred. */
+            protected: boolean;
             /** @enum {string} */
             gender?: "male" | "female";
             cp?: number;
@@ -413,6 +432,9 @@ export interface components {
             /** @description Goals, most important first. */
             goals: ("collecting" | "trading" | "battling")[];
         };
+        Protection: {
+            protected: boolean;
+        };
         SpeciesRules: {
             rules: components["schemas"]["SpeciesRule"][];
         };
@@ -431,6 +453,8 @@ export interface components {
             surplus: number;
             /** @description Kept until unknown features (shiny, costume…) are confirmed. */
             needsConfirmation: number;
+            /** @description Kept Pokémon the trainer protected. */
+            protected: number;
             /** @description Copies of each variant kept by default for this capacity. */
             minimum: number;
             /** @description Copies of each variant of a legendary, mythical or Ultra Beast species kept by default for this capacity. */
@@ -463,6 +487,8 @@ export interface components {
             keptIds: string[];
             /** @description Pokémon beyond the minimum, best first. */
             surplusIds: string[];
+            /** @description Kept copies the trainer protected. */
+            protectedIds: string[];
         };
         InvalidRow: {
             /** @description 1-based line number in the file, counting the header. */
@@ -779,6 +805,35 @@ export interface operations {
                 };
             };
             401: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    setProtection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pokemonId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Protection"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Protection"];
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };
     };

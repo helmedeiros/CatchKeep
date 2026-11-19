@@ -96,3 +96,29 @@ func TestKeep_SpeciesRules(t *testing.T) {
 		}
 	}
 }
+
+func TestKeep_ProtectingAPokemon(t *testing.T) {
+	wantStatus(t, newAPI(t).do(http.MethodPut, "/api/v1/collection/X/protection", `{"protected":true}`), http.StatusUnauthorized)
+	api := signedIn(t, "Ash")
+	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/setup", `{"capacity":350,"goals":["collecting"]}`), http.StatusOK)
+	type pokemon struct {
+		ID        string
+		Protected bool
+	}
+	list := decode[struct{ Pokemon []pokemon }](t, api.do(http.MethodGet, "/api/v1/collection", "").Body.Bytes())
+	id := list.Pokemon[0].ID
+
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/collection/missing/protection", `{"protected":true}`), http.StatusNotFound)
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/collection/"+id+"/protection", `{"protected":true}`), http.StatusOK)
+
+	list = decode[struct{ Pokemon []pokemon }](t, api.do(http.MethodGet, "/api/v1/collection", "").Body.Bytes())
+	if !list.Pokemon[0].Protected {
+		t.Fatalf("collection = %+v; the first Pokémon is protected", list)
+	}
+	summary := decode[struct{ Protected int }](t, api.do(http.MethodGet, "/api/v1/keep-summary", "").Body.Bytes())
+	if summary.Protected != 0 {
+		t.Fatalf("protected = %d; unconfirmed Pokémon are not in a group yet", summary.Protected)
+	}
+}
