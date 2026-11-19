@@ -131,13 +131,14 @@ func newRootHandler(cfg serveConfig, store *sqlite.Store) http.Handler {
 	clock := ids.SystemClock{}
 	ulids := ids.NewULID()
 	collection := sqlite.NewCollection(store)
+	teams := sqlite.NewTeams(store)
 	api := httpapi.NewHandler(httpapi.Services{
 		Health:     app.NewHealth(buildinfo.Version()),
 		Profiles:   app.NewProfiles(trainers, hasher, ulids, clock),
 		Sessions:   app.NewSessions(trainers, sqlite.NewSessions(store), hasher, ids.Tokens{}, clock),
 		Imports:    app.NewImports(csvimport.NewPokeGenie(time.Local), collection, collection, ulids, clock),
 		Collection: app.NewCollection(collection, collection, clock),
-		Keep:       app.NewKeep(sqlite.NewSetups(store), collection, refdata.NewSpecies()),
+		Keep:       app.NewKeep(sqlite.NewSetups(store), collection, refdata.NewSpecies(), teams),
 	})
 	if cfg.webDir == "" {
 		return api

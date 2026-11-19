@@ -296,3 +296,57 @@ type RareSpecies []string
 
 // Rare reports whether species is listed.
 func (r RareSpecies) Rare(species string) bool { return slices.Contains(r, species) }
+
+// Teams is an in-memory ports.Teams that checks members against a
+// CollectionStore.
+type Teams struct {
+	mu         sync.Mutex
+	collection *CollectionStore
+	teams      map[domain.TrainerID][]domain.Team
+}
+
+// NewTeams returns an empty store whose members must be in collection.
+func NewTeams(collection *CollectionStore) *Teams {
+	return &Teams{collection: collection, teams: map[domain.TrainerID][]domain.Team{}}
+}
+
+// ListTeams implements ports.Teams.
+func (s *Teams) ListTeams(_ context.Context, trainer domain.TrainerID) ([]domain.Team, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := slices.Clone(s.teams[trainer])
+	slices.SortFunc(out, func(a, b domain.Team) int { return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)) })
+	return out, nil
+}
+
+// SaveTeam implements ports.Teams.
+func (s *Teams) SaveTeam(ctx context.Context, trainer domain.TrainerID, t domain.Team) error {
+	owned, _ := s.collection.ListPokemon(ctx, trainer)
+	for _, m := range t.Members {
+		if !slices.ContainsFunc(owned, func(p domain.Pokemon) bool { return p.ID == m }) {
+			return domain.ErrPokemonNotFound
+		}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for other, teams := range s.teams {
+		if other != trainer && slices.ContainsFunc(teams, func(x domain.Team) bool { return x.ID == t.ID }) {
+			return domain.ErrTeamNotFound
+		}
+	}
+	teams := slices.DeleteFunc(slices.Clone(s.teams[trainer]), func(x domain.Team) bool { return x.ID == t.ID })
+	s.teams[trainer] = append(teams, t)
+	return nil
+}
+
+// DeleteTeam implements ports.Teams.
+func (s *Teams) DeleteTeam(_ context.Context, trainer domain.TrainerID, id domain.TeamID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	before := len(s.teams[trainer])
+	s.teams[trainer] = slices.DeleteFunc(slices.Clone(s.teams[trainer]), func(x domain.Team) bool { return x.ID == id })
+	if len(s.teams[trainer]) == before {
+		return domain.ErrTeamNotFound
+	}
+	return nil
+}
