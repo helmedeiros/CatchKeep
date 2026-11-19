@@ -226,3 +226,33 @@ func TestCollection_AddObservationsIsAllOrNothingAndScopedToTheTrainer(t *testin
 		t.Fatalf("observations = %+v", list[0].Observations)
 	}
 }
+
+func TestCollection_SetProtectedIsScopedToTheTrainer(t *testing.T) {
+	store, _ := openTemp(t)
+	withTrainers(t, store, "ash", "misty")
+	coll := sqlite.NewCollection(store)
+	b := stagedBatch()
+	if err := coll.Save(t.Context(), b); err != nil {
+		t.Fatal(err)
+	}
+	b.Status = domain.ImportCommitted
+	if err := coll.Commit(t.Context(), b, []domain.Pokemon{{ID: "P1", TrainerID: "ash", Observations: b.Parsed.Rows[0].Observations}}, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := coll.SetProtected(t.Context(), "misty", "P1", true); !errors.Is(err, domain.ErrPokemonNotFound) {
+		t.Fatalf("misty protecting ash's Pokémon: err = %v", err)
+	}
+	if err := coll.SetProtected(t.Context(), "ash", "P1", true); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := coll.ListPokemon(t.Context(), "ash"); !list[0].Protected {
+		t.Fatal("P1 is not protected")
+	}
+	if err := coll.SetProtected(t.Context(), "ash", "P1", false); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := coll.ListPokemon(t.Context(), "ash"); list[0].Protected {
+		t.Fatal("P1 is still protected")
+	}
+}

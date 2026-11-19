@@ -242,6 +242,20 @@ func (s *CollectionStore) addObservations(trainer domain.TrainerID, updates []do
 	return nil
 }
 
+// SetProtected implements ports.CollectionWriter.
+func (s *CollectionStore) SetProtected(_ context.Context, trainer domain.TrainerID, id domain.PokemonID, protected bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	owned := slices.Clone(s.pokemon[trainer])
+	i := slices.IndexFunc(owned, func(p domain.Pokemon) bool { return p.ID == id })
+	if i < 0 {
+		return domain.ErrPokemonNotFound
+	}
+	owned[i].Protected = protected
+	s.pokemon[trainer] = owned
+	return nil
+}
+
 // ListPokemon implements ports.CollectionReader.
 func (s *CollectionStore) ListPokemon(_ context.Context, trainer domain.TrainerID) ([]domain.Pokemon, error) {
 	s.mu.Lock()

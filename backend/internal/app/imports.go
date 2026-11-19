@@ -210,6 +210,11 @@ func (c *Collection) ConfirmAbsent(ctx context.Context, trainer domain.TrainerID
 	return len(updates), nil
 }
 
+// Protect sets or clears the trainer's manual protection of one Pokémon.
+func (c *Collection) Protect(ctx context.Context, trainer domain.TrainerID, id domain.PokemonID, protected bool) error {
+	return c.writer.SetProtected(ctx, trainer, id, protected)
+}
+
 // List returns the trainer's Pokémon, highest CP first, unknown CP last.
 func (c *Collection) List(ctx context.Context, trainer domain.TrainerID) ([]domain.Pokemon, error) {
 	list, err := c.reader.ListPokemon(ctx, trainer)

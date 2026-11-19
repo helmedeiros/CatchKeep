@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"strconv"
 	"time"
 )
@@ -55,6 +56,10 @@ type Observation struct {
 	SourceRef  string
 	ObservedAt time.Time
 }
+
+// ErrPokemonNotFound is returned for a Pokémon that is not in the
+// trainer's active collection.
+var ErrPokemonNotFound = errors.New("pokemon not found")
 
 // Pokemon is a record and everything observed about it.
 type Pokemon struct {
