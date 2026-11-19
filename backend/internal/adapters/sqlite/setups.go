@@ -71,11 +71,13 @@ func (r *Setups) SaveSetup(ctx context.Context, trainer domain.TrainerID, s doma
 	if err != nil {
 		return fmt.Errorf("encode species rules: %w", err)
 	}
-	if _, err := r.db.ExecContext(ctx, `
-		INSERT INTO trainer_setups (trainer_id, capacity, goals, species) VALUES (?, ?, ?, ?)
-		ON CONFLICT (trainer_id) DO UPDATE SET capacity = excluded.capacity, goals = excluded.goals, species = excluded.species`,
-		string(trainer), s.Capacity, string(goals), string(species)); err != nil {
-		return fmt.Errorf("save setup: %w", err)
-	}
-	return nil
+	return inTx(ctx, r.db, trainer, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO trainer_setups (trainer_id, capacity, goals, species) VALUES (?, ?, ?, ?)
+			ON CONFLICT (trainer_id) DO UPDATE SET capacity = excluded.capacity, goals = excluded.goals, species = excluded.species`,
+			string(trainer), s.Capacity, string(goals), string(species)); err != nil {
+			return fmt.Errorf("save setup: %w", err)
+		}
+		return nil
+	})
 }

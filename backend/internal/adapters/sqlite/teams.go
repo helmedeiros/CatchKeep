@@ -94,6 +94,9 @@ func (r *Teams) SaveTeam(ctx context.Context, trainer domain.TrainerID, t domain
 			return fmt.Errorf("add member: %w", err)
 		}
 	}
+	if err := bumpRevision(ctx, tx, trainer); err != nil {
+		return err
+	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit: %w", err)
 	}
@@ -102,14 +105,16 @@ func (r *Teams) SaveTeam(ctx context.Context, trainer domain.TrainerID, t domain
 
 // DeleteTeam implements ports.Teams.
 func (r *Teams) DeleteTeam(ctx context.Context, trainer domain.TrainerID, id domain.TeamID) error {
-	res, err := r.db.ExecContext(ctx, `DELETE FROM teams WHERE id = ? AND trainer_id = ?`, string(id), string(trainer))
-	if err != nil {
-		return fmt.Errorf("delete team: %w", err)
-	}
-	if n, err := res.RowsAffected(); err != nil {
-		return fmt.Errorf("delete team: %w", err)
-	} else if n == 0 {
-		return domain.ErrTeamNotFound
-	}
-	return nil
+	return inTx(ctx, r.db, trainer, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, `DELETE FROM teams WHERE id = ? AND trainer_id = ?`, string(id), string(trainer))
+		if err != nil {
+			return fmt.Errorf("delete team: %w", err)
+		}
+		if n, err := res.RowsAffected(); err != nil {
+			return fmt.Errorf("delete team: %w", err)
+		} else if n == 0 {
+			return domain.ErrTeamNotFound
+		}
+		return nil
+	})
 }
