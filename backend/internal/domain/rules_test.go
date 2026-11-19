@@ -263,3 +263,38 @@ func TestSummarizeKeeps_ProtectedCopiesAreAlwaysKeptAndCountTowardTheMinimum(t *
 		t.Fatalf("group = %+v; both protected copies stay even above the minimum", g)
 	}
 }
+
+func TestSummarizeKeeps_GroupsExplainTheGeneratedDefaultBehindTheirRule(t *testing.T) {
+	shiny := mon("S1", "species", "Pidgey", "form", "Normal", "shiny", "true", "costume", "false", "background", "false", "dynamax", "false", "gigantamax", "false")
+	pokemon := []domain.Pokemon{known("P1", "Pidgey"), known("P2", "Pidgey"), shiny, known("M1", "Mewtwo"), known("E1", "Eevee")}
+	rare := func(s string) bool { return s == "Mewtwo" }
+	setup := domain.Setup{
+		Capacity: 2700, Goals: []domain.Goal{domain.GoalTrading},
+		Species: []domain.SpeciesRule{{Species: "Eevee", Minimum: 5}},
+	}
+
+	got := map[string]domain.VariantGroup{}
+	for _, g := range domain.SummarizeKeeps(pokemon, setup, rare).Groups {
+		key := g.Species
+		if g.Shiny {
+			key += " shiny"
+		}
+		got[key] = g
+	}
+
+	for key, want := range map[string]struct {
+		rule       domain.Rule
+		def, min   int
+		tradeBonus bool
+	}{
+		"Pidgey":       {domain.RuleDefault, 2, 2, false},
+		"Pidgey shiny": {domain.RuleDefault, 3, 3, true},
+		"Mewtwo":       {domain.RuleRare, 5, 5, true},
+		"Eevee":        {domain.RuleSpecies, 2, 1, false},
+	} {
+		g := got[key]
+		if g.Rule != want.rule || g.Default != want.def || g.Minimum != want.min || g.TradeBonus != want.tradeBonus {
+			t.Errorf("%s: rule %q default %d minimum %d trade bonus %v, want %+v", key, g.Rule, g.Default, g.Minimum, g.TradeBonus, want)
+		}
+	}
+}
