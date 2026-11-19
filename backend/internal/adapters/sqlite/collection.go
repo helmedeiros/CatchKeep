@@ -159,6 +159,22 @@ func (c *Collection) Commit(ctx context.Context, b domain.ImportBatch, add []dom
 	return nil
 }
 
+// SetProtected implements ports.CollectionWriter.
+func (c *Collection) SetProtected(ctx context.Context, trainer domain.TrainerID, id domain.PokemonID, protected bool) error {
+	res, err := c.db.ExecContext(ctx, `
+		UPDATE pokemon SET manual_protected = ?
+		WHERE id = ? AND trainer_id = ? AND status = 'active'`, protected, string(id), string(trainer))
+	if err != nil {
+		return fmt.Errorf("set protected: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("set protected: %w", err)
+	} else if n == 0 {
+		return domain.ErrPokemonNotFound
+	}
+	return nil
+}
+
 // AddObservations implements ports.CollectionWriter in a single transaction.
 func (c *Collection) AddObservations(ctx context.Context, trainer domain.TrainerID, updates []domain.PokemonUpdate) (err error) {
 	tx, err := c.db.BeginTx(ctx, nil)
@@ -217,7 +233,7 @@ func addObservations(ctx context.Context, tx *sql.Tx, insertObs *sql.Stmt, train
 // ListPokemon implements ports.CollectionReader.
 func (c *Collection) ListPokemon(ctx context.Context, trainer domain.TrainerID) ([]domain.Pokemon, error) {
 	rows, err := c.db.QueryContext(ctx, `
-		SELECT p.id, o.field, o.value, o.source, o.source_ref, o.observed_at
+		SELECT p.id, p.manual_protected, o.field, o.value, o.source, o.source_ref, o.observed_at
 		FROM pokemon p LEFT JOIN observations o ON o.pokemon_id = p.id
 		WHERE p.trainer_id = ? AND p.status = 'active'
 		ORDER BY p.id, o.id`, string(trainer))
@@ -229,13 +245,14 @@ func (c *Collection) ListPokemon(ctx context.Context, trainer domain.TrainerID) 
 	for rows.Next() {
 		var (
 			id                                  string
+			protected                           bool
 			field, value, source, ref, observed sql.NullString
 		)
-		if err := rows.Scan(&id, &field, &value, &source, &ref, &observed); err != nil {
+		if err := rows.Scan(&id, &protected, &field, &value, &source, &ref, &observed); err != nil {
 			return nil, fmt.Errorf("scan pokemon: %w", err)
 		}
 		if len(out) == 0 || out[len(out)-1].ID != domain.PokemonID(id) {
-			out = append(out, domain.Pokemon{ID: domain.PokemonID(id), TrainerID: trainer})
+			out = append(out, domain.Pokemon{ID: domain.PokemonID(id), TrainerID: trainer, Protected: protected})
 		}
 		if !field.Valid {
 			continue

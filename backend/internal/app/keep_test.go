@@ -87,3 +87,31 @@ func TestKeep_SpeciesRulesNeedSetupAndSurviveSetupChanges(t *testing.T) {
 		t.Fatalf("setup = %+v; changing storage keeps the species rules", got)
 	}
 }
+
+func TestKeep_ProtectedPokemonAreKept(t *testing.T) {
+	f := newImportsFixture()
+	preview, _ := f.imports.Stage(t.Context(), ash, strings.NewReader("Pidgey,1,2,3,100\nPidgey,4,5,6,200\n"))
+	if _, err := f.imports.Commit(t.Context(), ash, preview.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.collection.ConfirmAbsent(t.Context(), ash, "", "", domain.ConfirmableFields); err != nil {
+		t.Fatal(err)
+	}
+	keep := app.NewKeep(apptest.NewSetups(), f.store, apptest.RareSpecies{})
+	if err := keep.SaveSetup(t.Context(), ash, domain.Setup{Capacity: 300, Goals: []domain.Goal{domain.GoalCollecting}}); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := f.collection.List(t.Context(), ash)
+
+	if err := f.collection.Protect(t.Context(), ash, "missing", true); !errors.Is(err, domain.ErrPokemonNotFound) {
+		t.Fatalf("protecting a missing Pokémon: err = %v", err)
+	}
+	if err := f.collection.Protect(t.Context(), ash, list[1].ID, true); err != nil {
+		t.Fatal(err)
+	}
+
+	s, _ := keep.Summary(t.Context(), ash)
+	if s.Protected != 1 || s.Surplus != 1 || s.Groups[0].KeptIDs[0] != list[1].ID {
+		t.Fatalf("summary = %+v; the protected, weaker Pidgey is the one kept", s)
+	}
+}
