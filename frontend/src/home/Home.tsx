@@ -4,6 +4,7 @@ import { ImportCard } from "../collection/ImportCard";
 import { useCollection } from "../collection/useCollection";
 import { KeepCard } from "../keep/KeepCard";
 import { useSignOut } from "../session/useSession";
+import { TeamsCard } from "../teams/TeamsCard";
 import { alert, card, secondaryButton } from "../ui/styles";
 
 export function Home({ displayName }: { displayName: string }) {
@@ -31,6 +32,7 @@ export function Home({ displayName }: { displayName: string }) {
           <ImportCard hasPokemon={pokemon.length > 0} />
           <ConfirmFeatures pokemon={pokemon} />
           {pokemon.length > 0 && <KeepCard pokemon={pokemon} />}
+          {pokemon.length > 0 && <TeamsCard pokemon={pokemon} />}
           <CollectionView pokemon={pokemon} />
         </>
       )}
