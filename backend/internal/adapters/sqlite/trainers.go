@@ -41,7 +41,7 @@ func (r *Trainers) Create(ctx context.Context, t domain.Trainer) error {
 // Get implements ports.Trainers.
 func (r *Trainers) Get(ctx context.Context, id domain.TrainerID) (domain.Trainer, error) {
 	row := r.db.QueryRowContext(ctx,
-		`SELECT id, display_name, pin_hash, created_at FROM trainers WHERE id = ?`, string(id))
+		`SELECT id, display_name, pin_hash, created_at, revision FROM trainers WHERE id = ?`, string(id))
 	t, err := scanTrainer(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Trainer{}, domain.ErrTrainerNotFound
@@ -51,7 +51,7 @@ func (r *Trainers) Get(ctx context.Context, id domain.TrainerID) (domain.Trainer
 
 // List implements ports.Trainers.
 func (r *Trainers) List(ctx context.Context) ([]domain.Trainer, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id, display_name, pin_hash, created_at FROM trainers`)
+	rows, err := r.db.QueryContext(ctx, `SELECT id, display_name, pin_hash, created_at, revision FROM trainers`)
 	if err != nil {
 		return nil, fmt.Errorf("list trainers: %w", err)
 	}
@@ -77,7 +77,7 @@ func scanTrainer(s scanner) (domain.Trainer, error) {
 		id      string
 		created string
 	)
-	if err := s.Scan(&id, &t.DisplayName, &t.PINHash, &created); err != nil {
+	if err := s.Scan(&id, &t.DisplayName, &t.PINHash, &created, &t.Revision); err != nil {
 		return domain.Trainer{}, err
 	}
 	at, err := parseTime(created)

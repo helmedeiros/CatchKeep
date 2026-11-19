@@ -27,6 +27,9 @@ type Trainer struct {
 	DisplayName string
 	PINHash     string
 	CreatedAt   time.Time
+	// Revision increases with every change that can affect recommendations,
+	// so a plan can tell it is stale (spec §5.1).
+	Revision int64
 }
 
 // NewDisplayName trims s and checks it is a usable display name.

@@ -153,6 +153,9 @@ func (c *Collection) Commit(ctx context.Context, b domain.ImportBatch, add []dom
 	if err = addObservations(ctx, tx, insertObs, b.TrainerID, update, recordedAt); err != nil {
 		return err
 	}
+	if err = bumpRevision(ctx, tx, b.TrainerID); err != nil {
+		return err
+	}
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("commit: %w", err)
 	}
@@ -161,18 +164,20 @@ func (c *Collection) Commit(ctx context.Context, b domain.ImportBatch, add []dom
 
 // SetProtected implements ports.CollectionWriter.
 func (c *Collection) SetProtected(ctx context.Context, trainer domain.TrainerID, id domain.PokemonID, protected bool) error {
-	res, err := c.db.ExecContext(ctx, `
-		UPDATE pokemon SET manual_protected = ?
-		WHERE id = ? AND trainer_id = ? AND status = 'active'`, protected, string(id), string(trainer))
-	if err != nil {
-		return fmt.Errorf("set protected: %w", err)
-	}
-	if n, err := res.RowsAffected(); err != nil {
-		return fmt.Errorf("set protected: %w", err)
-	} else if n == 0 {
-		return domain.ErrPokemonNotFound
-	}
-	return nil
+	return inTx(ctx, c.db, trainer, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, `
+			UPDATE pokemon SET manual_protected = ?
+			WHERE id = ? AND trainer_id = ? AND status = 'active'`, protected, string(id), string(trainer))
+		if err != nil {
+			return fmt.Errorf("set protected: %w", err)
+		}
+		if n, err := res.RowsAffected(); err != nil {
+			return fmt.Errorf("set protected: %w", err)
+		} else if n == 0 {
+			return domain.ErrPokemonNotFound
+		}
+		return nil
+	})
 }
 
 // AddObservations implements ports.CollectionWriter in a single transaction.
@@ -192,6 +197,9 @@ func (c *Collection) AddObservations(ctx context.Context, trainer domain.Trainer
 	}
 	defer func() { _ = insertObs.Close() }()
 	if err = addObservations(ctx, tx, insertObs, trainer, updates, ""); err != nil {
+		return err
+	}
+	if err = bumpRevision(ctx, tx, trainer); err != nil {
 		return err
 	}
 	if err = tx.Commit(); err != nil {
