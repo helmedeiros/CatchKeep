@@ -57,8 +57,27 @@ describe("keep rules", () => {
     const user = await withCollection(rows);
 
     const setup = await saveSetup(user, "350", ["Trading", "Collecting"]);
+    expect(setup).toHaveTextContent(
+      "With 350 slots the defaults keep the best 1 of each variant and 2 of legendary, mythical and Ultra Beast ones, plus 1 more of rare, shiny, costume and background variants for trading.",
+    );
     expect(setup).toHaveTextContent("Priority: Trading, then Collecting");
+    await user.click(
+      within(setup).getByRole("button", { name: "Move Collecting up" }),
+    );
+    expect(setup).toHaveTextContent("Priority: Collecting, then Trading");
+    await user.click(
+      within(setup).getByRole("button", { name: "Move Collecting down" }),
+    );
     await user.click(within(setup).getByRole("button", { name: "Save" }));
+
+    const next = await screen.findByRole("region", {
+      name: "Optional next steps",
+    });
+    expect(next).toHaveTextContent(/your own rule or make it a favorite/);
+    await user.click(within(next).getByRole("button", { name: "Got it" }));
+    expect(
+      screen.queryByRole("region", { name: "Optional next steps" }),
+    ).not.toBeInTheDocument();
 
     const keep = await screen.findByRole("region", {
       name: "Your keep rules",
@@ -318,7 +337,13 @@ describe("keep rules", () => {
     });
     expect(within(edit).getByLabelText("Storage slots")).toHaveValue(350);
     await saveSetup(user, "2700", []);
+    expect(edit).toHaveTextContent(
+      "With 2700 slots the defaults keep the best 2 of each variant and 4 of legendary",
+    );
     await user.click(within(edit).getByRole("button", { name: "Save" }));
+    expect(
+      screen.queryByRole("region", { name: "Optional next steps" }),
+    ).not.toBeInTheDocument();
 
     expect(
       await screen.findByText("2700 slots · Collecting"),

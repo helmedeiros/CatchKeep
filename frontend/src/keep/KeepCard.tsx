@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import {
   alert,
   card,
@@ -10,9 +10,11 @@ import type { Pokemon } from "../collection/useCollection";
 import { KeepGroups } from "./KeepGroups";
 import { SpeciesRuleList } from "./SpeciesRules";
 import {
+  type CapacityBand,
   type Goal,
   type KeepSummary,
   type Setup,
+  useCapacityBands,
   useKeepSummary,
   useSaveSetup,
   useSetup,
@@ -26,10 +28,15 @@ const GOALS: Array<[Goal, string]> = [
 const label = (g: Goal) => GOALS.find(([x]) => x === g)?.[1] ?? g;
 const priority = (goals: Goal[]) => goals.map(label).join(", then ");
 
-/** Setup step 1 (storage and goals) and what the keep rules do with it. */
+/**
+ * Setup step 1 (storage and goals) and what the keep rules do with it. After
+ * the first setup it points to the optional steps: species rules, favorites,
+ * protection and teams (spec V1-SET-02, V1-SET-03).
+ */
 export function KeepCard({ pokemon }: { pokemon: Pokemon[] }) {
   const setup = useSetup();
   const [editing, setEditing] = useState(false);
+  const [justSetUp, setJustSetUp] = useState(false);
 
   if (setup.isPending) return null;
   if (setup.isError) {
@@ -39,7 +46,10 @@ export function KeepCard({ pokemon }: { pokemon: Pokemon[] }) {
     return (
       <SetupForm
         initial={setup.data}
-        onDone={() => setEditing(false)}
+        onDone={() => {
+          setJustSetUp(!setup.data);
+          setEditing(false);
+        }}
         onCancel={setup.data ? () => setEditing(false) : undefined}
       />
     );
@@ -48,9 +58,50 @@ export function KeepCard({ pokemon }: { pokemon: Pokemon[] }) {
     <Summary
       setup={setup.data}
       pokemon={pokemon}
-      onChange={() => setEditing(true)}
+      onChange={() => {
+        setJustSetUp(false);
+        setEditing(true);
+      }}
+      nextSteps={
+        justSetUp && <NextSteps onDismiss={() => setJustSetUp(false)} />
+      }
     />
   );
+}
+
+function NextSteps({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <section
+      aria-label="Optional next steps"
+      className="flex flex-col gap-2 rounded-xl bg-teal-50 p-3 text-sm dark:bg-teal-950"
+    >
+      <p>
+        You're set. If you like, fine-tune it: tap a species below to set your
+        own rule or make it a favorite, protect single Pokémon in your
+        collection, or build a team. Everything can change later.
+      </p>
+      <button
+        type="button"
+        className={`${secondaryButton} self-start`}
+        onClick={onDismiss}
+      >
+        Got it
+      </button>
+    </section>
+  );
+}
+
+function defaultsText(
+  bands: CapacityBand[] | undefined,
+  capacity: number,
+  trading: boolean,
+): string | null {
+  const band = bands?.find((b) => capacity <= b.upTo);
+  if (!band) return null;
+  const extra = trading
+    ? ", plus 1 more of rare, shiny, costume and background variants for trading"
+    : "";
+  return `With ${capacity} slots the defaults keep the best ${band.ordinary} of each variant and ${band.rare} of legendary, mythical and Ultra Beast ones${extra}.`;
 }
 
 function SetupForm({
@@ -63,6 +114,7 @@ function SetupForm({
   onCancel: (() => void) | undefined;
 }) {
   const save = useSaveSetup();
+  const bands = useCapacityBands();
   const [slots, setSlots] = useState(initial ? String(initial.capacity) : "");
   const [goals, setGoals] = useState<Goal[]>(initial?.goals ?? []);
   const capacity = Number(slots);
@@ -73,6 +125,14 @@ function SetupForm({
     : goals.length === 0
       ? "Choose at least one goal."
       : null;
+
+  const move = (from: number, to: number) =>
+    setGoals((cur) => {
+      const next = [...cur];
+      const [g] = next.splice(from, 1);
+      if (g) next.splice(to, 0, g);
+      return next;
+    });
 
   const toggle = (g: Goal) =>
     setGoals((cur) =>
@@ -99,7 +159,8 @@ function SetupForm({
       </label>
       <fieldset className="flex flex-col gap-1.5 text-sm">
         <legend className="mb-1">
-          What do you keep Pokémon for? Tick the most important first.
+          What do you keep Pokémon for? Pick any; order them below if more than
+          one.
         </legend>
         {GOALS.map(([g, name]) => (
           <label key={g} className="flex items-center gap-2">
@@ -114,8 +175,43 @@ function SetupForm({
         ))}
       </fieldset>
       {goals.length > 1 && (
+        <div className="flex flex-col gap-1.5 text-sm">
+          <p className="text-slate-600 dark:text-slate-400">
+            Priority: {priority(goals)}
+          </p>
+          <ol aria-label="Goal priority" className="flex flex-col gap-1">
+            {goals.map((g, i) => (
+              <li key={g} className="flex items-center gap-2">
+                <span className="w-5 tabular-nums text-slate-500">
+                  {i + 1}.
+                </span>
+                <span className="flex-1">{label(g)}</span>
+                <button
+                  type="button"
+                  aria-label={`Move ${label(g)} up`}
+                  className={secondaryButton}
+                  disabled={i === 0}
+                  onClick={() => move(i, i - 1)}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Move ${label(g)} down`}
+                  className={secondaryButton}
+                  disabled={i === goals.length - 1}
+                  onClick={() => move(i, i + 1)}
+                >
+                  ↓
+                </button>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+      {capacityOk && (
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Priority: {priority(goals)}
+          {defaultsText(bands.data, capacity, goals.includes("trading"))}
         </p>
       )}
       {problem && slots !== "" && (
@@ -147,10 +243,12 @@ function Summary({
   setup,
   pokemon,
   onChange,
+  nextSteps,
 }: {
   setup: Setup;
   pokemon: Pokemon[];
   onChange: () => void;
+  nextSteps: ReactNode;
 }) {
   const summary = useKeepSummary(true);
   return (
@@ -169,6 +267,7 @@ function Summary({
           Change
         </button>
       </div>
+      {nextSteps}
       {summary.isError && (
         <p className={alert}>Couldn't work out your keep rules.</p>
       )}

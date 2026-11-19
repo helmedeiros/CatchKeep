@@ -27,6 +27,17 @@ export function useSetup() {
   });
 }
 
+export type CapacityBand = components["schemas"]["CapacityBand"];
+
+export function useCapacityBands() {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["capacity-bands"],
+    staleTime: Infinity,
+    queryFn: async () => unwrap(await api.GET("/capacity-bands")).bands,
+  });
+}
+
 export function useSaveSetup() {
   const api = useApi();
   const queryClient = useQueryClient();

@@ -192,6 +192,16 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
       }
       return jsonResponse(200, preview(answer[1] ?? ""));
     }
+    if (path === "/capacity-bands") {
+      if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
+      return jsonResponse(200, {
+        bands: [
+          { upTo: 1000, ordinary: 1, rare: 2 },
+          { upTo: 4000, ordinary: 2, rare: 4 },
+          { upTo: 20000, ordinary: 3, rare: 6 },
+        ],
+      });
+    }
     if (path === "/setup") {
       if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
       if (req.method === "PUT") {
