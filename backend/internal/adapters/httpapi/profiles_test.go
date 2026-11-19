@@ -26,13 +26,15 @@ func newAPI(t *testing.T) *apiClient {
 	clock := apptest.NewFixedClock(time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC))
 	hasher := apptest.PlainHasher{}
 	collection := apptest.NewCollectionStore()
+	teams := apptest.NewTeams(collection)
 	return &apiClient{t: t, handler: httpapi.NewHandler(httpapi.Services{
 		Health:     app.NewHealth("test"),
 		Profiles:   app.NewProfiles(trainers, hasher, ulidLike{}, clock),
 		Sessions:   app.NewSessions(trainers, apptest.NewSessionStore(), hasher, apptest.NewSequentialTokens(), clock),
 		Imports:    app.NewImports(csvimport.NewPokeGenie(time.UTC), collection, collection, ulidLike{}, clock),
 		Collection: app.NewCollection(collection, collection, clock),
-		Keep:       app.NewKeep(apptest.NewSetups(), collection, apptest.RareSpecies{"Mewtwo"}, apptest.NewTeams(collection)),
+		Keep:       app.NewKeep(apptest.NewSetups(), collection, apptest.RareSpecies{"Mewtwo"}, teams),
+		Teams:      app.NewTeams(teams, ulidLike{}),
 	})}
 }
 
