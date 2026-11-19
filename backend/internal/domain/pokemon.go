@@ -61,6 +61,9 @@ type Pokemon struct {
 	ID           PokemonID
 	TrainerID    TrainerID
 	Observations []Observation
+	// Protected Pokémon are never transferred: the trainer protected them
+	// or they are on one of the trainer's teams (spec §7.2).
+	Protected bool
 }
 
 // Snapshot is the current value of each observed field.
