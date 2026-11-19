@@ -139,7 +139,11 @@ const (
 type VariantGroup struct {
 	Variant
 	// Rare is set for legendary, mythical and Ultra Beast species.
-	Rare                 bool
+	Rare bool
+	// Default is the generated minimum (spec V1-RUL-09), including the
+	// trading bonus when TradeBonus is set; Rule says what replaced it.
+	Default              int
+	TradeBonus           bool
 	Rule                 Rule
 	Count, Minimum, Keep int
 	// KeptIDs are the protected copies, then the best others; SurplusIDs
@@ -196,7 +200,9 @@ func SummarizeKeeps(pokemon []Pokemon, setup Setup, rare Rarity) KeepSummary {
 		}
 		if setup.has(GoalTrading) && (g.Rare || v.special()) {
 			g.Minimum++
+			g.TradeBonus = true
 		}
+		g.Default = g.Minimum
 		g.Keep = min(g.Minimum, g.Count)
 		built[v] = g
 		bySpecies[v.Species] = append(bySpecies[v.Species], g)
