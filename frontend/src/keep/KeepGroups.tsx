@@ -2,10 +2,12 @@ import { useMemo, useState } from "react";
 import { PokemonRow } from "../collection/PokemonRow";
 import { ProtectButton } from "../collection/ProtectButton";
 import type { Pokemon } from "../collection/useCollection";
+import { type Team, useTeams } from "../teams/useTeams";
 import { Sprite } from "../ui/Sprite";
+import { RuleInspector } from "./RuleInspector";
 import { SpeciesRuleEditor } from "./SpeciesRules";
 import { secondaryButton } from "../ui/styles";
-import type { KeepSummary } from "./useKeep";
+import { type KeepSummary, useSpeciesRules } from "./useKeep";
 
 type Group = KeepSummary["groups"][number];
 
@@ -80,6 +82,8 @@ function GroupRow({
   byId: Map<string, Pokemon>;
 }) {
   const [open, setOpen] = useState(false);
+  const rules = useSpeciesRules(open);
+  const teams = useTeams();
   const first = byId.get(g.keptIds[0] ?? g.surplusIds[0] ?? "");
   const name = [g.species, ...variantLabels(g)].join(" · ");
   return (
@@ -102,6 +106,16 @@ function GroupRow({
           {g.rule === "species" && " (your rule)"} · {g.surplusIds.length} extra
         </span>
       </button>
+      {open && (
+        <RuleInspector
+          group={g}
+          name={name}
+          rule={rules.data?.find((r) => r.species === g.species)}
+          protectedByYou={
+            g.protectedIds.filter((id) => byId.get(id)?.protected).length
+          }
+        />
+      )}
       {open && <SpeciesRuleEditor species={g.species} />}
       {open && (
         <ul
@@ -118,7 +132,7 @@ function GroupRow({
                     action={<ProtectButton pokemon={p} />}
                   >
                     {i < g.keep ? (
-                      <Tag tone="keep">Keep</Tag>
+                      <Tag tone="keep">{keepReason(p, teams.data)}</Tag>
                     ) : (
                       <Tag tone="go">Possible transfer</Tag>
                     )}
@@ -131,6 +145,12 @@ function GroupRow({
       )}
     </li>
   );
+}
+
+function keepReason(p: Pokemon, teams: Team[] | undefined): string {
+  if (p.protected) return "Keep · protected by you";
+  const team = teams?.find((t) => t.memberIds.includes(p.id));
+  return team ? `Keep · on team ${team.name}` : "Keep";
 }
 
 function Tag({ tone, children }: { tone: "keep" | "go"; children: string }) {

@@ -94,6 +94,13 @@ describe("keep rules", () => {
     );
 
     await user.click(pidgey);
+    const why = within(keep).getByRole("region", {
+      name: "Why Pidgey keeps 1",
+    });
+    expect(why).toHaveTextContent(/Default from your storage\s*1 copy/);
+    expect(why).toHaveTextContent(/Your rule\s*None/);
+    expect(why).toHaveTextContent(/Minimum used\s*1, from the default/);
+    expect(why).toHaveTextContent(/Copies\s*3/);
     const copies = within(
       within(keep).getByRole("list", { name: "Pidgey copies" }),
     ).getAllByRole("listitem");
@@ -122,6 +129,12 @@ describe("keep rules", () => {
       name: /Mewtwo · rare/,
     });
     expect(mewtwo).toHaveTextContent("3 · keep 2 · 1 extra");
+    await user.click(mewtwo);
+    expect(
+      within(keep).getByRole("region", { name: "Why Mewtwo · rare keeps 2" }),
+    ).toHaveTextContent(
+      /Default from your storage\s*2 copies of a rare species.*Minimum used\s*2, from the rare-species default/,
+    );
   });
 
   it("lets the trainer keep more of a species, then go back to the default", async () => {
@@ -158,6 +171,11 @@ describe("keep rules", () => {
     expect(
       within(keep).getByRole("button", { name: /^Pidgey/ }),
     ).toHaveTextContent("keep 2 (your rule) · 1 extra");
+    expect(
+      within(keep).getByRole("region", { name: "Why Pidgey keeps 2" }),
+    ).toHaveTextContent(
+      /Default from your storage\s*1 copy.*Your rule\s*Keep at least 2 across every Pidgey variant.*Minimum used\s*2, from your species rule/,
+    );
 
     await user.click(
       within(mine).getByRole("button", { name: "Remove the rule for Pidgey" }),
@@ -236,7 +254,54 @@ describe("keep rules", () => {
     ).toHaveAttribute("aria-pressed", "true");
     expect(keep).toHaveTextContent(/2\s*possible transfers/);
     const [kept] = within(copies).getAllByRole("listitem");
-    expect(kept).toHaveTextContent(/CP 120.*Keep/);
+    expect(kept).toHaveTextContent(/CP 120.*Keep · protected by you/);
+    expect(
+      within(keep).getByRole("region", { name: "Why Pidgey keeps 1" }),
+    ).toHaveTextContent(/Protected\s*1 by you/);
+  });
+
+  it("says which team keeps a copy", async () => {
+    const user = await withCollection(rows);
+    const setup = await saveSetup(user, "350", ["Collecting"]);
+    await user.click(within(setup).getByRole("button", { name: "Save" }));
+    const confirm = await screen.findByRole("region", {
+      name: "Confirm what the export can't tell",
+    });
+    await user.click(
+      within(confirm).getByRole("button", { name: "Confirm all 2 species" }),
+    );
+    await user.click(
+      within(confirm).getByRole("button", { name: "Yes, I checked them all" }),
+    );
+    const teams = screen.getByRole("region", { name: "Your teams" });
+    await user.type(within(teams).getByLabelText("New team name"), "Raid");
+    await user.click(
+      within(teams).getByRole("button", { name: "Create team" }),
+    );
+    const editor = await within(teams).findByRole("form", {
+      name: "Edit Raid",
+    });
+    await user.type(within(editor).getByLabelText("Add Pokémon"), "pidgey");
+    await user.click(
+      within(within(editor).getByRole("list", { name: "Matches" })).getByRole(
+        "button",
+        { name: "Add Pidgey CP 120" },
+      ),
+    );
+    await user.click(within(editor).getByRole("button", { name: "Save team" }));
+
+    const keep = screen.getByRole("region", { name: "Your keep rules" });
+    await waitFor(() =>
+      expect(keep).toHaveTextContent(/2\s*possible transfers/),
+    );
+    await user.click(within(keep).getByRole("button", { name: /^Pidgey/ }));
+    const [kept] = within(
+      within(keep).getByRole("list", { name: "Pidgey copies" }),
+    ).getAllByRole("listitem");
+    expect(kept).toHaveTextContent(/CP 120.*Keep · on team Raid/);
+    expect(
+      within(keep).getByRole("region", { name: "Why Pidgey keeps 1" }),
+    ).toHaveTextContent(/Protected\s*1 on a team/);
   });
 
   it("lets the trainer change the setup later", async () => {
