@@ -205,6 +205,40 @@ describe("keep rules", () => {
     ).toHaveTextContent("Pidgey · favorite, keep every copy");
   });
 
+  it("keeps a protected Pokémon even when a stronger copy exists", async () => {
+    const user = await withCollection(rows);
+    const setup = await saveSetup(user, "350", ["Collecting"]);
+    await user.click(within(setup).getByRole("button", { name: "Save" }));
+    const confirm = await screen.findByRole("region", {
+      name: "Confirm what the export can't tell",
+    });
+    await user.click(
+      within(confirm).getByRole("button", { name: "Confirm all 2 species" }),
+    );
+    await user.click(
+      within(confirm).getByRole("button", { name: "Yes, I checked them all" }),
+    );
+    const keep = screen.getByRole("region", { name: "Your keep rules" });
+    await user.click(
+      await within(keep).findByRole("button", { name: /^Pidgey/ }),
+    );
+
+    const copies = within(keep).getByRole("list", { name: "Pidgey copies" });
+    await user.click(
+      within(copies).getByRole("button", { name: "Protect Pidgey CP 120" }),
+    );
+
+    await waitFor(() =>
+      expect(keep).toHaveTextContent("1 protected by you, always kept."),
+    );
+    expect(
+      within(copies).getByRole("button", { name: "Unprotect Pidgey CP 120" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(keep).toHaveTextContent(/2\s*possible transfers/);
+    const [kept] = within(copies).getAllByRole("listitem");
+    expect(kept).toHaveTextContent(/CP 120.*Keep/);
+  });
+
   it("lets the trainer change the setup later", async () => {
     const user = await withCollection(rows);
     const setup = await saveSetup(user, "350", ["Collecting"]);
