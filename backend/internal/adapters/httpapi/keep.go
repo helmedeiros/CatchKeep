@@ -70,7 +70,7 @@ func (s *server) GetKeepSummary(ctx context.Context, _ GetKeepSummaryRequestObje
 		vg := VariantGroup{
 			Species: g.Species, Form: g.Form, Shiny: g.Shiny, Costume: g.Costume, Background: g.Background,
 			Dynamax: g.Dynamax, Gigantamax: g.Gigantamax, Lucky: g.Lucky, Shadow: g.Shadow, Purified: g.Purified,
-			Rare: g.Rare, Rule: VariantGroupRule(g.Rule), Count: g.Count, Minimum: g.Minimum, Keep: g.Keep,
+			Rare: g.Rare, Default: g.Default, TradeBonus: g.TradeBonus, Rule: VariantGroupRule(g.Rule), Count: g.Count, Minimum: g.Minimum, Keep: g.Keep,
 			KeptIds: make([]string, 0, len(g.KeptIDs)), SurplusIds: make([]string, 0, len(g.SurplusIDs)),
 			ProtectedIds: make([]string, 0, len(g.ProtectedIDs)),
 		}

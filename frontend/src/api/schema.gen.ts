@@ -527,6 +527,10 @@ export interface components {
             purified: boolean;
             /** @description Legendary, mythical or Ultra Beast species. */
             rare: boolean;
+            /** @description Minimum generated from storage and goals, before any species rule or favorite replaced it. */
+            default: number;
+            /** @description The trading goal added one to the generated minimum. */
+            tradeBonus: boolean;
             /**
              * @description The rule that decided this group's minimum.
              * @enum {string}

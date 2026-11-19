@@ -1072,6 +1072,8 @@ components:
           shadow,
           purified,
           rare,
+          default,
+          tradeBonus,
           rule,
           count,
           minimum,
@@ -1104,6 +1106,15 @@ components:
         rare:
           type: boolean
           description: Legendary, mythical or Ultra Beast species.
+        default:
+          type: integer
+          minimum: 1
+          description: >-
+            Minimum generated from storage and goals, before any species rule
+            or favorite replaced it.
+        tradeBonus:
+          type: boolean
+          description: The trading goal added one to the generated minimum.
         rule:
           type: string
           enum: [default, rare, species, favorite]
