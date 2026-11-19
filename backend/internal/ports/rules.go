@@ -18,3 +18,16 @@ type Species interface {
 	// Rare reports legendary, mythical and Ultra Beast species.
 	Rare(species string) bool
 }
+
+// Teams persists each trainer's named teams.
+type Teams interface {
+	// ListTeams returns the trainer's teams by name.
+	ListTeams(ctx context.Context, trainer domain.TrainerID) ([]domain.Team, error)
+	// SaveTeam creates or replaces a team. It returns
+	// domain.ErrPokemonNotFound if a member is not one of the trainer's
+	// active Pokémon and domain.ErrTeamNotFound if the ID belongs to
+	// another trainer.
+	SaveTeam(ctx context.Context, trainer domain.TrainerID, t domain.Team) error
+	// DeleteTeam returns domain.ErrTeamNotFound unless the team is theirs.
+	DeleteTeam(ctx context.Context, trainer domain.TrainerID, id domain.TeamID) error
+}

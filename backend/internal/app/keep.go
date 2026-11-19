@@ -14,11 +14,12 @@ type Keep struct {
 	setups     ports.Setups
 	collection ports.CollectionReader
 	species    ports.Species
+	teams      ports.Teams
 }
 
 // NewKeep wires the keep-rule use cases.
-func NewKeep(setups ports.Setups, collection ports.CollectionReader, species ports.Species) *Keep {
-	return &Keep{setups: setups, collection: collection, species: species}
+func NewKeep(setups ports.Setups, collection ports.CollectionReader, species ports.Species, teams ports.Teams) *Keep {
+	return &Keep{setups: setups, collection: collection, species: species, teams: teams}
 }
 
 // Setup returns the trainer's setup, or domain.ErrSetupNotFound.
@@ -59,7 +60,8 @@ func (k *Keep) save(ctx context.Context, trainer domain.TrainerID, s domain.Setu
 	return nil
 }
 
-// Summary applies the trainer's keep rules to their collection.
+// Summary applies the trainer's keep rules to their collection; team
+// members are protected.
 func (k *Keep) Summary(ctx context.Context, trainer domain.TrainerID) (domain.KeepSummary, error) {
 	setup, err := k.setups.GetSetup(ctx, trainer)
 	if err != nil {
@@ -69,5 +71,9 @@ func (k *Keep) Summary(ctx context.Context, trainer domain.TrainerID) (domain.Ke
 	if err != nil {
 		return domain.KeepSummary{}, err
 	}
-	return domain.SummarizeKeeps(pokemon, setup, k.species.Rare), nil
+	teams, err := k.teams.ListTeams(ctx, trainer)
+	if err != nil {
+		return domain.KeepSummary{}, err
+	}
+	return domain.SummarizeKeeps(domain.ProtectTeamMembers(pokemon, teams), setup, k.species.Rare), nil
 }

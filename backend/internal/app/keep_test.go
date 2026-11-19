@@ -11,7 +11,7 @@ import (
 )
 
 func TestKeep_SummaryNeedsSetupFirst(t *testing.T) {
-	keep := app.NewKeep(apptest.NewSetups(), apptest.NewCollectionStore(), apptest.RareSpecies{})
+	keep := app.NewKeep(apptest.NewSetups(), apptest.NewCollectionStore(), apptest.RareSpecies{}, apptest.NewTeams(apptest.NewCollectionStore()))
 
 	if _, err := keep.Summary(t.Context(), ash); !errors.Is(err, domain.ErrSetupNotFound) {
 		t.Fatalf("err = %v, want ErrSetupNotFound", err)
@@ -27,7 +27,7 @@ func TestKeep_SavesSetupAndSummarizesTheCollection(t *testing.T) {
 	if _, err := f.imports.Commit(t.Context(), ash, preview.ID); err != nil {
 		t.Fatal(err)
 	}
-	keep := app.NewKeep(apptest.NewSetups(), f.store, apptest.RareSpecies{"Rattata"})
+	keep := app.NewKeep(apptest.NewSetups(), f.store, apptest.RareSpecies{"Rattata"}, apptest.NewTeams(f.store))
 
 	if err := keep.SaveSetup(t.Context(), ash, domain.Setup{Capacity: 300}); !errors.Is(err, domain.ErrInvalidSetup) {
 		t.Fatalf("invalid setup: err = %v", err)
@@ -62,7 +62,7 @@ func TestKeep_SavesSetupAndSummarizesTheCollection(t *testing.T) {
 }
 
 func TestKeep_SpeciesRulesNeedSetupAndSurviveSetupChanges(t *testing.T) {
-	keep := app.NewKeep(apptest.NewSetups(), apptest.NewCollectionStore(), apptest.RareSpecies{})
+	keep := app.NewKeep(apptest.NewSetups(), apptest.NewCollectionStore(), apptest.RareSpecies{}, apptest.NewTeams(apptest.NewCollectionStore()))
 	rules := []domain.SpeciesRule{{Species: "Kyurem", Minimum: 10}}
 	if err := keep.SaveSpeciesRules(t.Context(), ash, rules); !errors.Is(err, domain.ErrSetupNotFound) {
 		t.Fatalf("before setup: err = %v", err)
@@ -97,7 +97,7 @@ func TestKeep_ProtectedPokemonAreKept(t *testing.T) {
 	if _, err := f.collection.ConfirmAbsent(t.Context(), ash, "", "", domain.ConfirmableFields); err != nil {
 		t.Fatal(err)
 	}
-	keep := app.NewKeep(apptest.NewSetups(), f.store, apptest.RareSpecies{})
+	keep := app.NewKeep(apptest.NewSetups(), f.store, apptest.RareSpecies{}, apptest.NewTeams(f.store))
 	if err := keep.SaveSetup(t.Context(), ash, domain.Setup{Capacity: 300, Goals: []domain.Goal{domain.GoalCollecting}}); err != nil {
 		t.Fatal(err)
 	}
