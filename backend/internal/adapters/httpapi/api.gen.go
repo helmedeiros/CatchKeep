@@ -274,6 +274,23 @@ type Attributes struct {
 	Shiny TriState `json:"shiny"`
 }
 
+// CapacityBand defines model for CapacityBand.
+type CapacityBand struct {
+	// Ordinary Copies kept of each variant.
+	Ordinary int `json:"ordinary"`
+
+	// Rare Copies kept of each variant of a rare species.
+	Rare int `json:"rare"`
+
+	// UpTo Largest storage, in slots, this band covers.
+	UpTo int `json:"upTo"`
+}
+
+// CapacityBands defines model for CapacityBands.
+type CapacityBands struct {
+	Bands []CapacityBand `json:"bands"`
+}
+
 // Collection defines model for Collection.
 type Collection struct {
 	Pokemon []Pokemon `json:"pokemon"`
@@ -664,6 +681,9 @@ type UpdateTeamJSONRequestBody = TeamInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// GetCapacityBands How many copies the default keep rules keep for each storage size.
+	// (GET /capacity-bands)
+	GetCapacityBands(w http.ResponseWriter, r *http.Request)
 	// ListCollection Every active Pokémon of the signed-in trainer.
 	// (GET /collection)
 	ListCollection(w http.ResponseWriter, r *http.Request)
@@ -740,6 +760,20 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetCapacityBands operation middleware
+func (siw *ServerInterfaceWrapper) GetCapacityBands(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCapacityBands(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListCollection operation middleware
 func (siw *ServerInterfaceWrapper) ListCollection(w http.ResponseWriter, r *http.Request) {
@@ -1254,6 +1288,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/collection", wrapper.ListCollection)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/collection/{pokemonId}/protection", wrapper.SetProtection)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/collection/confirmations", wrapper.ConfirmAbsent)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/capacity-bands", wrapper.GetCapacityBands)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/setup", wrapper.GetSetup)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/setup", wrapper.SaveSetup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/species-rules", wrapper.GetSpeciesRules)
@@ -1268,6 +1303,58 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 }
 
 type ErrorJSONResponse Error
+
+type GetCapacityBandsRequestObject struct {
+}
+
+type GetCapacityBandsResponseObject interface {
+	VisitGetCapacityBandsResponse(w http.ResponseWriter) error
+}
+
+type GetCapacityBands200JSONResponse CapacityBands
+
+func (response GetCapacityBands200JSONResponse) VisitGetCapacityBandsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCapacityBands401JSONResponse struct{ ErrorJSONResponse }
+
+func (response GetCapacityBands401JSONResponse) VisitGetCapacityBandsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCapacityBandsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetCapacityBandsdefaultJSONResponse) VisitGetCapacityBandsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type ListCollectionRequestObject struct {
 }
@@ -2759,6 +2846,9 @@ func (response UpdateTeamdefaultJSONResponse) VisitUpdateTeamResponse(w http.Res
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// GetCapacityBands How many copies the default keep rules keep for each storage size.
+	// (GET /capacity-bands)
+	GetCapacityBands(ctx context.Context, request GetCapacityBandsRequestObject) (GetCapacityBandsResponseObject, error)
 	// ListCollection Every active Pokémon of the signed-in trainer.
 	// (GET /collection)
 	ListCollection(ctx context.Context, request ListCollectionRequestObject) (ListCollectionResponseObject, error)
@@ -2864,6 +2954,30 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GetCapacityBands operation middleware
+func (sh *strictHandler) GetCapacityBands(w http.ResponseWriter, r *http.Request) {
+	var request GetCapacityBandsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCapacityBands(ctx, request.(GetCapacityBandsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCapacityBands")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCapacityBandsResponseObject); ok {
+		if err := validResponse.VisitGetCapacityBandsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListCollection operation middleware

@@ -211,6 +211,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/capacity-bands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How many copies the default keep rules keep for each storage size. */
+        get: operations["getCapacityBands"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/setup": {
         parameters: {
             query?: never;
@@ -513,6 +530,17 @@ export interface components {
             rareMinimum: number;
             /** @description One per fully known variant, largest surplus first. */
             groups: components["schemas"]["VariantGroup"][];
+        };
+        CapacityBands: {
+            bands: components["schemas"]["CapacityBand"][];
+        };
+        CapacityBand: {
+            /** @description Largest storage, in slots, this band covers. */
+            upTo: number;
+            /** @description Copies kept of each variant. */
+            ordinary: number;
+            /** @description Copies kept of each variant of a rare species. */
+            rare: number;
         };
         VariantGroup: {
             species: string;
@@ -917,6 +945,28 @@ export interface operations {
             };
             401: components["responses"]["Error"];
             422: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getCapacityBands: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The bands, smallest storage first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapacityBands"];
+                };
+            };
+            401: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };
     };

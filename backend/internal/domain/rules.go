@@ -80,18 +80,22 @@ func (s Setup) Validate() error {
 
 func (s Setup) has(g Goal) bool { return slices.Contains(s.Goals, g) }
 
-type capacityBand struct{ UpTo, Ordinary, Rare int }
+// CapacityBand is one storage size range: up to UpTo slots, keep Ordinary
+// copies of each variant and Rare of rare species (spec V1-RUL-02).
+type CapacityBand struct{ UpTo, Ordinary, Rare int }
 
-// capacityBands are placeholder defaults until OD-01 is decided: up to
-// UpTo slots, keep Ordinary copies of each variant, Rare of rare species
-// (spec V1-RUL-02).
-var capacityBands = []capacityBand{
+// capacityBands are placeholder defaults until OD-01 is decided.
+var capacityBands = []CapacityBand{
 	{UpTo: 1000, Ordinary: 1, Rare: 2},
 	{UpTo: 4000, Ordinary: 2, Rare: 4},
 	{UpTo: maxCapacity, Ordinary: 3, Rare: 6},
 }
 
-func bandFor(capacity int) capacityBand {
+// CapacityBands returns the bands, smallest first, ending at the largest
+// storage a setup allows.
+func CapacityBands() []CapacityBand { return slices.Clone(capacityBands) }
+
+func bandFor(capacity int) CapacityBand {
 	for _, b := range capacityBands {
 		if capacity <= b.UpTo {
 			return b

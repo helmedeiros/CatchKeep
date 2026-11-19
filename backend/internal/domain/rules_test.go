@@ -298,3 +298,19 @@ func TestSummarizeKeeps_GroupsExplainTheGeneratedDefaultBehindTheirRule(t *testi
 		}
 	}
 }
+
+func TestCapacityBands_CoverEveryCapacityAndMatchTheMinimums(t *testing.T) {
+	bands := domain.CapacityBands()
+	if last := bands[len(bands)-1]; last.UpTo != 20000 {
+		t.Fatalf("last band ends at %d, want the 20,000 maximum", last.UpTo)
+	}
+	for _, b := range bands {
+		if domain.OrdinaryMinimum(b.UpTo) != b.Ordinary || domain.RareMinimum(b.UpTo) != b.Rare {
+			t.Errorf("band %+v disagrees with the minimums", b)
+		}
+	}
+	bands[0].Ordinary = 99
+	if domain.OrdinaryMinimum(1) == 99 {
+		t.Fatal("changing the returned bands changed the rules")
+	}
+}
