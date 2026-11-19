@@ -21,6 +21,7 @@ const (
 	codeSetupRequired    = "SETUP_REQUIRED"
 	codeUnsupportedFile  = "UNSUPPORTED_FILE"
 	codePayloadTooLarge  = "PAYLOAD_TOO_LARGE"
+	codeTeamNameTaken    = "TEAM_NAME_TAKEN"
 )
 
 func errorBody(code, message string) Error {

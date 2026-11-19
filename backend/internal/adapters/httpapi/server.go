@@ -20,6 +20,7 @@ type Services struct {
 	Imports    *app.Imports
 	Collection *app.Collection
 	Keep       *app.Keep
+	Teams      *app.Teams
 
 	// SecureCookies marks the session cookie Secure. Enable it whenever the
 	// API is served over HTTPS.

@@ -440,6 +440,110 @@ paths:
           $ref: "#/components/responses/Error"
         default:
           $ref: "#/components/responses/Error"
+  /teams:
+    get:
+      tags: [keep]
+      operationId: listTeams
+      summary: The trainer's teams by name. Every member is protected.
+      security:
+        - session: []
+      responses:
+        "200":
+          description: The teams.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Teams"
+        "401":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [keep]
+      operationId: createTeam
+      summary: Create a named team (V1-SET-03).
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamInput"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: Another team has that name (TEAM_NAME_TAKEN).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+  /teams/{teamId}:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      tags: [keep]
+      operationId: updateTeam
+      summary: Rename a team and replace its members.
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamInput"
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: Another team has that name (TEAM_NAME_TAKEN).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [keep]
+      operationId: deleteTeam
+      summary: Delete a team; its members lose that protection.
+      security:
+        - session: []
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
   /keep-summary:
     get:
       tags: [keep]
@@ -832,6 +936,44 @@ components:
           items:
             type: string
             enum: [collecting, trading, battling]
+    Teams:
+      type: object
+      additionalProperties: false
+      required: [teams]
+      properties:
+        teams:
+          type: array
+          items:
+            $ref: "#/components/schemas/Team"
+    Team:
+      type: object
+      additionalProperties: false
+      required: [id, name, memberIds]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          examples: [Raid Kyurem]
+        memberIds:
+          type: array
+          description: Members in the trainer's order.
+          items:
+            type: string
+    TeamInput:
+      type: object
+      additionalProperties: false
+      required: [name, memberIds]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        memberIds:
+          type: array
+          maxItems: 100
+          items:
+            type: string
     Protection:
       type: object
       additionalProperties: false

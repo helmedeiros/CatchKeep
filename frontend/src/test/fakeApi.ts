@@ -67,6 +67,7 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
   let next = 0;
   let setup: Schemas["Setup"] | null = null;
   let speciesRules: Schemas["SpeciesRule"][] = [];
+  let teams: Schemas["Team"][] = [];
   const collection: Stored[] = [];
   const imports = new Map<string, FakeImport>();
   const err = (status: number, code: string, message: string) =>
@@ -209,6 +210,43 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
       p.protected = (body as Schemas["Protection"]).protected;
       return jsonResponse(200, { protected: p.protected });
     }
+    if (path === "/teams" || path.startsWith("/teams/")) {
+      if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
+      const id = path.split("/")[2];
+      const input = body as Schemas["TeamInput"];
+      const taken = (other?: string) =>
+        teams.some(
+          (t) =>
+            t.id !== other &&
+            t.name.toLowerCase() === input.name.trim().toLowerCase(),
+        );
+      if (req.method === "GET") return jsonResponse(200, { teams });
+      if (req.method === "POST") {
+        if (taken()) return err(409, "TEAM_NAME_TAKEN", "name is used");
+        const team = {
+          id: `T${++next}`,
+          name: input.name.trim(),
+          memberIds: input.memberIds,
+        };
+        teams = [...teams, team];
+        return jsonResponse(201, team);
+      }
+      if (!teams.some((t) => t.id === id)) {
+        return err(404, "NOT_FOUND", "team not found");
+      }
+      if (req.method === "DELETE") {
+        teams = teams.filter((t) => t.id !== id);
+        return new Response(null, { status: 204 });
+      }
+      if (taken(id)) return err(409, "TEAM_NAME_TAKEN", "name is used");
+      const team = {
+        id: id ?? "",
+        name: input.name.trim(),
+        memberIds: input.memberIds,
+      };
+      teams = teams.map((t) => (t.id === id ? team : t));
+      return jsonResponse(200, team);
+    }
     if (path === "/species-rules") {
       if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
       if (!setup) return err(409, "SETUP_REQUIRED", "Set up first.");
@@ -303,12 +341,14 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
       groups.set(p.species, [...(groups.get(p.species) ?? []), p]);
     }
     const out = [...groups.entries()].map(([species, members]) => {
+      const onTeam = new Set(teams.flatMap((t) => t.memberIds));
+      const isProtected = (p: Stored) =>
+        (p.protected ?? false) || onTeam.has(p.id);
       const best = [...members].sort(
         (a, b) =>
-          Number(b.protected ?? false) - Number(a.protected ?? false) ||
-          b.cp - a.cp,
+          Number(isProtected(b)) - Number(isProtected(a)) || b.cp - a.cp,
       );
-      const protectedIds = best.filter((p) => p.protected).map((p) => p.id);
+      const protectedIds = best.filter(isProtected).map((p) => p.id);
       const rare = species === "Mewtwo";
       const own = speciesRules.find((r) => r.species === species);
       const minimum = own?.favorite
