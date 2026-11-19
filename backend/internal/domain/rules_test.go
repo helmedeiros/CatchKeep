@@ -241,3 +241,25 @@ func TestSummarizeKeeps_FavoriteSpeciesKeepEveryCopy(t *testing.T) {
 		t.Fatalf("surplus = %d, want one extra Pidgey", s.Surplus)
 	}
 }
+
+func TestSummarizeKeeps_ProtectedCopiesAreAlwaysKeptAndCountTowardTheMinimum(t *testing.T) {
+	weak := known("P1", "Pidgey", "0", "0", "0")
+	weak.Protected = true
+	pokemon := []domain.Pokemon{weak, known("P2", "Pidgey", "15", "15", "15"), known("P3", "Pidgey", "10", "10", "10")}
+	setup := domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}}
+
+	s := domain.SummarizeKeeps(pokemon, setup, nil)
+
+	g := s.Groups[0]
+	if s.Protected != 1 || g.Keep != 1 || len(g.KeptIDs) != 1 || g.KeptIDs[0] != "P1" || len(g.ProtectedIDs) != 1 {
+		t.Fatalf("group = %+v; the protected 0/0/0 copy fills the one slot", g)
+	}
+
+	strong := pokemon[1]
+	strong.Protected = true
+	pokemon[1] = strong
+	s = domain.SummarizeKeeps(pokemon, setup, nil)
+	if g := s.Groups[0]; g.Keep != 2 || s.Surplus != 1 || g.SurplusIDs[0] != "P3" {
+		t.Fatalf("group = %+v; both protected copies stay even above the minimum", g)
+	}
+}

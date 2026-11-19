@@ -142,14 +142,18 @@ type VariantGroup struct {
 	Rare                 bool
 	Rule                 Rule
 	Count, Minimum, Keep int
-	// KeptIDs are the best copies, SurplusIDs the rest, best first.
-	KeptIDs, SurplusIDs []PokemonID
+	// KeptIDs are the protected copies, then the best others; SurplusIDs
+	// the rest, best first. ProtectedIDs are the kept copies the trainer
+	// protected.
+	KeptIDs, SurplusIDs, ProtectedIDs []PokemonID
 }
 
 // KeepSummary is what the default keep rules do with a collection:
 // Kept + Surplus + NeedsConfirmation = Total.
 type KeepSummary struct {
 	Total, Kept, Surplus, NeedsConfirmation int
+	// Protected counts kept Pokémon the trainer protected.
+	Protected int
 	// Minimum and RareMinimum are the per-variant minimums for the setup's
 	// capacity.
 	Minimum, RareMinimum int
@@ -180,7 +184,7 @@ func SummarizeKeeps(pokemon []Pokemon, setup Setup, rare Rarity) KeepSummary {
 		if _, seen := groups[v]; !seen {
 			order = append(order, v)
 		}
-		groups[v] = append(groups[v], member{p.ID, rank(cur)})
+		groups[v] = append(groups[v], member{p.ID, rank(cur), p.Protected})
 	}
 	built := map[Variant]*VariantGroup{}
 	bySpecies := map[string][]*VariantGroup{}
@@ -202,13 +206,8 @@ func SummarizeKeeps(pokemon []Pokemon, setup Setup, rare Rarity) KeepSummary {
 	}
 	for _, v := range order {
 		g := built[v]
-		for i, m := range groups[v] {
-			if i < g.Keep {
-				g.KeptIDs = append(g.KeptIDs, m.id)
-			} else {
-				g.SurplusIDs = append(g.SurplusIDs, m.id)
-			}
-		}
+		split(g, groups[v])
+		out.Protected += len(g.ProtectedIDs)
 		out.Kept += g.Keep
 		out.Surplus += len(g.SurplusIDs)
 		out.Groups = append(out.Groups, *g)
@@ -220,8 +219,30 @@ func SummarizeKeeps(pokemon []Pokemon, setup Setup, rare Rarity) KeepSummary {
 }
 
 type member struct {
-	id    PokemonID
-	score [2]int
+	id        PokemonID
+	score     [2]int
+	protected bool
+}
+
+// split keeps every protected copy, which also counts toward the group's
+// minimum (V1-RUL-05), then the best others up to it.
+func split(g *VariantGroup, members []member) {
+	for _, m := range members {
+		if m.protected {
+			g.KeptIDs = append(g.KeptIDs, m.id)
+			g.ProtectedIDs = append(g.ProtectedIDs, m.id)
+		}
+	}
+	for _, m := range members {
+		switch {
+		case m.protected:
+		case len(g.KeptIDs) < g.Keep:
+			g.KeptIDs = append(g.KeptIDs, m.id)
+		default:
+			g.SurplusIDs = append(g.SurplusIDs, m.id)
+		}
+	}
+	g.Keep = len(g.KeptIDs)
 }
 
 // compare orders the better copy first, then by ID for stability.
