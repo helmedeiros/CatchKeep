@@ -15,8 +15,8 @@ type Setups interface {
 
 // Species is the bundled reference data about species.
 type Species interface {
-	// Rare reports legendary, mythical and Ultra Beast species.
-	Rare(species string) bool
+	// Category names a species' category, or "" if it is in none.
+	Category(species string) domain.Category
 }
 
 // Teams persists each trainer's named teams.

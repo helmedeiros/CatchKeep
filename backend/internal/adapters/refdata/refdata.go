@@ -4,6 +4,8 @@ package refdata
 import (
 	_ "embed"
 	"strings"
+
+	"github.com/helmedeiros/catchkeep/backend/internal/domain"
 )
 
 //go:embed rare.txt
@@ -11,23 +13,28 @@ var rareList string
 
 // Species answers questions about species from the bundled lists.
 type Species struct {
-	rare map[string]bool
+	category map[string]domain.Category
 }
 
 // NewSpecies loads the bundled species lists.
 func NewSpecies() *Species {
-	s := &Species{rare: map[string]bool{}}
+	s := &Species{category: map[string]domain.Category{}}
+	var section domain.Category
 	for line := range strings.Lines(rareList) {
 		name := strings.TrimSpace(line)
-		if name == "" || strings.HasPrefix(name, "#") {
-			continue
+		switch {
+		case name == "" || strings.HasPrefix(name, "#"):
+		case strings.HasPrefix(name, "[") && strings.HasSuffix(name, "]"):
+			section = domain.Category(strings.Trim(name, "[]"))
+		default:
+			s.category[strings.ToLower(name)] = section
 		}
-		s.rare[strings.ToLower(name)] = true
 	}
 	return s
 }
 
-// Rare reports whether a species is legendary, mythical or an Ultra Beast.
-func (s *Species) Rare(species string) bool {
-	return s.rare[strings.ToLower(strings.TrimSpace(species))]
+// Category names a species' category: legendary, mythical, Ultra Beast or
+// none.
+func (s *Species) Category(species string) domain.Category {
+	return s.category[strings.ToLower(strings.TrimSpace(species))]
 }

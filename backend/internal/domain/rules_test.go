@@ -144,7 +144,9 @@ func TestSummarizeKeeps_RareSpeciesKeepMoreCopies(t *testing.T) {
 	for _, id := range []string{"K1", "K2", "K3", "K4", "K5", "K6"} {
 		pokemon = append(pokemon, known(id, "Kyurem"))
 	}
-	rare := func(species string) bool { return species == "Kyurem" }
+	rare := func(species string) domain.Category {
+		return map[string]domain.Category{"Kyurem": domain.CategoryLegendary}[species]
+	}
 	collecting := domain.Setup{Capacity: 2700, Goals: []domain.Goal{domain.GoalCollecting}}
 
 	s := domain.SummarizeKeeps(pokemon, collecting, rare)
@@ -200,7 +202,7 @@ func TestSummarizeKeeps_SpeciesMinimumCountsAcrossVariantsAndCanLowerTheDefault(
 		mon("S1", append(knownVariant("Kyurem"), "shadow", "true", "iv_attack", "0", "iv_defense", "0", "iv_stamina", "0")...),
 		mon("S2", append(knownVariant("Kyurem"), "shadow", "true", "iv_attack", "14", "iv_defense", "14", "iv_stamina", "14")...),
 	)
-	rare := func(string) bool { return true }
+	rare := func(string) domain.Category { return domain.CategoryLegendary }
 	setup := domain.Setup{Capacity: 2700, Goals: []domain.Goal{domain.GoalCollecting}}
 
 	if kept, rule := keptOf(domain.SummarizeKeeps(pokemon, setup, rare), "Kyurem"); kept != 6 || rule != domain.RuleRare {
@@ -267,7 +269,9 @@ func TestSummarizeKeeps_ProtectedCopiesAreAlwaysKeptAndCountTowardTheMinimum(t *
 func TestSummarizeKeeps_GroupsExplainTheGeneratedDefaultBehindTheirRule(t *testing.T) {
 	shiny := mon("S1", "species", "Pidgey", "form", "Normal", "shiny", "true", "costume", "false", "background", "false", "dynamax", "false", "gigantamax", "false")
 	pokemon := []domain.Pokemon{known("P1", "Pidgey"), known("P2", "Pidgey"), shiny, known("M1", "Mewtwo"), known("E1", "Eevee")}
-	rare := func(s string) bool { return s == "Mewtwo" }
+	rare := func(s string) domain.Category {
+		return map[string]domain.Category{"Mewtwo": domain.CategoryLegendary}[s]
+	}
 	setup := domain.Setup{
 		Capacity: 2700, Goals: []domain.Goal{domain.GoalTrading},
 		Species: []domain.SpeciesRule{{Species: "Eevee", Minimum: 5}},

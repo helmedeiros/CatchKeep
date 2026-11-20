@@ -291,11 +291,12 @@ func (s *Setups) SaveSetup(_ context.Context, trainer domain.TrainerID, setup do
 	return nil
 }
 
-// RareSpecies is a ports.Species fake naming the rare species.
-type RareSpecies []string
+// SpeciesCategories is a ports.Species fake naming each listed species'
+// category.
+type SpeciesCategories map[string]domain.Category
 
-// Rare reports whether species is listed.
-func (r RareSpecies) Rare(species string) bool { return slices.Contains(r, species) }
+// Category implements ports.Species.
+func (c SpeciesCategories) Category(species string) domain.Category { return c[species] }
 
 // Teams is an in-memory ports.Teams that checks members against a
 // CollectionStore.

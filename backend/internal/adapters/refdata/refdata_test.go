@@ -4,18 +4,30 @@ import (
 	"testing"
 
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/refdata"
+	"github.com/helmedeiros/catchkeep/backend/internal/domain"
 )
 
-func TestSpecies_Rare(t *testing.T) {
+func TestSpecies_Category(t *testing.T) {
 	s := refdata.NewSpecies()
-	for _, name := range []string{"Kyurem", "Mewtwo", "mew", "Ho-Oh", "Type: Null", "Tapu Koko", "Nihilego", "Pecharunt"} {
-		if !s.Rare(name) {
-			t.Errorf("%s should be rare", name)
-		}
-	}
-	for _, name := range []string{"Pidgey", "Charmander", "Mr. Mime", "", "# Kanto"} {
-		if s.Rare(name) {
-			t.Errorf("%q should not be rare", name)
+	for name, want := range map[string]domain.Category{
+		"Kyurem":     domain.CategoryLegendary,
+		"Mewtwo":     domain.CategoryLegendary,
+		"Ho-Oh":      domain.CategoryLegendary,
+		"Type: Null": domain.CategoryLegendary,
+		"Tapu Koko":  domain.CategoryLegendary,
+		"mew":        domain.CategoryMythical,
+		"Pecharunt":  domain.CategoryMythical,
+		"Meltan":     domain.CategoryMythical,
+		"Nihilego":   domain.CategoryUltraBeast,
+		"Poipole":    domain.CategoryUltraBeast,
+		"Pidgey":     "",
+		"Mr. Mime":   "",
+		"":           "",
+		"# Kanto":    "",
+		"[mythical]": "",
+	} {
+		if got := s.Category(name); got != want {
+			t.Errorf("%q: category %q, want %q", name, got, want)
 		}
 	}
 }
