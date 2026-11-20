@@ -45,3 +45,15 @@ func TestURLs(t *testing.T) {
 		t.Errorf("URLs = %v without a network", got)
 	}
 }
+
+func TestHostNames(t *testing.T) {
+	network := ifaces("127.0.0.1/8", "192.168.1.20/24")
+	got := netaddr.HostNames(listen("0.0.0.0:8080"), network, "Ashs-MacBook")
+	want := []string{"192.168.1.20", "ashs-macbook", "ashs-macbook.local"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("HostNames = %v, want %v", got, want)
+	}
+	if got := netaddr.HostNames(listen("127.0.0.1:8080"), network, "Ashs-MacBook.local"); !slices.Equal(got, []string{"ashs-macbook.local"}) {
+		t.Fatalf("HostNames = %v; listening only on this computer keeps its name", got)
+	}
+}

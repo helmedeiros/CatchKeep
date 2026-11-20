@@ -142,6 +142,7 @@ func newRootHandler(cfg serveConfig, store *sqlite.Store, listen net.Addr) http.
 		Keep:       app.NewKeep(sqlite.NewSetups(store), collection, refdata.NewSpecies(), teams),
 		Teams:      app.NewTeams(teams, ulids),
 		Addresses:  func() []string { return netaddr.URLs(listen, net.InterfaceAddrs) },
+		HostNames:  func() []string { return netaddr.HostNames(listen, net.InterfaceAddrs, hostname()) },
 	})
 	if cfg.webDir == "" {
 		return api
@@ -150,6 +151,11 @@ func newRootHandler(cfg serveConfig, store *sqlite.Store, listen net.Addr) http.
 	mux.Handle("/api/", api)
 	mux.Handle("/", web.Handler(os.DirFS(cfg.webDir)))
 	return mux
+}
+
+func hostname() string {
+	name, _ := os.Hostname()
+	return name
 }
 
 func envOr(key, fallback string) string {
