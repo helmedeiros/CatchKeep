@@ -100,6 +100,24 @@ export function useConfirmAbsent() {
 }
 
 /** Protects or unprotects one Pokémon; the collection and keep summary follow. */
+export type FeatureMarks = components["schemas"]["FeatureMarks"];
+
+/** Records the trainer's yes or no for one Pokémon's special features. */
+export function useMarkFeatures() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, marks }: { id: string; marks: FeatureMarks }) =>
+      unwrap(
+        await api.PUT("/collection/{pokemonId}/features", {
+          params: { path: { pokemonId: id } },
+          body: marks,
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: collectionKey }),
+  });
+}
+
 export function useProtect() {
   const api = useApi();
   const queryClient = useQueryClient();

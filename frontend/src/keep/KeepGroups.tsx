@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { PokemonRow } from "../collection/PokemonRow";
-import { ProtectButton } from "../collection/ProtectButton";
+import { PokemonItem } from "../collection/PokemonItem";
 import type { Pokemon } from "../collection/useCollection";
 import { type Team, useTeams } from "../teams/useTeams";
 import { Sprite } from "../ui/Sprite";
@@ -136,16 +135,13 @@ function GroupRow({
             return (
               p && (
                 <li key={id} className="py-2">
-                  <PokemonRow
-                    pokemon={p}
-                    action={<ProtectButton pokemon={p} />}
-                  >
+                  <PokemonItem pokemon={p}>
                     {i < g.keep ? (
                       <Tag tone="keep">{keepReason(p, teams.data)}</Tag>
                     ) : (
                       <Tag tone="go">Possible transfer</Tag>
                     )}
-                  </PokemonRow>
+                  </PokemonItem>
                 </li>
               )
             );

@@ -17,6 +17,8 @@ interface Row {
   protected?: boolean;
   /** Features confirmed absent. */
   absent?: string[];
+  /** Features the trainer marked yes or no for this Pokémon. */
+  marks?: Record<string, boolean>;
 }
 interface Stored extends Row {
   id: string;
@@ -32,7 +34,11 @@ interface FakeImport {
 }
 
 const toPokemon = (id: string, p: Row): Schemas["Pokemon"] => {
-  const tri = (f: string) => (p.absent?.includes(f) ? "no" : "unknown");
+  const tri = (f: string, otherwise: "yes" | "unknown" = "unknown") => {
+    const mark = p.marks?.[f];
+    if (mark !== undefined) return mark ? "yes" : "no";
+    return p.absent?.includes(f) ? "no" : otherwise;
+  };
   return {
     id,
     species: p.species,
@@ -45,9 +51,9 @@ const toPokemon = (id: string, p: Row): Schemas["Pokemon"] => {
     iv: { attack: 15, defense: 14, stamina: 13 },
     attributes: {
       shiny: tri("shiny"),
-      lucky: p.lucky ? "yes" : "unknown",
-      shadow: "unknown",
-      purified: "unknown",
+      lucky: tri("lucky", p.lucky ? "yes" : "unknown"),
+      shadow: tri("shadow"),
+      purified: tri("purified"),
       favorite: "unknown",
       costume: tri("costume"),
       background: tri("background"),
@@ -276,6 +282,24 @@ export function createFakeApi(
       return setup
         ? jsonResponse(200, setup)
         : err(404, "NOT_FOUND", "setup not done yet");
+    }
+    const features = /^\/collection\/([^/]+)\/features$/.exec(path);
+    if (features && req.method === "PUT") {
+      if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
+      const p = collection.find((x) => x.id === features[1]);
+      if (!p) return err(404, "NOT_FOUND", "not in your collection");
+      const marks = { ...(body as Record<string, boolean>) };
+      if (marks.shadow && marks.purified) {
+        return err(
+          422,
+          "VALIDATION_FAILED",
+          "cannot be both shadow and purified",
+        );
+      }
+      if (marks.shadow) marks.purified = false;
+      if (marks.purified) marks.shadow = false;
+      p.marks = { ...p.marks, ...marks };
+      return jsonResponse(200, toPokemon(p.id, p));
     }
     const protect = /^\/collection\/([^/]+)\/protection$/.exec(path);
     if (protect && req.method === "PUT") {
