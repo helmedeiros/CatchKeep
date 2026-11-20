@@ -360,6 +360,18 @@ Each component may be unknown. A record with any unknown component has a _set_ o
 
 **OD-02 decided (M3): per-species reading.** A rule for a category (legendary, mythical, Ultra Beast) applies to each species in it as if it were that species' own rule; a species' own rule replaces it. "Mythical minimum 4" keeps 4 of every Mythical species, and "Mew minimum 2" keeps 2 Mew. Categories do not overlap, so no two category rules meet on one species. The inspector shows the category rule, the species rule and which one won.
 
+**OD-01 decided (M3): five fixed bands**, the same for every trainer; species and category rules cover the exceptions.
+
+| Storage up to | Ordinary copies per variant | Rare (legendary, mythical, Ultra Beast) |
+| ------------: | --------------------------: | --------------------------------------: |
+|           500 |                           1 |                                       2 |
+|         1,500 |                           1 |                                       3 |
+|         3,000 |                           2 |                                       4 |
+|         6,000 |                           2 |                                       5 |
+|        20,000 |                           3 |                                       6 |
+
+Trading adds one to rare, shiny, costume and background variants (V1-RUL-03).
+
 ### 6.4 Import and reconciliation
 
 | ID        | Requirement                                                                                                                                                                                                                          |
@@ -947,7 +959,7 @@ Fixture corpus: supplied PNGs + new captures for every screen kind × protected 
 
 | ID    | Decision                                                                                                                                                                                        | Needed by            | Default until decided                                                  |
 | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------- |
-| OD-01 | Exact capacity bands and default minimums                                                                                                                                                       | V1 rules engine (M3) | Editable placeholder bands matching the reference points in V1-RUL-02  |
+| OD-01 | ~~Exact capacity bands and default minimums~~ Decided: five fixed bands (§6.3)                                                                                                                  | V1 rules engine (M3) | Editable placeholder bands matching the reference points in V1-RUL-02  |
 | OD-02 | ~~Semantics of nested group vs species minimum~~ Decided: per-species reading (§6.3)                                                                                                            | V1 rules engine (M3) | Constraint model in §6.3                                               |
 | OD-03 | Poke Genie export semantics not visible in the sample: does `Favorite=0` mean "not favorite" or "not captured"; `Lucky` reliability; `Shadow/Purified` codes; any hidden shiny/costume encoding | V1 import (M2)       | Per §6.5: `0` treated as unknown, shiny/costume/background/Max unknown |
 | OD-04 | Local HTTPS setup on client devices (CA install, hostname, mDNS reliability)                                                                                                                    | V1 host (M1)         | mkcert + `.local` hostname                                             |

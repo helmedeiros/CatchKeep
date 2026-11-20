@@ -108,10 +108,12 @@ func (s Setup) has(g Goal) bool { return slices.Contains(s.Goals, g) }
 // copies of each variant and Rare of rare species (spec V1-RUL-02).
 type CapacityBand struct{ UpTo, Ordinary, Rare int }
 
-// capacityBands are placeholder defaults until OD-01 is decided.
+// capacityBands are fixed for every trainer (OD-01, decided).
 var capacityBands = []CapacityBand{
-	{UpTo: 1000, Ordinary: 1, Rare: 2},
-	{UpTo: 4000, Ordinary: 2, Rare: 4},
+	{UpTo: 500, Ordinary: 1, Rare: 2},
+	{UpTo: 1500, Ordinary: 1, Rare: 3},
+	{UpTo: 3000, Ordinary: 2, Rare: 4},
+	{UpTo: 6000, Ordinary: 2, Rare: 5},
 	{UpTo: maxCapacity, Ordinary: 3, Rare: 6},
 }
 
