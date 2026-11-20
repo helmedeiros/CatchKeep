@@ -45,7 +45,7 @@ func NewHandler(services Services) http.Handler {
 	return HandlerWithOptions(strict, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
 		BaseRouter:       http.NewServeMux(),
-		Middlewares:      []MiddlewareFunc{readSessionCookie, markAdmin, blockCrossSite, checkHost(services.HostNames)},
+		Middlewares:      []MiddlewareFunc{readSessionCookie, markAdmin, blockCrossSite, limitBody, checkHost(services.HostNames), secureHeaders},
 		ErrorHandlerFunc: writeRequestError,
 	})
 }

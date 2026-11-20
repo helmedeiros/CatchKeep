@@ -48,6 +48,10 @@ func writeError(w http.ResponseWriter, status int, body Error) {
 
 // writeRequestError answers requests the generated layer could not decode.
 func writeRequestError(w http.ResponseWriter, _ *http.Request, err error) {
+	if tooLarge(err) {
+		writeError(w, http.StatusRequestEntityTooLarge, errorBody(codePayloadTooLarge, "The request is too large."))
+		return
+	}
 	writeError(w, http.StatusUnprocessableEntity, errorBody(codeValidationFailed, "The request is not valid: "+err.Error()))
 }
 

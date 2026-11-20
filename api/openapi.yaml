@@ -1051,6 +1051,7 @@ components:
       properties:
         mapping:
           type: array
+          maxItems: 200
           items:
             $ref: "#/components/schemas/ColumnMapEntry"
     MappableField:
@@ -1250,6 +1251,7 @@ components:
       properties:
         rules:
           type: array
+          maxItems: 2000
           items:
             $ref: "#/components/schemas/SpeciesRule"
     SpeciesRule:
@@ -1280,6 +1282,7 @@ components:
       properties:
         rules:
           type: array
+          maxItems: 3
           items:
             $ref: "#/components/schemas/CategoryRule"
     CategoryRule:
