@@ -7,7 +7,8 @@ import { Sprite } from "../ui/Sprite";
 import { RuleInspector } from "./RuleInspector";
 import { SpeciesRuleEditor } from "./SpeciesRules";
 import { secondaryButton } from "../ui/styles";
-import { type KeepSummary, useSpeciesRules } from "./useKeep";
+import { CATEGORY_NAMES } from "./categories";
+import { type KeepSummary, useCategoryRules, useSpeciesRules } from "./useKeep";
 
 type Group = KeepSummary["groups"][number];
 
@@ -31,7 +32,7 @@ function variantLabels(g: Group): string[] {
   return [
     ...(g.form !== "Normal" ? [g.form] : []),
     ...FLAGS.filter((f) => g[f]),
-    ...(g.rare ? ["rare"] : []),
+    ...(g.category ? [CATEGORY_NAMES[g.category]] : g.rare ? ["rare"] : []),
   ];
 }
 
@@ -83,6 +84,7 @@ function GroupRow({
 }) {
   const [open, setOpen] = useState(false);
   const rules = useSpeciesRules(open);
+  const categoryRules = useCategoryRules(open && g.category !== undefined);
   const teams = useTeams();
   const first = byId.get(g.keptIds[0] ?? g.surplusIds[0] ?? "");
   const name = [g.species, ...variantLabels(g)].join(" · ");
@@ -103,7 +105,11 @@ function GroupRow({
         <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
         <span className="shrink-0 text-sm tabular-nums text-slate-500">
           {g.count} · keep {g.keep}
-          {g.rule === "species" && " (your rule)"} · {g.surplusIds.length} extra
+          {g.rule === "species" && " (your rule)"}
+          {g.rule === "category" &&
+            g.category &&
+            ` (${CATEGORY_NAMES[g.category]} rule)`}{" "}
+          · {g.surplusIds.length} extra
         </span>
       </button>
       {open && (
@@ -111,6 +117,9 @@ function GroupRow({
           group={g}
           name={name}
           rule={rules.data?.find((r) => r.species === g.species)}
+          categoryRule={categoryRules.data?.find(
+            (r) => r.category === g.category,
+          )}
           protectedByYou={
             g.protectedIds.filter((id) => byId.get(id)?.protected).length
           }
