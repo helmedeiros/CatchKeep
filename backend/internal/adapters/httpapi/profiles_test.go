@@ -19,6 +19,8 @@ type apiClient struct {
 	t       *testing.T
 	handler http.Handler
 	cookie  *http.Cookie
+	// remote is the caller's address; the Mac itself unless onPhone.
+	remote string
 }
 
 func newAPI(t *testing.T) *apiClient {
@@ -69,6 +71,10 @@ func (c *apiClient) doWithType(method, path, body, contentType string) *httptest
 	}
 	if c.cookie != nil {
 		req.AddCookie(c.cookie)
+	}
+	req.RemoteAddr = "127.0.0.1:50000"
+	if c.remote != "" {
+		req.RemoteAddr = c.remote
 	}
 	rec := httptest.NewRecorder()
 	c.handler.ServeHTTP(rec, req)
@@ -181,4 +187,43 @@ func TestSignIn_RepeatedWrongPINsAreRateLimited(t *testing.T) {
 	if got := errorCode(t, rec); got != "RATE_LIMITED" {
 		t.Fatalf("code = %q, want RATE_LIMITED", got)
 	}
+}
+
+// onPhone makes the client call from another device on the home network.
+func (c *apiClient) onPhone() *apiClient {
+	c.remote = "192.168.1.20:50000"
+	return c
+}
+
+func TestHost_OnlyTheMacIsAdmin(t *testing.T) {
+	type host struct{ Admin bool }
+	if got := decode[host](t, newAPI(t).do(http.MethodGet, "/api/v1/host", "").Body.Bytes()); !got.Admin {
+		t.Fatal("the Mac itself should be admin")
+	}
+	if got := decode[host](t, newAPI(t).onPhone().do(http.MethodGet, "/api/v1/host", "").Body.Bytes()); got.Admin {
+		t.Fatal("a phone on the network should not be admin")
+	}
+}
+
+func TestProfiles_OnlyTheMacCreatesThem(t *testing.T) {
+	rec := newAPI(t).onPhone().do(http.MethodPost, "/api/v1/profiles", `{"displayName":"Ash","pin":"2468"}`)
+	wantStatus(t, rec, http.StatusForbidden)
+	if code := errorCode(t, rec); code != "ADMIN_ONLY" {
+		t.Fatalf("code = %q", code)
+	}
+}
+
+func TestProfiles_TheMacResetsAPIN(t *testing.T) {
+	phone := signedIn(t, "Ash")
+	id := decode[[]struct{ ID string }](t, phone.do(http.MethodGet, "/api/v1/profiles", "").Body.Bytes())[0].ID
+	phone.onPhone()
+	wantStatus(t, phone.do(http.MethodPut, "/api/v1/profiles/"+id+"/pin", `{"pin":"1357"}`), http.StatusForbidden)
+
+	mac := &apiClient{t: t, handler: phone.handler}
+	wantStatus(t, mac.do(http.MethodPut, "/api/v1/profiles/"+id+"/pin", `{"pin":"12"}`), http.StatusUnprocessableEntity)
+	wantStatus(t, mac.do(http.MethodPut, "/api/v1/profiles/01JD2Z8Q4M8V7Y6X5W4T3S2R00/pin", `{"pin":"1357"}`), http.StatusNotFound)
+	wantStatus(t, mac.do(http.MethodPut, "/api/v1/profiles/"+id+"/pin", `{"pin":"1357"}`), http.StatusNoContent)
+
+	wantStatus(t, phone.do(http.MethodGet, "/api/v1/me", ""), http.StatusUnauthorized)
+	wantStatus(t, phone.do(http.MethodPost, "/api/v1/session", `{"profileId":"`+id+`","pin":"1357"}`), http.StatusOK)
 }

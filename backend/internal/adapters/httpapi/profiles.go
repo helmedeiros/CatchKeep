@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"time"
 
@@ -22,6 +23,50 @@ func readSessionCookie(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+type adminKey struct{}
+
+// markAdmin marks requests made on the host itself: only the Mac running
+// CatchKeep may create profiles and reset PINs (OD-07, decided). A
+// forwarded request is never admin.
+func markAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if ip := net.ParseIP(host); err == nil && ip != nil && ip.IsLoopback() && r.Header.Get("X-Forwarded-For") == "" {
+			r = r.WithContext(context.WithValue(r.Context(), adminKey{}, true))
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func isAdmin(ctx context.Context) bool {
+	admin, _ := ctx.Value(adminKey{}).(bool)
+	return admin
+}
+
+func adminOnly() Error {
+	return errorBody(codeAdminOnly, "Only the Mac running CatchKeep can do this.")
+}
+
+func (s *server) GetHost(ctx context.Context, _ GetHostRequestObject) (GetHostResponseObject, error) {
+	return GetHost200JSONResponse{Admin: isAdmin(ctx)}, nil
+}
+
+func (s *server) ResetPin(ctx context.Context, req ResetPinRequestObject) (ResetPinResponseObject, error) {
+	if !isAdmin(ctx) {
+		return ResetPin403JSONResponse{ErrorJSONResponse(adminOnly())}, nil
+	}
+	err := s.services.Sessions.ResetPIN(ctx, domain.TrainerID(req.ProfileId), req.Body.Pin)
+	switch {
+	case errors.Is(err, domain.ErrInvalidPIN):
+		return ResetPin422JSONResponse(errorBody(codeValidationFailed, err.Error())), nil
+	case errors.Is(err, domain.ErrTrainerNotFound):
+		return ResetPin404JSONResponse(errorBody(codeNotFound, "No such profile.")), nil
+	case err != nil:
+		return nil, err
+	}
+	return ResetPin204Response{}, nil
 }
 
 func tokenFrom(ctx context.Context) string {
@@ -61,12 +106,15 @@ func (s *server) ListProfiles(ctx context.Context, _ ListProfilesRequestObject) 
 }
 
 func (s *server) CreateProfile(ctx context.Context, req CreateProfileRequestObject) (CreateProfileResponseObject, error) {
+	if !isAdmin(ctx) {
+		return CreateProfile403JSONResponse{ErrorJSONResponse(adminOnly())}, nil
+	}
 	p, err := s.services.Profiles.Create(ctx, req.Body.DisplayName, req.Body.Pin)
 	switch {
 	case errors.Is(err, domain.ErrInvalidDisplayName), errors.Is(err, domain.ErrInvalidPIN):
 		return CreateProfile422JSONResponse(errorBody(codeValidationFailed, err.Error())), nil
 	case errors.Is(err, domain.ErrDisplayNameTaken):
-		return CreateProfile409JSONResponse{ErrorJSONResponse(errorBody(codeNameTaken, err.Error()))}, nil
+		return CreateProfile409JSONResponse(errorBody(codeNameTaken, err.Error())), nil
 	case err != nil:
 		return nil, err
 	}

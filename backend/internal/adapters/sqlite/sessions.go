@@ -72,6 +72,14 @@ func (r *Sessions) Touch(ctx context.Context, tokenHash string, at time.Time) er
 	return nil
 }
 
+// DeleteForTrainer implements ports.Sessions.
+func (r *Sessions) DeleteForTrainer(ctx context.Context, trainer domain.TrainerID) error {
+	if _, err := r.db.ExecContext(ctx, `DELETE FROM sessions WHERE trainer_id = ?`, string(trainer)); err != nil {
+		return fmt.Errorf("delete sessions: %w", err)
+	}
+	return nil
+}
+
 // Delete implements ports.Sessions.
 func (r *Sessions) Delete(ctx context.Context, tokenHash string) error {
 	if _, err := r.db.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = ?`, tokenHash); err != nil {

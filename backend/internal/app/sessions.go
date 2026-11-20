@@ -101,6 +101,28 @@ func (s *Sessions) Resolve(ctx context.Context, token string) (ProfileSummary, e
 	return ProfileSummary{ID: trainer.ID, DisplayName: trainer.DisplayName}, nil
 }
 
+// ResetPIN gives the trainer a new PIN, ends all their sessions and lifts
+// any lockout. Only the host admin may call it.
+func (s *Sessions) ResetPIN(ctx context.Context, id domain.TrainerID, pin string) error {
+	if err := domain.ValidatePIN(pin); err != nil {
+		return err
+	}
+	hash, err := s.hasher.Hash(pin)
+	if err != nil {
+		return fmt.Errorf("hash PIN: %w", err)
+	}
+	if err := s.trainers.SetPINHash(ctx, id, hash); err != nil {
+		return err
+	}
+	if err := s.sessions.DeleteForTrainer(ctx, id); err != nil {
+		return fmt.Errorf("end sessions: %w", err)
+	}
+	s.mu.Lock()
+	delete(s.attempts, id)
+	s.mu.Unlock()
+	return nil
+}
+
 // SignOut ends the session for token. Unknown tokens are ignored.
 func (s *Sessions) SignOut(ctx context.Context, token string) error {
 	return s.sessions.Delete(ctx, hashToken(token))

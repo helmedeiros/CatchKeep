@@ -49,6 +49,20 @@ func (r *Trainers) Get(ctx context.Context, id domain.TrainerID) (domain.Trainer
 	return t, err
 }
 
+// SetPINHash implements ports.Trainers.
+func (r *Trainers) SetPINHash(ctx context.Context, id domain.TrainerID, hash string) error {
+	res, err := r.db.ExecContext(ctx, `UPDATE trainers SET pin_hash = ? WHERE id = ?`, hash, string(id))
+	if err != nil {
+		return fmt.Errorf("set PIN: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("set PIN: %w", err)
+	} else if n == 0 {
+		return domain.ErrTrainerNotFound
+	}
+	return nil
+}
+
 // List implements ports.Trainers.
 func (r *Trainers) List(ctx context.Context) ([]domain.Trainer, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT id, display_name, pin_hash, created_at, revision FROM trainers`)
