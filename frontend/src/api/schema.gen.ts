@@ -264,6 +264,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/category-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The trainer's keep rules for legendary, mythical and Ultra Beast species. */
+        get: operations["getCategoryRules"];
+        /** Replace the category keep rules. Each applies to every species in its category as that species' own rule would, unless the species has its own rule (OD-02). */
+        put: operations["saveCategoryRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams": {
         parameters: {
             query?: never;
@@ -515,6 +533,18 @@ export interface components {
             /** @description A favorite species keeps every copy. */
             favorite: boolean;
         };
+        /** @enum {string} */
+        SpeciesCategory: "legendary" | "mythical" | "ultra-beast";
+        CategoryRules: {
+            rules: components["schemas"]["CategoryRule"][];
+        };
+        CategoryRule: {
+            category: components["schemas"]["SpeciesCategory"];
+            /** @description Copies kept across all variants of each species in the category; 0 when only a favorite. */
+            minimum: number;
+            /** @description Every copy of every species in the category is kept. */
+            favorite: boolean;
+        };
         KeepSummary: {
             total: number;
             kept: number;
@@ -555,6 +585,7 @@ export interface components {
             purified: boolean;
             /** @description Legendary, mythical or Ultra Beast species. */
             rare: boolean;
+            category?: components["schemas"]["SpeciesCategory"];
             /** @description Minimum generated from storage and goals, before any species rule or favorite replaced it. */
             default: number;
             /** @description The trading goal added one to the generated minimum. */
@@ -563,7 +594,7 @@ export interface components {
              * @description The rule that decided this group's minimum.
              * @enum {string}
              */
-            rule: "default" | "rare" | "species" | "favorite";
+            rule: "default" | "rare" | "category" | "species" | "favorite";
             count: number;
             minimum: number;
             keep: number;
@@ -1063,6 +1094,65 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpeciesRules"];
+                };
+            };
+            401: components["responses"]["Error"];
+            /** @description Storage and goals are not set up yet (SETUP_REQUIRED). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            422: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getCategoryRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The category rules; empty until the trainer sets one. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryRules"];
+                };
+            };
+            401: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    saveCategoryRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryRules"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryRules"];
                 };
             };
             401: components["responses"]["Error"];
