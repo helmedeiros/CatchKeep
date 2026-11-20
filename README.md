@@ -8,6 +8,12 @@ Deciding what is worth keeping is only half of it. The hard part is knowing how 
 
 CatchKeep takes both off your plate. It reads your Poke Genie export, keeps the best copies of every variant by rules you set once, and shows what you can safely let go, so you go into the next Community Day with room to spare instead of clearing storage at the last minute.
 
+![Signing in, importing a Poke Genie export and browsing the collection](docs/demo/import.gif)
+
+![Setting storage and goals, then seeing why Pidgey keeps two copies](docs/demo/keep.gif)
+
+![Protecting a weak Pidgey so it is always kept](docs/demo/protect.gif)
+
 ## What you can do today
 
 - **A profile per trainer.** Each trainer has a PIN-protected profile, so collections never get mixed up.
