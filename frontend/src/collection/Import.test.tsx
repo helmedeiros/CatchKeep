@@ -59,7 +59,7 @@ describe("importing a collection", () => {
     expect(within(list).getByText("Lucky")).toBeInTheDocument();
   });
 
-  it("explains files that are not a Poke Genie export", async () => {
+  it("explains files it cannot read as a table", async () => {
     const user = userEvent.setup();
     const api = createFakeApi();
     api.signIn("Ash");
@@ -67,11 +67,11 @@ describe("importing a collection", () => {
 
     await user.upload(
       await screen.findByLabelText("Choose your Poke Genie export"),
-      new File(["name,cp\nPikachu,500"], "other.csv", { type: "text/csv" }),
+      new File(["just some notes"], "notes.csv", { type: "text/csv" }),
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "not a Poke Genie CSV export",
+      "not a CSV export CatchKeep can read",
     );
   });
 
@@ -91,5 +91,70 @@ describe("importing a collection", () => {
       screen.queryByRole("region", { name: "Import preview" }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("No Pokémon yet.")).toBeInTheDocument();
+  });
+
+  it("reads another app's CSV once the trainer matches its columns, and remembers them", async () => {
+    const user = userEvent.setup();
+    const api = createFakeApi();
+    api.signIn("Ash");
+    renderWithApi(<App />, api.fetch);
+    const sheet = () =>
+      new File(
+        ["Mon,Combat Power,Note\nPidgey,120,buddy\nRattata,90,\n"],
+        "my-sheet.csv",
+        { type: "text/csv" },
+      );
+
+    await user.upload(
+      await screen.findByLabelText("Choose your Poke Genie export"),
+      sheet(),
+    );
+    const mapper = await screen.findByRole("form", {
+      name: "Match your columns",
+    });
+    expect(mapper).toHaveTextContent(/Mon\s*e\.g\. Pidgey, Rattata/);
+    expect(
+      within(mapper).getByRole("combobox", {
+        name: 'What "Combat Power" holds',
+      }),
+    ).toHaveValue("cp");
+    expect(
+      within(mapper).getByRole("button", { name: "Read the file" }),
+    ).toBeDisabled();
+    expect(mapper).toHaveTextContent("Pick the column with the species.");
+
+    await user.selectOptions(
+      within(mapper).getByRole("combobox", { name: 'What "Mon" holds' }),
+      "species",
+    );
+    await user.click(
+      within(mapper).getByRole("button", { name: "Read the file" }),
+    );
+
+    const preview = await screen.findByRole("region", {
+      name: "Import preview",
+    });
+    expect(within(preview).getByText("2 Pokémon found")).toBeInTheDocument();
+    expect(
+      within(preview).getByRole("button", {
+        name: "Change how columns are read",
+      }),
+    ).toBeInTheDocument();
+    await user.click(
+      within(preview).getByRole("button", { name: "Add 2 Pokémon" }),
+    );
+    const list = await screen.findByRole("list", { name: "Collection" });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+
+    await user.upload(
+      screen.getByLabelText("Choose your Poke Genie export"),
+      sheet(),
+    );
+    expect(
+      await screen.findByRole("region", { name: "Import preview" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("form", { name: "Match your columns" }),
+    ).not.toBeInTheDocument();
   });
 });
