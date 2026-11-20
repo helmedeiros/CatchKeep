@@ -3,12 +3,18 @@ import { useApi } from "../api/useApi";
 
 const HEALTH_REFRESH_MS = 30_000;
 
+/** The page was opened by a name CatchKeep does not answer to. */
+class WrongAddress extends Error {}
+
 export function HostStatus() {
   const api = useApi();
   const health = useQuery({
     queryKey: ["health"],
     queryFn: async () => {
       const { data, error } = await api.GET("/health");
+      if (error?.error.code === "HOST_NOT_ALLOWED") {
+        throw new WrongAddress();
+      }
       if (error || !data) {
         throw new Error("host reported an error");
       }
@@ -20,6 +26,18 @@ export function HostStatus() {
 
   if (health.isPending) {
     return <p className="text-sm text-slate-500">Checking host…</p>;
+  }
+
+  if (health.error instanceof WrongAddress) {
+    return (
+      <p
+        role="alert"
+        className="rounded-lg bg-amber-100 px-4 py-3 text-sm text-amber-900"
+      >
+        Open CatchKeep using the address shown on the computer running it, under
+        “Use CatchKeep on other devices”.
+      </p>
+    );
   }
 
   if (health.isError) {

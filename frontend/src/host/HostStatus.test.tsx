@@ -38,4 +38,22 @@ describe("HostStatus", () => {
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
   });
+
+  it("explains how to open CatchKeep when it was opened by a name it does not answer to", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      jsonResponse(421, {
+        error: {
+          code: "HOST_NOT_ALLOWED",
+          message:
+            "Open CatchKeep by the address shown on the computer running it.",
+          correlationId: "x",
+        },
+      });
+
+    renderWithApi(<HostStatus />, fetchImpl);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Open CatchKeep using the address shown on the computer running it, under “Use CatchKeep on other devices”.",
+    );
+  });
 });
