@@ -318,3 +318,61 @@ func TestCapacityBands_CoverEveryCapacityAndMatchTheMinimums(t *testing.T) {
 		t.Fatal("changing the returned bands changed the rules")
 	}
 }
+
+func TestSetup_ValidateCategoryRules(t *testing.T) {
+	base := domain.Setup{Capacity: 2700, Goals: []domain.Goal{domain.GoalCollecting}}
+	for name, rules := range map[string][]domain.CategoryRule{
+		"unknown category": {{Category: "starter", Minimum: 2}},
+		"nothing set":      {{Category: domain.CategoryMythical}},
+		"absurd minimum":   {{Category: domain.CategoryMythical, Minimum: 100000}},
+		"repeated":         {{Category: domain.CategoryMythical, Minimum: 2}, {Category: domain.CategoryMythical, Favorite: true}},
+	} {
+		s := base
+		s.Categories = rules
+		if err := s.Validate(); !errors.Is(err, domain.ErrInvalidSetup) {
+			t.Errorf("%s: err = %v, want ErrInvalidSetup", name, err)
+		}
+	}
+	base.Categories = []domain.CategoryRule{{Category: domain.CategoryMythical, Minimum: 4}, {Category: domain.CategoryUltraBeast, Favorite: true}}
+	if err := base.Validate(); err != nil {
+		t.Fatalf("valid category rules rejected: %v", err)
+	}
+}
+
+func TestSummarizeKeeps_CategoryRulesApplyToEachSpeciesUnlessItHasItsOwn(t *testing.T) {
+	var pokemon []domain.Pokemon
+	for _, species := range []string{"Mew", "Celebi", "Mewtwo", "Nihilego"} {
+		for i, iv := range []string{"1", "2", "3"} {
+			pokemon = append(pokemon, known(species+string(rune('1'+i)), species, iv, iv, iv))
+		}
+	}
+	categories := map[string]domain.Category{
+		"Mew": domain.CategoryMythical, "Celebi": domain.CategoryMythical,
+		"Mewtwo": domain.CategoryLegendary, "Nihilego": domain.CategoryUltraBeast,
+	}
+	categorize := func(s string) domain.Category { return categories[s] }
+	setup := domain.Setup{
+		Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting},
+		Categories: []domain.CategoryRule{
+			{Category: domain.CategoryMythical, Minimum: 1},
+			{Category: domain.CategoryUltraBeast, Favorite: true},
+		},
+	}
+
+	check := func(s domain.KeepSummary, want map[string]int, rules map[string]domain.Rule) {
+		t.Helper()
+		for species, keep := range want {
+			if kept, rule := keptOf(s, species); kept != keep || rule != rules[species] {
+				t.Errorf("%s kept %d by %q, want %d by %q", species, kept, rule, keep, rules[species])
+			}
+		}
+	}
+	check(domain.SummarizeKeeps(pokemon, setup, categorize),
+		map[string]int{"Mew": 1, "Celebi": 1, "Mewtwo": 2, "Nihilego": 3},
+		map[string]domain.Rule{"Mew": domain.RuleCategory, "Celebi": domain.RuleCategory, "Mewtwo": domain.RuleRare, "Nihilego": domain.RuleCategory})
+
+	setup.Species = []domain.SpeciesRule{{Species: "Mew", Minimum: 3}}
+	check(domain.SummarizeKeeps(pokemon, setup, categorize),
+		map[string]int{"Mew": 3, "Celebi": 1},
+		map[string]domain.Rule{"Mew": domain.RuleSpecies, "Celebi": domain.RuleCategory})
+}

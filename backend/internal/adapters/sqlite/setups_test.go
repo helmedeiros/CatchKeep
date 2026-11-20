@@ -49,3 +49,18 @@ func TestSetups_KeepSpeciesRules(t *testing.T) {
 		t.Fatalf("Species = %+v, %v", got.Species, err)
 	}
 }
+
+func TestSetups_KeepCategoryRules(t *testing.T) {
+	store, _ := openTemp(t)
+	withTrainers(t, store, "ash")
+	setups := sqlite.NewSetups(store)
+	rules := []domain.CategoryRule{{Category: domain.CategoryMythical, Minimum: 4}, {Category: domain.CategoryUltraBeast, Favorite: true}}
+	if err := setups.SaveSetup(t.Context(), "ash", domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}, Categories: rules}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := setups.GetSetup(t.Context(), "ash")
+	if err != nil || !slices.Equal(got.Categories, rules) {
+		t.Fatalf("Categories = %+v, %v", got.Categories, err)
+	}
+}

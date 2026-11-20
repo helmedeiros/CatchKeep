@@ -88,6 +88,34 @@ func TestKeep_SpeciesRulesNeedSetupAndSurviveSetupChanges(t *testing.T) {
 	}
 }
 
+func TestKeep_CategoryRulesNeedSetupAndSurviveOtherChanges(t *testing.T) {
+	keep := app.NewKeep(apptest.NewSetups(), apptest.NewCollectionStore(), apptest.SpeciesCategories{}, apptest.NewTeams(apptest.NewCollectionStore()))
+	rules := []domain.CategoryRule{{Category: domain.CategoryMythical, Minimum: 4}}
+	if err := keep.SaveCategoryRules(t.Context(), ash, rules); !errors.Is(err, domain.ErrSetupNotFound) {
+		t.Fatalf("before setup: err = %v", err)
+	}
+	setup := domain.Setup{Capacity: 2700, Goals: []domain.Goal{domain.GoalCollecting}}
+	if err := keep.SaveSetup(t.Context(), ash, setup); err != nil {
+		t.Fatal(err)
+	}
+	if err := keep.SaveCategoryRules(t.Context(), ash, []domain.CategoryRule{{Category: "starter", Minimum: 1}}); !errors.Is(err, domain.ErrInvalidSetup) {
+		t.Fatalf("invalid rule: err = %v", err)
+	}
+	if err := keep.SaveCategoryRules(t.Context(), ash, rules); err != nil {
+		t.Fatal(err)
+	}
+	if err := keep.SaveSpeciesRules(t.Context(), ash, []domain.SpeciesRule{{Species: "Mew", Minimum: 2}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := keep.SaveSetup(t.Context(), ash, setup); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := keep.Setup(t.Context(), ash)
+	if len(got.Categories) != 1 || got.Categories[0] != rules[0] || len(got.Species) != 1 {
+		t.Fatalf("setup = %+v; other changes keep the category rules", got)
+	}
+}
+
 func TestKeep_ProtectedPokemonAreKept(t *testing.T) {
 	f := newImportsFixture()
 	preview, _ := f.imports.Stage(t.Context(), ash, strings.NewReader("Pidgey,1,2,3,100\nPidgey,4,5,6,200\n"))

@@ -31,12 +31,12 @@ func (k *Keep) Setup(ctx context.Context, trainer domain.TrainerID) (domain.Setu
 }
 
 // SaveSetup validates and stores the trainer's storage and goals, keeping
-// any species rules they already have.
+// any species and category rules they already have.
 func (k *Keep) SaveSetup(ctx context.Context, trainer domain.TrainerID, s domain.Setup) error {
 	current, err := k.setups.GetSetup(ctx, trainer)
 	switch {
 	case err == nil:
-		s.Species = current.Species
+		s.Species, s.Categories = current.Species, current.Categories
 	case !errors.Is(err, domain.ErrSetupNotFound):
 		return err
 	}
@@ -50,6 +50,16 @@ func (k *Keep) SaveSpeciesRules(ctx context.Context, trainer domain.TrainerID, r
 		return err
 	}
 	s.Species = rules
+	return k.save(ctx, trainer, s)
+}
+
+// SaveCategoryRules replaces the trainer's category rules. It needs a setup.
+func (k *Keep) SaveCategoryRules(ctx context.Context, trainer domain.TrainerID, rules []domain.CategoryRule) error {
+	s, err := k.setups.GetSetup(ctx, trainer)
+	if err != nil {
+		return err
+	}
+	s.Categories = rules
 	return k.save(ctx, trainer, s)
 }
 
