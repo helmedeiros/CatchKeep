@@ -64,8 +64,8 @@ export function ColumnMapper({
       </p>
       <ul className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
         {preview.columns.map((c) => (
-          <li key={c.name} className="flex items-center gap-3 py-2 text-sm">
-            <div className="min-w-0 flex-1">
+          <li key={c.name} className="flex flex-col gap-1.5 py-2 text-sm">
+            <div className="min-w-0">
               <p className="truncate font-medium">{c.name}</p>
               {c.samples.length > 0 && (
                 <p className="truncate text-xs text-slate-500">
@@ -75,7 +75,7 @@ export function ColumnMapper({
             </div>
             <select
               aria-label={`What "${c.name}" holds`}
-              className={`${input} w-44 shrink-0`}
+              className={input}
               value={chosen.get(c.name) ?? ""}
               onChange={(e) => choose(c.name, e.target.value)}
             >
