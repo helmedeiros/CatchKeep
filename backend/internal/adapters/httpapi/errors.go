@@ -24,6 +24,10 @@ const (
 	codeTeamNameTaken    = "TEAM_NAME_TAKEN"
 	codeNeedsMapping     = "IMPORT_NEEDS_MAPPING"
 	codeAdminOnly        = "ADMIN_ONLY"
+	codeHostNotAllowed   = "HOST_NOT_ALLOWED"
+	codeCrossSite        = "CROSS_SITE"
+
+	codeUnsupportedMediaType = "UNSUPPORTED_MEDIA_TYPE"
 )
 
 func errorBody(code, message string) Error {

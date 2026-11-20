@@ -15,6 +15,7 @@ func TestGetHealth_ReportsOKAndVersion(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/health", http.NoBody)
+	req.Host = "localhost:8080"
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {

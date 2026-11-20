@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/helmedeiros/catchkeep/backend/internal/app"
@@ -27,13 +28,14 @@ func readSessionCookie(next http.Handler) http.Handler {
 
 type adminKey struct{}
 
-// markAdmin marks requests made on the host itself: only the computer running
-// CatchKeep may create profiles and reset PINs (OD-07, decided). A
-// forwarded request is never admin.
+// markAdmin marks requests made on the host itself and addressed to it as
+// localhost: only the computer running CatchKeep may create profiles and
+// reset PINs (OD-07, decided). A forwarded request is never admin.
 func markAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host, _, err := net.SplitHostPort(r.RemoteAddr)
-		if ip := net.ParseIP(host); err == nil && ip != nil && ip.IsLoopback() && r.Header.Get("X-Forwarded-For") == "" {
+		ip := net.ParseIP(host)
+		if err == nil && ip != nil && ip.IsLoopback() && slices.Contains(loopbackNames, hostName(r.Host)) && r.Header.Get("X-Forwarded-For") == "" {
 			r = r.WithContext(context.WithValue(r.Context(), adminKey{}, true))
 		}
 		next.ServeHTTP(w, r)

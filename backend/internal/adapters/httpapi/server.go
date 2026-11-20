@@ -22,6 +22,11 @@ type Services struct {
 	Keep       *app.Keep
 	Teams      *app.Teams
 
+	// HostNames are this computer's names on the network (addresses and
+	// host names, without ports). Requests addressed to any other name are
+	// refused; localhost always works. It may be nil.
+	HostNames func() []string
+
 	// Addresses lists the web addresses other devices can use to reach the
 	// host; it may be nil.
 	Addresses func() []string
@@ -40,7 +45,7 @@ func NewHandler(services Services) http.Handler {
 	return HandlerWithOptions(strict, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
 		BaseRouter:       http.NewServeMux(),
-		Middlewares:      []MiddlewareFunc{readSessionCookie, markAdmin},
+		Middlewares:      []MiddlewareFunc{readSessionCookie, markAdmin, blockCrossSite, checkHost(services.HostNames)},
 		ErrorHandlerFunc: writeRequestError,
 	})
 }

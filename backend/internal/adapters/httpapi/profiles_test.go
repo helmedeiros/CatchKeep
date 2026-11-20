@@ -19,9 +19,13 @@ type apiClient struct {
 	t       *testing.T
 	handler http.Handler
 	cookie  *http.Cookie
-	// remote is the caller's address; the host itself unless onOtherDevice.
-	remote string
+	// remote is the caller's address and host the name it addresses the
+	// server by: the computer running CatchKeep itself unless onOtherDevice.
+	remote, host string
 }
+
+// hostAddress is the test server's own address on the network.
+const hostAddress = "192.168.1.5"
 
 func newAPI(t *testing.T) *apiClient {
 	t.Helper()
@@ -38,6 +42,7 @@ func newAPI(t *testing.T) *apiClient {
 		Collection: app.NewCollection(collection, collection, clock),
 		Keep:       app.NewKeep(apptest.NewSetups(), collection, apptest.SpeciesCategories{"Mewtwo": domain.CategoryLegendary}, teams),
 		Teams:      app.NewTeams(teams, ulidLike{}),
+		HostNames:  func() []string { return []string{hostAddress} },
 	})}
 }
 
@@ -72,9 +77,9 @@ func (c *apiClient) doWithType(method, path, body, contentType string) *httptest
 	if c.cookie != nil {
 		req.AddCookie(c.cookie)
 	}
-	req.RemoteAddr = "127.0.0.1:50000"
+	req.RemoteAddr, req.Host = "127.0.0.1:50000", "localhost:8080"
 	if c.remote != "" {
-		req.RemoteAddr = c.remote
+		req.RemoteAddr, req.Host = c.remote, c.host
 	}
 	rec := httptest.NewRecorder()
 	c.handler.ServeHTTP(rec, req)
@@ -191,7 +196,7 @@ func TestSignIn_RepeatedWrongPINsAreRateLimited(t *testing.T) {
 
 // onOtherDevice makes the client call from another device on the network.
 func (c *apiClient) onOtherDevice() *apiClient {
-	c.remote = "192.168.1.20:50000"
+	c.remote, c.host = "192.168.1.20:50000", hostAddress+":8080"
 	return c
 }
 
@@ -210,6 +215,7 @@ func TestHost_TellsOnlyTheHostTheAddressesForOtherDevices(t *testing.T) {
 	withAddresses := func() *apiClient {
 		return &apiClient{t: t, handler: httpapi.NewHandler(httpapi.Services{
 			Addresses: func() []string { return []string{"http://192.168.1.20:8080"} },
+			HostNames: func() []string { return []string{hostAddress} },
 		})}
 	}
 	if got := decode[host](t, withAddresses().do(http.MethodGet, "/api/v1/host", "").Body.Bytes()); len(got.Addresses) != 1 {
