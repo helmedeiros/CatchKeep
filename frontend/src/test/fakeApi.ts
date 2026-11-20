@@ -108,7 +108,7 @@ export function createFakeApi(
         return err(
           403,
           "ADMIN_ONLY",
-          "Only the Mac running CatchKeep can do this.",
+          "Only the computer running CatchKeep can do this.",
         );
       const p = profiles.find((x) => x.id === pinPath[1]);
       if (!p) return err(404, "NOT_FOUND", "No such profile.");
@@ -122,7 +122,7 @@ export function createFakeApi(
         return err(
           403,
           "ADMIN_ONLY",
-          "Only the Mac running CatchKeep can do this.",
+          "Only the computer running CatchKeep can do this.",
         );
       if (
         profiles.some(

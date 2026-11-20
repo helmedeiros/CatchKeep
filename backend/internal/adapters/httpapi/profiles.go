@@ -27,7 +27,7 @@ func readSessionCookie(next http.Handler) http.Handler {
 
 type adminKey struct{}
 
-// markAdmin marks requests made on the host itself: only the Mac running
+// markAdmin marks requests made on the host itself: only the computer running
 // CatchKeep may create profiles and reset PINs (OD-07, decided). A
 // forwarded request is never admin.
 func markAdmin(next http.Handler) http.Handler {
@@ -46,7 +46,7 @@ func isAdmin(ctx context.Context) bool {
 }
 
 func adminOnly() Error {
-	return errorBody(codeAdminOnly, "Only the Mac running CatchKeep can do this.")
+	return errorBody(codeAdminOnly, "Only the computer running CatchKeep can do this.")
 }
 
 func (s *server) GetHost(ctx context.Context, _ GetHostRequestObject) (GetHostResponseObject, error) {
@@ -75,8 +75,8 @@ func tokenFrom(ctx context.Context) string {
 }
 
 func (s *server) sessionCookie(value string, maxAge int) string {
-	// Secure follows the serving scheme: the host serves plain HTTP on the
-	// home network (OD-04, decided), so it is off unless configured.
+	// Secure follows the serving scheme: the host serves plain HTTP on its
+	// network (OD-04, decided), so it is off unless configured.
 	c := &http.Cookie{ //nolint:gosec // Secure is set from config, see above
 		Name:     sessionCookie,
 		Value:    value,
