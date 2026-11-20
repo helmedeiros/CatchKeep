@@ -167,3 +167,24 @@ func TestKeep_CategoryRules(t *testing.T) {
 		}
 	}
 }
+
+func TestCollection_MarksOnePokemonsFeatures(t *testing.T) {
+	wantStatus(t, newAPI(t).do(http.MethodPut, "/api/v1/collection/X/features", `{"shiny":true}`), http.StatusUnauthorized)
+	api := signedIn(t, "Ash")
+	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
+	type pokemon struct {
+		ID         string
+		Attributes map[string]string
+	}
+	id := decode[struct{ Pokemon []pokemon }](t, api.do(http.MethodGet, "/api/v1/collection", "").Body.Bytes()).Pokemon[0].ID
+
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/collection/missing/features", `{"shiny":true}`), http.StatusNotFound)
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/collection/"+id+"/features", `{"shadow":true,"purified":true}`), http.StatusUnprocessableEntity)
+	rec := api.do(http.MethodPut, "/api/v1/collection/"+id+"/features", `{"purified":true,"shiny":false}`)
+	wantStatus(t, rec, http.StatusOK)
+	got := decode[pokemon](t, rec.Body.Bytes())
+	if got.ID != id || got.Attributes["purified"] != "yes" || got.Attributes["shadow"] != "no" || got.Attributes["shiny"] != "no" {
+		t.Fatalf("marked = %+v", got)
+	}
+}

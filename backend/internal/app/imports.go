@@ -309,6 +309,29 @@ func (c *Collection) ConfirmAbsent(ctx context.Context, trainer domain.TrainerID
 	return len(updates), nil
 }
 
+// Mark records the trainer's own yes or no for features of one of their
+// Pokémon and returns it as it is now.
+func (c *Collection) Mark(ctx context.Context, trainer domain.TrainerID, id domain.PokemonID, marks map[domain.Field]bool) (domain.Pokemon, error) {
+	list, err := c.reader.ListPokemon(ctx, trainer)
+	if err != nil {
+		return domain.Pokemon{}, err
+	}
+	i := slices.IndexFunc(list, func(p domain.Pokemon) bool { return p.ID == id })
+	if i < 0 {
+		return domain.Pokemon{}, domain.ErrPokemonNotFound
+	}
+	u, err := domain.MarkFeatures(list[i], marks, c.clock.Now())
+	if err != nil {
+		return domain.Pokemon{}, err
+	}
+	if err := c.writer.AddObservations(ctx, trainer, []domain.PokemonUpdate{u}); err != nil {
+		return domain.Pokemon{}, fmt.Errorf("mark features: %w", err)
+	}
+	p := list[i]
+	p.Observations = append(p.Observations, u.Observations...)
+	return p, nil
+}
+
 // Protect sets or clears the trainer's manual protection of one Pokémon.
 func (c *Collection) Protect(ctx context.Context, trainer domain.TrainerID, id domain.PokemonID, protected bool) error {
 	return c.writer.SetProtected(ctx, trainer, id, protected)

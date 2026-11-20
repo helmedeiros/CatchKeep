@@ -455,6 +455,18 @@ type ErrorDetail struct {
 	Message string `json:"message"`
 }
 
+// FeatureMarks defines model for FeatureMarks.
+type FeatureMarks struct {
+	Background *bool `json:"background,omitempty"`
+	Costume    *bool `json:"costume,omitempty"`
+	Dynamax    *bool `json:"dynamax,omitempty"`
+	Gigantamax *bool `json:"gigantamax,omitempty"`
+	Lucky      *bool `json:"lucky,omitempty"`
+	Purified   *bool `json:"purified,omitempty"`
+	Shadow     *bool `json:"shadow,omitempty"`
+	Shiny      *bool `json:"shiny,omitempty"`
+}
+
 // Health defines model for Health.
 type Health struct {
 	Status HealthStatus `json:"status"`
@@ -824,6 +836,9 @@ type SaveCategoryRulesJSONRequestBody = CategoryRules
 // ConfirmAbsentJSONRequestBody defines body for ConfirmAbsent for application/json ContentType.
 type ConfirmAbsentJSONRequestBody = AbsenceConfirmation
 
+// MarkFeaturesJSONRequestBody defines body for MarkFeatures for application/json ContentType.
+type MarkFeaturesJSONRequestBody = FeatureMarks
+
 // SetProtectionJSONRequestBody defines body for SetProtection for application/json ContentType.
 type SetProtectionJSONRequestBody = Protection
 
@@ -871,6 +886,9 @@ type ServerInterface interface {
 	// ConfirmAbsent Confirm that none of a species' (or any) Pokémon have some features.
 	// (POST /collection/confirmations)
 	ConfirmAbsent(w http.ResponseWriter, r *http.Request)
+	// MarkFeatures Say whether one Pokémon is shiny, lucky, shadow, purified, costumed, has a background, or is Dynamax or Gigantamax, as seen in the game.
+	// (PUT /collection/{pokemonId}/features)
+	MarkFeatures(w http.ResponseWriter, r *http.Request, pokemonId string)
 	// SetProtection Protect one Pokémon so it is never suggested for transfer, or remove that protection (V1-SET-03).
 	// (PUT /collection/{pokemonId}/protection)
 	SetProtection(w http.ResponseWriter, r *http.Request, pokemonId string)
@@ -1012,6 +1030,32 @@ func (siw *ServerInterfaceWrapper) ConfirmAbsent(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ConfirmAbsent(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkFeatures operation middleware
+func (siw *ServerInterfaceWrapper) MarkFeatures(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "pokemonId" -------------
+	var pokemonId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pokemonId", r.PathValue("pokemonId"), &pokemonId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pokemonId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkFeatures(w, r, pokemonId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1573,6 +1617,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/imports/{importId}/mapping", wrapper.MapImportColumns)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{importId}/answers", wrapper.AnswerPossibleMatches)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/collection", wrapper.ListCollection)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/collection/{pokemonId}/features", wrapper.MarkFeatures)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/collection/{pokemonId}/protection", wrapper.SetProtection)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/collection/confirmations", wrapper.ConfirmAbsent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/capacity-bands", wrapper.GetCapacityBands)
@@ -1900,6 +1945,88 @@ type ConfirmAbsentdefaultJSONResponse struct {
 }
 
 func (response ConfirmAbsentdefaultJSONResponse) VisitConfirmAbsentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkFeaturesRequestObject struct {
+	PokemonId string `json:"pokemonId"`
+	Body      *MarkFeaturesJSONRequestBody
+}
+
+type MarkFeaturesResponseObject interface {
+	VisitMarkFeaturesResponse(w http.ResponseWriter) error
+}
+
+type MarkFeatures200JSONResponse Pokemon
+
+func (response MarkFeatures200JSONResponse) VisitMarkFeaturesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkFeatures401JSONResponse struct{ ErrorJSONResponse }
+
+func (response MarkFeatures401JSONResponse) VisitMarkFeaturesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkFeatures404JSONResponse Error
+
+func (response MarkFeatures404JSONResponse) VisitMarkFeaturesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkFeatures422JSONResponse Error
+
+func (response MarkFeatures422JSONResponse) VisitMarkFeaturesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkFeaturesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response MarkFeaturesdefaultJSONResponse) VisitMarkFeaturesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -3521,6 +3648,9 @@ type StrictServerInterface interface {
 	// ConfirmAbsent Confirm that none of a species' (or any) Pokémon have some features.
 	// (POST /collection/confirmations)
 	ConfirmAbsent(ctx context.Context, request ConfirmAbsentRequestObject) (ConfirmAbsentResponseObject, error)
+	// MarkFeatures Say whether one Pokémon is shiny, lucky, shadow, purified, costumed, has a background, or is Dynamax or Gigantamax, as seen in the game.
+	// (PUT /collection/{pokemonId}/features)
+	MarkFeatures(ctx context.Context, request MarkFeaturesRequestObject) (MarkFeaturesResponseObject, error)
 	// SetProtection Protect one Pokémon so it is never suggested for transfer, or remove that protection (V1-SET-03).
 	// (PUT /collection/{pokemonId}/protection)
 	SetProtection(ctx context.Context, request SetProtectionRequestObject) (SetProtectionResponseObject, error)
@@ -3758,6 +3888,39 @@ func (sh *strictHandler) ConfirmAbsent(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ConfirmAbsentResponseObject); ok {
 		if err := validResponse.VisitConfirmAbsentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MarkFeatures operation middleware
+func (sh *strictHandler) MarkFeatures(w http.ResponseWriter, r *http.Request, pokemonId string) {
+	var request MarkFeaturesRequestObject
+
+	request.PokemonId = pokemonId
+
+	var body MarkFeaturesJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MarkFeatures(ctx, request.(MarkFeaturesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MarkFeatures")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MarkFeaturesResponseObject); ok {
+		if err := validResponse.VisitMarkFeaturesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

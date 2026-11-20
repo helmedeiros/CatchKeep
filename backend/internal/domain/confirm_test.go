@@ -64,3 +64,42 @@ func TestConfirmAbsent_NoSpeciesMeansTheWholeCollection(t *testing.T) {
 		t.Fatalf("updates = %+v, err = %v; want P1 and P2 only", updates, err)
 	}
 }
+
+func TestMarkFeatures_RecordsTheTrainersAnswerForOnePokemon(t *testing.T) {
+	at := time.Date(2026, 11, 20, 9, 0, 0, 0, time.UTC)
+	export := mon("P1", append(knownVariant("Dialga"), "shadow", "true")...)
+
+	u, err := domain.MarkFeatures(export, map[domain.Field]bool{domain.FieldPurified: true, domain.FieldShiny: true}, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	export.Observations = append(export.Observations, u.Observations...)
+	cur := export.Current()
+	if cur.Tri(domain.FieldPurified) != domain.Yes || cur.Tri(domain.FieldShadow) != domain.No || cur.Tri(domain.FieldShiny) != domain.Yes {
+		t.Fatalf("current = %v; purified, so not shadow, and shiny", cur)
+	}
+	for _, o := range u.Observations {
+		if o.Source != domain.SourceManual || !o.ObservedAt.Equal(at) {
+			t.Fatalf("observation %+v should be the trainer's own, now", o)
+		}
+	}
+
+	later := mon("P1", append(knownVariant("Dialga"), "shadow", "true")...)
+	later.Observations = append(u.Observations, later.Observations...)
+	for i := range later.Observations[len(u.Observations):] {
+		later.Observations[len(u.Observations)+i].ObservedAt = at.Add(time.Hour)
+	}
+	if later.Current().Tri(domain.FieldShadow) != domain.No {
+		t.Fatal("a newer export must not override the trainer's answer")
+	}
+
+	if _, err := domain.MarkFeatures(export, map[domain.Field]bool{domain.FieldShadow: true, domain.FieldPurified: true}, at); !errors.Is(err, domain.ErrNotConfirmable) {
+		t.Fatalf("shadow and purified together: err = %v", err)
+	}
+	if _, err := domain.MarkFeatures(export, map[domain.Field]bool{domain.FieldCP: true}, at); !errors.Is(err, domain.ErrNotConfirmable) {
+		t.Fatalf("CP is not a yes/no feature: err = %v", err)
+	}
+	if _, err := domain.MarkFeatures(export, nil, at); !errors.Is(err, domain.ErrNotConfirmable) {
+		t.Fatalf("nothing to mark: err = %v", err)
+	}
+}
