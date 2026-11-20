@@ -126,7 +126,7 @@ func TestImport_RequiresSignInAndStaysWithinTheProfile(t *testing.T) {
 func TestImport_RejectsUnrecognizedAndOversizedFiles(t *testing.T) {
 	api := signedIn(t, "Ash")
 
-	rec := api.doWithType(http.MethodPost, "/api/v1/imports", "name,cp\nPikachu,500\n", "text/csv")
+	rec := api.doWithType(http.MethodPost, "/api/v1/imports", "just some notes\nnothing tabular\n", "text/csv")
 	wantStatus(t, rec, http.StatusUnprocessableEntity)
 	if code := errorCode(t, rec); code != "UNSUPPORTED_FILE" {
 		t.Fatalf("code = %q", code)
@@ -243,5 +243,48 @@ func TestCollection_ConfirmAbsentForTheWholeCollection(t *testing.T) {
 	wantStatus(t, rec, http.StatusOK)
 	if got := decode[struct{ Updated int }](t, rec.Body.Bytes()); got.Updated != 4 {
 		t.Fatalf("updated = %d, want all 4", got.Updated)
+	}
+}
+
+func TestImport_MapsTheColumnsOfAnUnfamiliarFile(t *testing.T) {
+	api := signedIn(t, "Ash")
+	type mapped struct {
+		ID           string
+		Source       string
+		NeedsMapping bool
+		NewCount     int
+		Columns      []struct {
+			Name    string
+			Samples []string
+		}
+		Mapping []struct{ Column, Field string }
+	}
+	rec := api.doWithType(http.MethodPost, "/api/v1/imports", "Mon,Combat Power,Note\nPikachu,500,buddy\n", "text/csv")
+	wantStatus(t, rec, http.StatusCreated)
+	p := decode[mapped](t, rec.Body.Bytes())
+	if !p.NeedsMapping || p.Source != "csv" || len(p.Columns) != 3 || p.Columns[0].Samples[0] != "Pikachu" ||
+		len(p.Mapping) != 1 || p.Mapping[0].Column != "Combat Power" || p.Mapping[0].Field != "cp" {
+		t.Fatalf("preview = %+v; columns with samples and a suggestion", p)
+	}
+	rec = api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", "")
+	wantStatus(t, rec, http.StatusConflict)
+	if code := errorCode(t, rec); code != "IMPORT_NEEDS_MAPPING" {
+		t.Fatalf("code = %q", code)
+	}
+
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/imports/"+p.ID+"/mapping", `{"mapping":[{"column":"Combat Power","field":"cp"}]}`), http.StatusUnprocessableEntity)
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/imports/"+p.ID+"/mapping", `{"mapping":[{"column":"Mon","field":"species"},{"column":"Mon","field":"form"}]}`), http.StatusUnprocessableEntity)
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/imports/nope/mapping", `{"mapping":[]}`), http.StatusNotFound)
+	rec = api.do(http.MethodPut, "/api/v1/imports/"+p.ID+"/mapping", `{"mapping":[{"column":"Mon","field":"species"},{"column":"Combat Power","field":"cp"}]}`)
+	wantStatus(t, rec, http.StatusOK)
+	if got := decode[mapped](t, rec.Body.Bytes()); got.NeedsMapping || got.NewCount != 1 || len(got.Mapping) != 2 {
+		t.Fatalf("mapped preview = %+v", got)
+	}
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/imports/"+p.ID+"/mapping", `{"mapping":[{"column":"Mon","field":"species"}]}`), http.StatusConflict)
+
+	next := decode[mapped](t, api.doWithType(http.MethodPost, "/api/v1/imports", "Mon,Combat Power,Note\nRaichu,900,\n", "text/csv").Body.Bytes())
+	if next.NeedsMapping || next.NewCount != 1 {
+		t.Fatalf("next preview = %+v; the saved mapping applies", next)
 	}
 }

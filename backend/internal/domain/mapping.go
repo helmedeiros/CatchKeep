@@ -15,6 +15,9 @@ var (
 	ErrImportNeedsMapping = errors.New("import needs a column mapping first")
 )
 
+// MappedSource names files read with a column mapping.
+const MappedSource = "csv"
+
 // Table is an export as read, column names and data rows, kept while the
 // trainer maps its columns (spec V1-IMP-02). Record i is on line i+2.
 type Table struct {
@@ -95,6 +98,21 @@ func (m ColumnMapping) Validate(t Table) error {
 		return fmt.Errorf("%w: choose the column with the species", ErrInvalidMapping)
 	}
 	return nil
+}
+
+// Rebind keys a saved mapping by this table's own column names, matching
+// them regardless of case and spacing; columns the table lacks are dropped.
+func (m ColumnMapping) Rebind(t Table) ColumnMapping {
+	out := ColumnMapping{}
+	for col, f := range m {
+		for _, h := range t.Header {
+			if strings.EqualFold(strings.TrimSpace(h), strings.TrimSpace(col)) {
+				out[strings.TrimSpace(h)] = f
+				break
+			}
+		}
+	}
+	return out
 }
 
 // columnAliases are normalized column names that suggest a field.

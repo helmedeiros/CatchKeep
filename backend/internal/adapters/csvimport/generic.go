@@ -12,8 +12,6 @@ import (
 	"github.com/helmedeiros/catchkeep/backend/internal/domain"
 )
 
-const genericSource = "csv"
-
 // variantFields stay unknown unless a column is mapped to them.
 var variantFields = []domain.Field{
 	domain.FieldShiny, domain.FieldCostume, domain.FieldBackground, domain.FieldDynamax, domain.FieldGigantamax,
@@ -23,13 +21,14 @@ var variantFields = []domain.Field{
 // column mapping (spec V1-IMP-02).
 type Generic struct{}
 
-// ReadTable reads the header and every line as text.
+// ReadTable reads the header and every line as text. A file needs at
+// least two columns and one line under the header to be a table.
 func (Generic) ReadTable(r io.Reader) (domain.Table, error) {
 	reader := csv.NewReader(skipBOM(r))
 	reader.FieldsPerRecord = -1
 	reader.LazyQuotes = true
 	records, err := reader.ReadAll()
-	if err != nil || len(records) == 0 || strings.TrimSpace(strings.Join(records[0], "")) == "" {
+	if err != nil || len(records) < 2 || len(records[0]) < 2 || strings.TrimSpace(strings.Join(records[0], "")) == "" {
 		return domain.Table{}, domain.ErrUnrecognizedExport
 	}
 	header := make([]string, len(records[0]))
@@ -44,7 +43,7 @@ func (Generic) ReadTable(r io.Reader) (domain.Table, error) {
 // yes/no column can establish that a feature is absent: the trainer said
 // what the column holds.
 func (Generic) ParseTable(t domain.Table, m domain.ColumnMapping, observedAt time.Time) domain.ParsedExport {
-	out := domain.ParsedExport{Source: genericSource}
+	out := domain.ParsedExport{Source: domain.MappedSource}
 	type column struct {
 		index int
 		name  string
@@ -102,13 +101,13 @@ func (Generic) ParseTable(t domain.Table, m domain.ColumnMapping, observedAt tim
 			hasForm = hasForm || c.field == domain.FieldForm
 			row.Observations = append(row.Observations, domain.Observation{
 				Field: c.field, Value: value, Source: domain.SourceCSV,
-				SourceRef: fmt.Sprintf("%s line %d", genericSource, line), ObservedAt: observedAt,
+				SourceRef: fmt.Sprintf("%s line %d", domain.MappedSource, line), ObservedAt: observedAt,
 			})
 		}
 		if !hasForm {
 			row.Observations = append(row.Observations, domain.Observation{
 				Field: domain.FieldForm, Value: "Normal", Source: domain.SourceCSV,
-				SourceRef: fmt.Sprintf("%s line %d", genericSource, line), ObservedAt: observedAt,
+				SourceRef: fmt.Sprintf("%s line %d", domain.MappedSource, line), ObservedAt: observedAt,
 			})
 		}
 		out.Rows = append(out.Rows, row)

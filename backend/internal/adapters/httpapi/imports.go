@@ -93,6 +93,8 @@ func (s *server) CommitImport(ctx context.Context, req CommitImportRequestObject
 		return CommitImport404JSONResponse(errorBody(codeNotFound, err.Error())), nil
 	case errors.Is(err, domain.ErrImportAlreadyCommitted):
 		return CommitImport409JSONResponse(errorBody(codeConflict, err.Error())), nil
+	case errors.Is(err, domain.ErrImportNeedsMapping):
+		return CommitImport409JSONResponse(errorBody(codeNeedsMapping, "Map the file's columns first.")), nil
 	case err != nil:
 		return nil, err
 	}
@@ -122,12 +124,43 @@ func (s *server) AnswerPossibleMatches(ctx context.Context, req AnswerPossibleMa
 		return AnswerPossibleMatches404JSONResponse(errorBody(codeNotFound, err.Error())), nil
 	case errors.Is(err, domain.ErrImportAlreadyCommitted):
 		return AnswerPossibleMatches409JSONResponse(errorBody(codeConflict, err.Error())), nil
+	case errors.Is(err, domain.ErrImportNeedsMapping):
+		return AnswerPossibleMatches409JSONResponse(errorBody(codeNeedsMapping, "Map the file's columns first.")), nil
 	case errors.Is(err, domain.ErrInvalidResolution):
 		return AnswerPossibleMatches422JSONResponse(errorBody(codeValidationFailed, err.Error())), nil
 	case err != nil:
 		return nil, err
 	}
 	return AnswerPossibleMatches200JSONResponse(toPreview(p)), nil
+}
+
+func (s *server) MapImportColumns(ctx context.Context, req MapImportColumnsRequestObject) (MapImportColumnsResponseObject, error) {
+	trainer, err := s.trainer(ctx)
+	if errors.Is(err, errNotSignedIn) {
+		return MapImportColumns401JSONResponse{unauthenticated()}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	mapping := domain.ColumnMapping{}
+	for _, e := range req.Body.Mapping {
+		if _, dup := mapping[e.Column]; dup {
+			return MapImportColumns422JSONResponse(errorBody(codeValidationFailed, fmt.Sprintf("Column %q is mapped twice.", e.Column))), nil
+		}
+		mapping[e.Column] = domain.Field(e.Field)
+	}
+	p, err := s.services.Imports.Map(ctx, trainer, req.ImportId, mapping)
+	switch {
+	case errors.Is(err, domain.ErrImportNotFound):
+		return MapImportColumns404JSONResponse(errorBody(codeNotFound, err.Error())), nil
+	case errors.Is(err, domain.ErrImportAlreadyCommitted):
+		return MapImportColumns409JSONResponse(errorBody(codeConflict, err.Error())), nil
+	case errors.Is(err, domain.ErrInvalidMapping):
+		return MapImportColumns422JSONResponse(errorBody(codeValidationFailed, err.Error())), nil
+	case err != nil:
+		return nil, err
+	}
+	return MapImportColumns200JSONResponse(toPreview(p)), nil
 }
 
 func deref(s *string) string {
@@ -206,6 +239,19 @@ func toPreview(p app.ImportPreview) ImportPreview {
 		PossibleMatches: make([]PossibleMatch, 0, len(p.Matches)),
 		InvalidRows:     make([]InvalidRow, 0, len(p.Problems)), IgnoredColumns: p.IgnoredColumns,
 		UnknownFields: make([]string, 0, len(p.UnknownFields)),
+		NeedsMapping:  p.NeedsMapping,
+		Columns:       make([]ImportColumn, 0, len(p.Columns)),
+		Mapping:       make([]ColumnMapEntry, 0, len(p.Mapping)),
+	}
+	for _, c := range p.Columns {
+		samples := c.Samples
+		if samples == nil {
+			samples = []string{}
+		}
+		out.Columns = append(out.Columns, ImportColumn{Name: c.Name, Samples: samples})
+		if f, ok := p.Mapping[c.Name]; ok {
+			out.Mapping = append(out.Mapping, ColumnMapEntry{Column: c.Name, Field: MappableField(f)})
+		}
 	}
 	for _, m := range p.Matches {
 		out.PossibleMatches = append(out.PossibleMatches, toPossibleMatch(m))

@@ -136,7 +136,7 @@ func newRootHandler(cfg serveConfig, store *sqlite.Store) http.Handler {
 		Health:     app.NewHealth(buildinfo.Version()),
 		Profiles:   app.NewProfiles(trainers, hasher, ulids, clock),
 		Sessions:   app.NewSessions(trainers, sqlite.NewSessions(store), hasher, ids.Tokens{}, clock),
-		Imports:    app.NewImports(csvimport.NewPokeGenie(time.Local), collection, collection, ulids, clock),
+		Imports:    app.NewImports(csvimport.NewPokeGenie(time.Local), csvimport.Generic{}, collection, collection, ulids, clock),
 		Collection: app.NewCollection(collection, collection, clock),
 		Keep:       app.NewKeep(sqlite.NewSetups(store), collection, refdata.NewSpecies(), teams),
 		Teams:      app.NewTeams(teams, ulids),

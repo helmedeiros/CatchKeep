@@ -38,11 +38,20 @@ func (c *Collection) Save(ctx context.Context, b domain.ImportBatch) error {
 	if err != nil {
 		return err
 	}
+	table, err := nullableJSON(b.Table, b.Table != nil)
+	if err != nil {
+		return fmt.Errorf("encode import table: %w", err)
+	}
+	mapping, err := nullableJSON(b.Mapping, b.Mapping != nil)
+	if err != nil {
+		return fmt.Errorf("encode column mapping: %w", err)
+	}
 	_, err = c.db.ExecContext(ctx, `
-		INSERT INTO import_batches (id, trainer_id, status, parsed, resolutions, new_count, updated_count, possible_match_count, created_at, committed_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO import_batches (id, trainer_id, status, parsed, resolutions, new_count, updated_count, possible_match_count, created_at, committed_at,
+			source_table, column_mapping)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		b.ID, string(b.TrainerID), string(b.Status), string(parsed), resolutions, b.NewCount, b.UpdatedCount, b.PossibleMatchCount,
-		formatTime(b.CreatedAt), nullableTime(b.CommittedAt))
+		formatTime(b.CreatedAt), nullableTime(b.CommittedAt), table, mapping)
 	if err != nil {
 		return fmt.Errorf("insert import: %w", err)
 	}
@@ -57,11 +66,14 @@ func (c *Collection) Get(ctx context.Context, trainer domain.TrainerID, id strin
 		parsed, createdAt string
 		resolutions       string
 		committedAt       sql.NullString
+		table, mapping    sql.NullString
 	)
 	err := c.db.QueryRowContext(ctx, `
-		SELECT id, trainer_id, status, parsed, resolutions, new_count, updated_count, possible_match_count, created_at, committed_at
+		SELECT id, trainer_id, status, parsed, resolutions, new_count, updated_count, possible_match_count, created_at, committed_at,
+			source_table, column_mapping
 		FROM import_batches WHERE id = ? AND trainer_id = ?`, id, string(trainer)).
-		Scan(&b.ID, &trainerID, &status, &parsed, &resolutions, &b.NewCount, &b.UpdatedCount, &b.PossibleMatchCount, &createdAt, &committedAt)
+		Scan(&b.ID, &trainerID, &status, &parsed, &resolutions, &b.NewCount, &b.UpdatedCount, &b.PossibleMatchCount, &createdAt, &committedAt,
+			&table, &mapping)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.ImportBatch{}, domain.ErrImportNotFound
 	}
@@ -74,6 +86,16 @@ func (c *Collection) Get(ctx context.Context, trainer domain.TrainerID, id strin
 	}
 	if err := json.Unmarshal([]byte(resolutions), &b.Resolutions); err != nil {
 		return domain.ImportBatch{}, fmt.Errorf("decode import answers: %w", err)
+	}
+	if table.Valid {
+		if err := json.Unmarshal([]byte(table.String), &b.Table); err != nil {
+			return domain.ImportBatch{}, fmt.Errorf("decode import table: %w", err)
+		}
+	}
+	if mapping.Valid {
+		if err := json.Unmarshal([]byte(mapping.String), &b.Mapping); err != nil {
+			return domain.ImportBatch{}, fmt.Errorf("decode column mapping: %w", err)
+		}
 	}
 	if b.CreatedAt, err = parseTime(createdAt); err != nil {
 		return domain.ImportBatch{}, err
@@ -97,6 +119,72 @@ func (c *Collection) SaveResolutions(ctx context.Context, b domain.ImportBatch) 
 		return fmt.Errorf("update import answers: %w", err)
 	}
 	return nil
+}
+
+// SaveMapping implements ports.ImportBatches in a single transaction.
+func (c *Collection) SaveMapping(ctx context.Context, b domain.ImportBatch) error {
+	if b.Table == nil {
+		return errors.New("save mapping: the import has no table")
+	}
+	parsed, err := json.Marshal(b.Parsed)
+	if err != nil {
+		return fmt.Errorf("encode import: %w", err)
+	}
+	resolutions, err := encodeResolutions(b)
+	if err != nil {
+		return err
+	}
+	mapping, err := json.Marshal(b.Mapping)
+	if err != nil {
+		return fmt.Errorf("encode column mapping: %w", err)
+	}
+	tx, err := c.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE import_batches SET parsed = ?, resolutions = ?, column_mapping = ?, new_count = ?, updated_count = ?, possible_match_count = ?
+		WHERE id = ? AND trainer_id = ?`,
+		string(parsed), resolutions, string(mapping), b.NewCount, b.UpdatedCount, b.PossibleMatchCount, b.ID, string(b.TrainerID)); err != nil {
+		return fmt.Errorf("update import mapping: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO column_mappings (trainer_id, signature, mapping) VALUES (?, ?, ?)
+		ON CONFLICT (trainer_id, signature) DO UPDATE SET mapping = excluded.mapping`,
+		string(b.TrainerID), b.Table.Signature(), string(mapping)); err != nil {
+		return fmt.Errorf("remember mapping: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+	return nil
+}
+
+// SavedMapping implements ports.ImportBatches.
+func (c *Collection) SavedMapping(ctx context.Context, trainer domain.TrainerID, signature string) (domain.ColumnMapping, error) {
+	var raw string
+	err := c.db.QueryRowContext(ctx, `SELECT mapping FROM column_mappings WHERE trainer_id = ? AND signature = ?`,
+		string(trainer), signature).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get saved mapping: %w", err)
+	}
+	var m domain.ColumnMapping
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		return nil, fmt.Errorf("decode saved mapping: %w", err)
+	}
+	return m, nil
+}
+
+func nullableJSON(v any, present bool) (sql.NullString, error) {
+	if !present {
+		return sql.NullString{}, nil
+	}
+	out, err := json.Marshal(v)
+	return sql.NullString{String: string(out), Valid: err == nil}, err
 }
 
 func encodeResolutions(b domain.ImportBatch) (string, error) {

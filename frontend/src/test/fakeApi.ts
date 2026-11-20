@@ -460,6 +460,9 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
         "dynamax",
         "gigantamax",
       ],
+      needsMapping: false,
+      columns: [],
+      mapping: [],
     };
   }
 

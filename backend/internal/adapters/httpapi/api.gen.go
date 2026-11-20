@@ -19,25 +19,25 @@ import (
 
 // Defines values for ConfirmableFeature.
 const (
-	Background ConfirmableFeature = "background"
-	Costume    ConfirmableFeature = "costume"
-	Dynamax    ConfirmableFeature = "dynamax"
-	Gigantamax ConfirmableFeature = "gigantamax"
-	Shiny      ConfirmableFeature = "shiny"
+	ConfirmableFeatureBackground ConfirmableFeature = "background"
+	ConfirmableFeatureCostume    ConfirmableFeature = "costume"
+	ConfirmableFeatureDynamax    ConfirmableFeature = "dynamax"
+	ConfirmableFeatureGigantamax ConfirmableFeature = "gigantamax"
+	ConfirmableFeatureShiny      ConfirmableFeature = "shiny"
 )
 
 // Valid indicates whether the value is a known member of the ConfirmableFeature enum.
 func (e ConfirmableFeature) Valid() bool {
 	switch e {
-	case Background:
+	case ConfirmableFeatureBackground:
 		return true
-	case Costume:
+	case ConfirmableFeatureCostume:
 		return true
-	case Dynamax:
+	case ConfirmableFeatureDynamax:
 		return true
-	case Gigantamax:
+	case ConfirmableFeatureGigantamax:
 		return true
-	case Shiny:
+	case ConfirmableFeatureShiny:
 		return true
 	default:
 		return false
@@ -61,12 +61,15 @@ func (e HealthStatus) Valid() bool {
 
 // Defines values for ImportPreviewSource.
 const (
+	Csv       ImportPreviewSource = "csv"
 	PokeGenie ImportPreviewSource = "poke-genie"
 )
 
 // Valid indicates whether the value is a known member of the ImportPreviewSource enum.
 func (e ImportPreviewSource) Valid() bool {
 	switch e {
+	case Csv:
+		return true
 	case PokeGenie:
 		return true
 	default:
@@ -86,6 +89,78 @@ func (e ImportPreviewStatus) Valid() bool {
 	case Committed:
 		return true
 	case Staged:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MappableField.
+const (
+	MappableFieldBackground     MappableField = "background"
+	MappableFieldCatchDate      MappableField = "catch_date"
+	MappableFieldCostume        MappableField = "costume"
+	MappableFieldCp             MappableField = "cp"
+	MappableFieldDexNumber      MappableField = "dex_number"
+	MappableFieldDynamax        MappableField = "dynamax"
+	MappableFieldForm           MappableField = "form"
+	MappableFieldGender         MappableField = "gender"
+	MappableFieldGigantamax     MappableField = "gigantamax"
+	MappableFieldHp             MappableField = "hp"
+	MappableFieldInGameFavorite MappableField = "in_game_favorite"
+	MappableFieldIvAttack       MappableField = "iv_attack"
+	MappableFieldIvDefense      MappableField = "iv_defense"
+	MappableFieldIvStamina      MappableField = "iv_stamina"
+	MappableFieldLevel          MappableField = "level"
+	MappableFieldLucky          MappableField = "lucky"
+	MappableFieldPurified       MappableField = "purified"
+	MappableFieldShadow         MappableField = "shadow"
+	MappableFieldShiny          MappableField = "shiny"
+	MappableFieldSpecies        MappableField = "species"
+)
+
+// Valid indicates whether the value is a known member of the MappableField enum.
+func (e MappableField) Valid() bool {
+	switch e {
+	case MappableFieldBackground:
+		return true
+	case MappableFieldCatchDate:
+		return true
+	case MappableFieldCostume:
+		return true
+	case MappableFieldCp:
+		return true
+	case MappableFieldDexNumber:
+		return true
+	case MappableFieldDynamax:
+		return true
+	case MappableFieldForm:
+		return true
+	case MappableFieldGender:
+		return true
+	case MappableFieldGigantamax:
+		return true
+	case MappableFieldHp:
+		return true
+	case MappableFieldInGameFavorite:
+		return true
+	case MappableFieldIvAttack:
+		return true
+	case MappableFieldIvDefense:
+		return true
+	case MappableFieldIvStamina:
+		return true
+	case MappableFieldLevel:
+		return true
+	case MappableFieldLucky:
+		return true
+	case MappableFieldPurified:
+		return true
+	case MappableFieldShadow:
+		return true
+	case MappableFieldShiny:
+		return true
+	case MappableFieldSpecies:
 		return true
 	default:
 		return false
@@ -232,25 +307,25 @@ func (e TriState) Valid() bool {
 
 // Defines values for VariantGroupRule.
 const (
-	Category VariantGroupRule = "category"
-	Default  VariantGroupRule = "default"
-	Favorite VariantGroupRule = "favorite"
-	Rare     VariantGroupRule = "rare"
-	Species  VariantGroupRule = "species"
+	VariantGroupRuleCategory VariantGroupRule = "category"
+	VariantGroupRuleDefault  VariantGroupRule = "default"
+	VariantGroupRuleFavorite VariantGroupRule = "favorite"
+	VariantGroupRuleRare     VariantGroupRule = "rare"
+	VariantGroupRuleSpecies  VariantGroupRule = "species"
 )
 
 // Valid indicates whether the value is a known member of the VariantGroupRule enum.
 func (e VariantGroupRule) Valid() bool {
 	switch e {
-	case Category:
+	case VariantGroupRuleCategory:
 		return true
-	case Default:
+	case VariantGroupRuleDefault:
 		return true
-	case Favorite:
+	case VariantGroupRuleFavorite:
 		return true
-	case Rare:
+	case VariantGroupRuleRare:
 		return true
-	case Species:
+	case VariantGroupRuleSpecies:
 		return true
 	default:
 		return false
@@ -337,6 +412,17 @@ type Collection struct {
 	Total   int       `json:"total"`
 }
 
+// ColumnMapEntry defines model for ColumnMapEntry.
+type ColumnMapEntry struct {
+	Column string        `json:"column"`
+	Field  MappableField `json:"field"`
+}
+
+// ColumnMappingInput defines model for ColumnMappingInput.
+type ColumnMappingInput struct {
+	Mapping []ColumnMapEntry `json:"mapping"`
+}
+
 // ConfirmableFeature defines model for ConfirmableFeature.
 type ConfirmableFeature string
 
@@ -389,13 +475,27 @@ type IVs struct {
 	Stamina int `json:"stamina"`
 }
 
+// ImportColumn defines model for ImportColumn.
+type ImportColumn struct {
+	Name    string   `json:"name"`
+	Samples []string `json:"samples"`
+}
+
 // ImportPreview defines model for ImportPreview.
 type ImportPreview struct {
-	Id string `json:"id"`
+	// Columns The columns of an unrecognized file with a few values each; empty for a recognized export.
+	Columns []ImportColumn `json:"columns"`
+	Id      string         `json:"id"`
 
 	// IgnoredColumns Columns this importer does not use.
 	IgnoredColumns []string     `json:"ignoredColumns"`
 	InvalidRows    []InvalidRow `json:"invalidRows"`
+
+	// Mapping How an unrecognized file's columns are mapped, or a suggestion from their names while it still needs mapping.
+	Mapping []ColumnMapEntry `json:"mapping"`
+
+	// NeedsMapping The file is not a recognized export and its columns are not mapped yet; nothing is read and it cannot be committed until they are.
+	NeedsMapping bool `json:"needsMapping"`
 
 	// NewCount Rows that will be added (or were added, once committed).
 	NewCount int `json:"newCount"`
@@ -404,10 +504,12 @@ type ImportPreview struct {
 	PossibleMatchCount int `json:"possibleMatchCount"`
 
 	// PossibleMatches Rows that might be Pokémon already collected, with their answers. Empty once committed.
-	PossibleMatches []PossibleMatch     `json:"possibleMatches"`
-	Source          ImportPreviewSource `json:"source"`
-	Status          ImportPreviewStatus `json:"status"`
-	TotalRows       int                 `json:"totalRows"`
+	PossibleMatches []PossibleMatch `json:"possibleMatches"`
+
+	// Source poke-genie for a recognized export; csv for any other file, read with a column mapping.
+	Source    ImportPreviewSource `json:"source"`
+	Status    ImportPreviewStatus `json:"status"`
+	TotalRows int                 `json:"totalRows"`
 
 	// UnknownFields Features this export cannot establish; they stay unknown.
 	UnknownFields []string `json:"unknownFields"`
@@ -416,7 +518,7 @@ type ImportPreview struct {
 	UpdatedCount int `json:"updatedCount"`
 }
 
-// ImportPreviewSource defines model for ImportPreview.Source.
+// ImportPreviewSource poke-genie for a recognized export; csv for any other file, read with a column mapping.
 type ImportPreviewSource string
 
 // ImportPreviewStatus defines model for ImportPreview.Status.
@@ -452,6 +554,9 @@ type KeepSummary struct {
 	Surplus int `json:"surplus"`
 	Total   int `json:"total"`
 }
+
+// MappableField defines model for MappableField.
+type MappableField string
 
 // MatchAnswer defines model for MatchAnswer.
 type MatchAnswer struct {
@@ -708,6 +813,9 @@ type SetProtectionJSONRequestBody = Protection
 // AnswerPossibleMatchesJSONRequestBody defines body for AnswerPossibleMatches for application/json ContentType.
 type AnswerPossibleMatchesJSONRequestBody = MatchAnswers
 
+// MapImportColumnsJSONRequestBody defines body for MapImportColumns for application/json ContentType.
+type MapImportColumnsJSONRequestBody = ColumnMappingInput
+
 // CreateProfileJSONRequestBody defines body for CreateProfile for application/json ContentType.
 type CreateProfileJSONRequestBody = NewProfile
 
@@ -761,6 +869,9 @@ type ServerInterface interface {
 	// CommitImport Add the staged Pokémon to the collection.
 	// (POST /imports/{importId}/commit)
 	CommitImport(w http.ResponseWriter, r *http.Request, importId ImportId)
+	// MapImportColumns Say which field each column of an unrecognized file holds.
+	// (PUT /imports/{importId}/mapping)
+	MapImportColumns(w http.ResponseWriter, r *http.Request, importId ImportId)
 	// GetKeepSummary What the keep rules do with the collection.
 	// (GET /keep-summary)
 	GetKeepSummary(w http.ResponseWriter, r *http.Request)
@@ -1007,6 +1118,32 @@ func (siw *ServerInterfaceWrapper) CommitImport(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CommitImport(w, r, importId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MapImportColumns operation middleware
+func (siw *ServerInterfaceWrapper) MapImportColumns(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "importId" -------------
+	var importId ImportId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "importId", r.PathValue("importId"), &importId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "importId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MapImportColumns(w, r, importId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1365,6 +1502,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports", wrapper.StageImport)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/imports/{importId}", wrapper.GetImport)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{importId}/commit", wrapper.CommitImport)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/imports/{importId}/mapping", wrapper.MapImportColumns)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports/{importId}/answers", wrapper.AnswerPossibleMatches)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/collection", wrapper.ListCollection)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/collection/{pokemonId}/protection", wrapper.SetProtection)
@@ -2125,6 +2263,102 @@ type CommitImportdefaultJSONResponse struct {
 }
 
 func (response CommitImportdefaultJSONResponse) VisitCommitImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MapImportColumnsRequestObject struct {
+	ImportId ImportId `json:"importId"`
+	Body     *MapImportColumnsJSONRequestBody
+}
+
+type MapImportColumnsResponseObject interface {
+	VisitMapImportColumnsResponse(w http.ResponseWriter) error
+}
+
+type MapImportColumns200JSONResponse ImportPreview
+
+func (response MapImportColumns200JSONResponse) VisitMapImportColumnsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MapImportColumns401JSONResponse struct{ ErrorJSONResponse }
+
+func (response MapImportColumns401JSONResponse) VisitMapImportColumnsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MapImportColumns404JSONResponse Error
+
+func (response MapImportColumns404JSONResponse) VisitMapImportColumnsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MapImportColumns409JSONResponse Error
+
+func (response MapImportColumns409JSONResponse) VisitMapImportColumnsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MapImportColumns422JSONResponse Error
+
+func (response MapImportColumns422JSONResponse) VisitMapImportColumnsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MapImportColumnsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response MapImportColumnsdefaultJSONResponse) VisitMapImportColumnsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -3109,6 +3343,9 @@ type StrictServerInterface interface {
 	// CommitImport Add the staged Pokémon to the collection.
 	// (POST /imports/{importId}/commit)
 	CommitImport(ctx context.Context, request CommitImportRequestObject) (CommitImportResponseObject, error)
+	// MapImportColumns Say which field each column of an unrecognized file holds.
+	// (PUT /imports/{importId}/mapping)
+	MapImportColumns(ctx context.Context, request MapImportColumnsRequestObject) (MapImportColumnsResponseObject, error)
 	// GetKeepSummary What the keep rules do with the collection.
 	// (GET /keep-summary)
 	GetKeepSummary(ctx context.Context, request GetKeepSummaryRequestObject) (GetKeepSummaryResponseObject, error)
@@ -3487,6 +3724,39 @@ func (sh *strictHandler) CommitImport(w http.ResponseWriter, r *http.Request, im
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CommitImportResponseObject); ok {
 		if err := validResponse.VisitCommitImportResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MapImportColumns operation middleware
+func (sh *strictHandler) MapImportColumns(w http.ResponseWriter, r *http.Request, importId ImportId) {
+	var request MapImportColumnsRequestObject
+
+	request.ImportId = importId
+
+	var body MapImportColumnsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MapImportColumns(ctx, request.(MapImportColumnsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MapImportColumns")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MapImportColumnsResponseObject); ok {
+		if err := validResponse.VisitMapImportColumnsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
