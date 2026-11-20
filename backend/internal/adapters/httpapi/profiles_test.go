@@ -12,6 +12,7 @@ import (
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/httpapi"
 	"github.com/helmedeiros/catchkeep/backend/internal/app"
 	"github.com/helmedeiros/catchkeep/backend/internal/app/apptest"
+	"github.com/helmedeiros/catchkeep/backend/internal/domain"
 )
 
 type apiClient struct {
@@ -33,7 +34,7 @@ func newAPI(t *testing.T) *apiClient {
 		Sessions:   app.NewSessions(trainers, apptest.NewSessionStore(), hasher, apptest.NewSequentialTokens(), clock),
 		Imports:    app.NewImports(csvimport.NewPokeGenie(time.UTC), collection, collection, ulidLike{}, clock),
 		Collection: app.NewCollection(collection, collection, clock),
-		Keep:       app.NewKeep(apptest.NewSetups(), collection, apptest.RareSpecies{"Mewtwo"}, teams),
+		Keep:       app.NewKeep(apptest.NewSetups(), collection, apptest.SpeciesCategories{"Mewtwo": domain.CategoryLegendary}, teams),
 		Teams:      app.NewTeams(teams, ulidLike{}),
 	})}
 }

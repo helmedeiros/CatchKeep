@@ -111,8 +111,20 @@ func OrdinaryMinimum(capacity int) int { return bandFor(capacity).Ordinary }
 // (legendary, mythical, Ultra Beast) are kept by default.
 func RareMinimum(capacity int) int { return bandFor(capacity).Rare }
 
-// Rarity reports whether a species is rare. A nil Rarity treats none as rare.
-type Rarity func(species string) bool
+// Category is a set of species a trainer can give one keep rule. Species
+// in any category are rare.
+type Category string
+
+// Categories.
+const (
+	CategoryLegendary  Category = "legendary"
+	CategoryMythical   Category = "mythical"
+	CategoryUltraBeast Category = "ultra-beast"
+)
+
+// Categorize names a species' category, or "" if it is in none. A nil
+// Categorize puts no species in any.
+type Categorize func(species string) Category
 
 // variantFields complete a variant key with species and form (spec §5.3).
 var variantFields = []Field{FieldShiny, FieldCostume, FieldBackground, FieldDynamax, FieldGigantamax}
@@ -142,8 +154,9 @@ const (
 // rules keep.
 type VariantGroup struct {
 	Variant
-	// Rare is set for legendary, mythical and Ultra Beast species.
-	Rare bool
+	// Category is the species' category; Rare is set when it has one.
+	Category Category
+	Rare     bool
 	// Default is the generated minimum (spec V1-RUL-09), including the
 	// trading bonus when TradeBonus is set; Rule says what replaced it.
 	Default              int
@@ -177,7 +190,7 @@ type KeepSummary struct {
 // a favorite. Pokémon with an unknown variant feature could belong to an
 // under-filled variant, so they are kept and counted as needing
 // confirmation (spec §7.3).
-func SummarizeKeeps(pokemon []Pokemon, setup Setup, rare Rarity) KeepSummary {
+func SummarizeKeeps(pokemon []Pokemon, setup Setup, categorize Categorize) KeepSummary {
 	band := bandFor(setup.Capacity)
 	out := KeepSummary{Total: len(pokemon), Minimum: band.Ordinary, RareMinimum: band.Rare}
 	groups := map[Variant][]member{}
@@ -198,7 +211,11 @@ func SummarizeKeeps(pokemon []Pokemon, setup Setup, rare Rarity) KeepSummary {
 	bySpecies := map[string][]*VariantGroup{}
 	for _, v := range order {
 		slices.SortStableFunc(groups[v], member.compare)
-		g := &VariantGroup{Variant: v, Rare: rare != nil && rare(v.Species), Rule: RuleDefault, Count: len(groups[v]), Minimum: out.Minimum}
+		g := &VariantGroup{Variant: v, Rule: RuleDefault, Count: len(groups[v]), Minimum: out.Minimum}
+		if categorize != nil {
+			g.Category = categorize(v.Species)
+		}
+		g.Rare = g.Category != ""
 		if g.Rare {
 			g.Rule, g.Minimum = RuleRare, out.RareMinimum
 		}

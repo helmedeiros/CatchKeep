@@ -1,12 +1,13 @@
-# Rare species: legendary, mythical and Ultra Beast, by English name as
-# Poke Genie exports them. One per line; blank lines and # comments ignored.
+# Rare species by category, by English name as Poke Genie exports them.
+# A [category] line starts a section; one species per line; blank lines
+# and # comments are ignored.
 
+[legendary]
 # Kanto
 Articuno
 Zapdos
 Moltres
 Mewtwo
-Mew
 
 # Johto
 Raikou
@@ -14,7 +15,6 @@ Entei
 Suicune
 Lugia
 Ho-Oh
-Celebi
 
 # Hoenn
 Regirock
@@ -25,8 +25,6 @@ Latios
 Kyogre
 Groudon
 Rayquaza
-Jirachi
-Deoxys
 
 # Sinnoh
 Uxie
@@ -38,14 +36,8 @@ Heatran
 Regigigas
 Giratina
 Cresselia
-Phione
-Manaphy
-Darkrai
-Shaymin
-Arceus
 
 # Unova
-Victini
 Cobalion
 Terrakion
 Virizion
@@ -55,17 +47,11 @@ Reshiram
 Zekrom
 Landorus
 Kyurem
-Keldeo
-Meloetta
-Genesect
 
 # Kalos
 Xerneas
 Yveltal
 Zygarde
-Diancie
-Hoopa
-Volcanion
 
 # Alola
 Type: Null
@@ -78,23 +64,7 @@ Cosmog
 Cosmoem
 Solgaleo
 Lunala
-Nihilego
-Buzzwole
-Pheromosa
-Xurkitree
-Celesteela
-Kartana
-Guzzlord
 Necrozma
-Magearna
-Marshadow
-Poipole
-Naganadel
-Stakataka
-Blacephalon
-Zeraora
-Meltan
-Melmetal
 
 # Galar
 Zacian
@@ -102,7 +72,6 @@ Zamazenta
 Eternatus
 Kubfu
 Urshifu
-Zarude
 Regieleki
 Regidrago
 Glastrier
@@ -122,4 +91,59 @@ Munkidori
 Fezandipiti
 Ogerpon
 Terapagos
+
+[mythical]
+# Kanto
+Mew
+
+# Johto
+Celebi
+
+# Hoenn
+Jirachi
+Deoxys
+
+# Sinnoh
+Phione
+Manaphy
+Darkrai
+Shaymin
+Arceus
+
+# Unova
+Victini
+Keldeo
+Meloetta
+Genesect
+
+# Kalos
+Diancie
+Hoopa
+Volcanion
+
+# Alola
+Magearna
+Marshadow
+Zeraora
+Meltan
+Melmetal
+
+# Galar
+Zarude
+
+# Paldea
 Pecharunt
+
+[ultra-beast]
+# Alola
+Nihilego
+Buzzwole
+Pheromosa
+Xurkitree
+Celesteela
+Kartana
+Guzzlord
+Poipole
+Naganadel
+Stakataka
+Blacephalon
