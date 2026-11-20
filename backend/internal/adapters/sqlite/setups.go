@@ -18,6 +18,13 @@ type speciesRule struct {
 	Favorite bool   `json:"favorite,omitempty"`
 }
 
+// categoryRule is the stored form of a domain.CategoryRule.
+type categoryRule struct {
+	Category domain.Category `json:"category"`
+	Minimum  int             `json:"minimum,omitempty"`
+	Favorite bool            `json:"favorite,omitempty"`
+}
+
 // Setups is the SQLite ports.Setups.
 type Setups struct {
 	db *sql.DB
@@ -33,11 +40,11 @@ func NewSetups(store *Store) *Setups {
 // GetSetup implements ports.Setups.
 func (r *Setups) GetSetup(ctx context.Context, trainer domain.TrainerID) (domain.Setup, error) {
 	var (
-		s              domain.Setup
-		goals, species string
+		s                          domain.Setup
+		goals, species, categories string
 	)
-	err := r.db.QueryRowContext(ctx, `SELECT capacity, goals, species FROM trainer_setups WHERE trainer_id = ?`, string(trainer)).
-		Scan(&s.Capacity, &goals, &species)
+	err := r.db.QueryRowContext(ctx, `SELECT capacity, goals, species, categories FROM trainer_setups WHERE trainer_id = ?`, string(trainer)).
+		Scan(&s.Capacity, &goals, &species, &categories)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Setup{}, domain.ErrSetupNotFound
 	}
@@ -53,6 +60,13 @@ func (r *Setups) GetSetup(ctx context.Context, trainer domain.TrainerID) (domain
 	}
 	for _, sr := range rules {
 		s.Species = append(s.Species, domain.SpeciesRule(sr))
+	}
+	var groups []categoryRule
+	if err := json.Unmarshal([]byte(categories), &groups); err != nil {
+		return domain.Setup{}, fmt.Errorf("decode category rules: %w", err)
+	}
+	for _, cr := range groups {
+		s.Categories = append(s.Categories, domain.CategoryRule(cr))
 	}
 	return s, nil
 }
@@ -71,11 +85,20 @@ func (r *Setups) SaveSetup(ctx context.Context, trainer domain.TrainerID, s doma
 	if err != nil {
 		return fmt.Errorf("encode species rules: %w", err)
 	}
+	groups := make([]categoryRule, 0, len(s.Categories))
+	for _, cr := range s.Categories {
+		groups = append(groups, categoryRule(cr))
+	}
+	categories, err := json.Marshal(groups)
+	if err != nil {
+		return fmt.Errorf("encode category rules: %w", err)
+	}
 	return inTx(ctx, r.db, trainer, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO trainer_setups (trainer_id, capacity, goals, species) VALUES (?, ?, ?, ?)
-			ON CONFLICT (trainer_id) DO UPDATE SET capacity = excluded.capacity, goals = excluded.goals, species = excluded.species`,
-			string(trainer), s.Capacity, string(goals), string(species)); err != nil {
+			INSERT INTO trainer_setups (trainer_id, capacity, goals, species, categories) VALUES (?, ?, ?, ?, ?)
+			ON CONFLICT (trainer_id) DO UPDATE SET capacity = excluded.capacity, goals = excluded.goals,
+				species = excluded.species, categories = excluded.categories`,
+			string(trainer), s.Capacity, string(goals), string(species), string(categories)); err != nil {
 			return fmt.Errorf("save setup: %w", err)
 		}
 		return nil

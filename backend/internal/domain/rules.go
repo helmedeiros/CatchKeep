@@ -28,11 +28,12 @@ const (
 const maxCapacity = 20000
 
 // Setup is storage capacity and goals in priority order (step 1), plus
-// optional per-species rules (spec V1-SET-02, V1-SET-03).
+// optional per-species and per-category rules (spec V1-SET-02, V1-SET-03).
 type Setup struct {
-	Capacity int
-	Goals    []Goal
-	Species  []SpeciesRule
+	Capacity   int
+	Goals      []Goal
+	Species    []SpeciesRule
+	Categories []CategoryRule
 }
 
 // SpeciesRule overrides the generated minimums of one species. Minimum
@@ -43,7 +44,16 @@ type SpeciesRule struct {
 	Favorite bool
 }
 
-// Validate checks capacity and that goals are known and not repeated.
+// CategoryRule sets a rule for every species in a category, as if each had
+// that species rule; a species' own rule replaces it (OD-02, decided).
+type CategoryRule struct {
+	Category Category
+	Minimum  int
+	Favorite bool
+}
+
+// Validate checks capacity, that goals are known and not repeated, and that
+// rules are complete and not repeated.
 func (s Setup) Validate() error {
 	if s.Capacity < 1 || s.Capacity > maxCapacity {
 		return fmt.Errorf("%w: storage must be between 1 and %d", ErrInvalidSetup, maxCapacity)
@@ -74,6 +84,20 @@ func (s Setup) Validate() error {
 			return fmt.Errorf("%w: %s has two rules", ErrInvalidSetup, r.Species)
 		}
 		species[r.Species] = true
+	}
+	categories := map[Category]bool{}
+	for _, r := range s.Categories {
+		switch {
+		case !slices.Contains(knownCategories, r.Category):
+			return fmt.Errorf("%w: unknown category %q", ErrInvalidSetup, r.Category)
+		case r.Minimum < 0 || r.Minimum > maxCapacity:
+			return fmt.Errorf("%w: minimum for %s must be between 0 and %d", ErrInvalidSetup, r.Category, maxCapacity)
+		case r.Minimum == 0 && !r.Favorite:
+			return fmt.Errorf("%w: set a minimum or mark %s as a favorite", ErrInvalidSetup, r.Category)
+		case categories[r.Category]:
+			return fmt.Errorf("%w: %s has two rules", ErrInvalidSetup, r.Category)
+		}
+		categories[r.Category] = true
 	}
 	return nil
 }
@@ -122,6 +146,8 @@ const (
 	CategoryUltraBeast Category = "ultra-beast"
 )
 
+var knownCategories = []Category{CategoryLegendary, CategoryMythical, CategoryUltraBeast}
+
 // Categorize names a species' category, or "" if it is in none. A nil
 // Categorize puts no species in any.
 type Categorize func(species string) Category
@@ -146,6 +172,7 @@ type Rule string
 const (
 	RuleDefault  Rule = "default"
 	RuleRare     Rule = "rare"
+	RuleCategory Rule = "category"
 	RuleSpecies  Rule = "species"
 	RuleFavorite Rule = "favorite"
 )
@@ -187,7 +214,9 @@ type KeepSummary struct {
 // rare, shiny, costume or background variants when trading is a goal. A
 // species rule replaces those defaults for its species: one copy of each
 // variant, then the best copies overall up to its minimum, or every copy of
-// a favorite. Pokémon with an unknown variant feature could belong to an
+// a favorite. A category rule does the same for each species in the
+// category without a rule of its own. Pokémon with an unknown variant
+// feature could belong to an
 // under-filled variant, so they are kept and counted as needing
 // confirmation (spec §7.3).
 func SummarizeKeeps(pokemon []Pokemon, setup Setup, categorize Categorize) KeepSummary {
@@ -228,8 +257,20 @@ func SummarizeKeeps(pokemon []Pokemon, setup Setup, categorize Categorize) KeepS
 		built[v] = g
 		bySpecies[v.Species] = append(bySpecies[v.Species], g)
 	}
+	own := map[string]SpeciesRule{}
 	for _, r := range setup.Species {
-		applySpeciesRule(r, bySpecies[r.Species], groups)
+		own[r.Species] = r
+	}
+	for species, sg := range bySpecies {
+		if r, ok := own[species]; ok {
+			applySpeciesRule(r, RuleSpecies, sg, groups)
+			continue
+		}
+		for _, r := range setup.Categories {
+			if r.Category == sg[0].Category {
+				applySpeciesRule(SpeciesRule{species, r.Minimum, r.Favorite}, RuleCategory, sg, groups)
+			}
+		}
 	}
 	for _, v := range order {
 		g := built[v]
@@ -277,16 +318,20 @@ func (a member) compare(b member) int {
 	return cmp.Or(cmp.Compare(b.score[0], a.score[0]), cmp.Compare(b.score[1], a.score[1]), cmp.Compare(a.id, b.id))
 }
 
-// applySpeciesRule replaces the defaults of one species' groups.
-func applySpeciesRule(r SpeciesRule, species []*VariantGroup, members map[Variant][]member) {
+// applySpeciesRule replaces the defaults of one species' groups. A species
+// favorite reports RuleFavorite; anything else reports rule.
+func applySpeciesRule(r SpeciesRule, rule Rule, species []*VariantGroup, members map[Variant][]member) {
 	if r.Favorite {
+		if rule == RuleSpecies {
+			rule = RuleFavorite
+		}
 		for _, g := range species {
-			g.Rule, g.Minimum, g.Keep = RuleFavorite, g.Count, g.Count
+			g.Rule, g.Minimum, g.Keep = rule, g.Count, g.Count
 		}
 		return
 	}
 	for _, g := range species {
-		g.Rule, g.Keep = RuleSpecies, 1
+		g.Rule, g.Keep = rule, 1
 	}
 	for left := r.Minimum - len(species); left > 0; left-- {
 		var best *VariantGroup
