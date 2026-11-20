@@ -63,7 +63,11 @@ const toPokemon = (id: string, p: Row): Schemas["Pokemon"] => {
  * imports and the collection. A staged row "might be" every collected
  * Pokémon of the same species; with one candidate it is an exact match.
  */
-export function createFakeApi(options: { lockAfter?: number } = {}) {
+/** admin: whether the app runs on the host Mac (default true). */
+export function createFakeApi(
+  options: { lockAfter?: number; admin?: boolean } = {},
+) {
+  const admin = options.admin ?? true;
   const profiles: Profile[] = [];
   let signedIn: Profile | null = null;
   let failures = 0;
@@ -97,7 +101,29 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
           .map(({ id, displayName }) => ({ id, displayName })),
       );
     }
+    if (path === "/host") return jsonResponse(200, { admin });
+    const pinPath = path.match(/^\/profiles\/([^/]+)\/pin$/);
+    if (pinPath && req.method === "PUT") {
+      if (!admin)
+        return err(
+          403,
+          "ADMIN_ONLY",
+          "Only the Mac running CatchKeep can do this.",
+        );
+      const p = profiles.find((x) => x.id === pinPath[1]);
+      if (!p) return err(404, "NOT_FOUND", "No such profile.");
+      p.pin = (body as Schemas["NewPin"]).pin;
+      if (signedIn?.id === p.id) signedIn = null;
+      failures = 0;
+      return new Response(null, { status: 204 });
+    }
     if (path === "/profiles" && req.method === "POST") {
+      if (!admin)
+        return err(
+          403,
+          "ADMIN_ONLY",
+          "Only the Mac running CatchKeep can do this.",
+        );
       if (
         profiles.some(
           (p) => p.displayName.toLowerCase() === body.displayName.toLowerCase(),

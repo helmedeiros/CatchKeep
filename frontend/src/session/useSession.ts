@@ -38,6 +38,35 @@ export function useCreateProfile() {
   });
 }
 
+/** Whether this device is the Mac running CatchKeep, which manages profiles. */
+export function useHost() {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["host"],
+    staleTime: Infinity,
+    queryFn: async () => unwrap(await api.GET("/host")),
+  });
+}
+
+export function useResetPin() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async ({
+      profileId,
+      pin,
+    }: {
+      profileId: string;
+      pin: string;
+    }) =>
+      unwrap(
+        await api.PUT("/profiles/{profileId}/pin", {
+          params: { path: { profileId } },
+          body: { pin },
+        }),
+      ),
+  });
+}
+
 export function useSignIn() {
   const api = useApi();
   const queryClient = useQueryClient();

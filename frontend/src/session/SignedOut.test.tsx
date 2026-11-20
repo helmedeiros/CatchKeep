@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import App from "../App";
@@ -71,6 +71,52 @@ describe("signing in", () => {
 
     expect(
       await screen.findByRole("button", { name: "Ash" }),
+    ).toBeInTheDocument();
+  });
+
+  it("on a phone, sends new trainers to the Mac instead of creating profiles", async () => {
+    const api = createFakeApi({ admin: false });
+    api.addProfile("Ash", "2468");
+    renderWithApi(<App />, api.fetch);
+
+    expect(
+      await screen.findByRole("button", { name: "Ash" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "New profile" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /add a trainer or reset a PIN on the Mac running CatchKeep/,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("on the Mac, resets a forgotten PIN", async () => {
+    const user = userEvent.setup();
+    const api = createFakeApi();
+    api.addProfile("Ash", "2468");
+    renderWithApi(<App />, api.fetch);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Reset a PIN" }),
+    );
+    const form = screen.getByRole("form", { name: "Reset a PIN" });
+    await user.selectOptions(within(form).getByLabelText("Profile"), "Ash");
+    await user.type(within(form).getByLabelText("New PIN"), "1357");
+    await user.type(within(form).getByLabelText("Repeat PIN"), "1357");
+    await user.click(within(form).getByRole("button", { name: "Set new PIN" }));
+    expect(
+      await screen.findByText(
+        "Ash's PIN is changed and they're signed out everywhere.",
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Ash" }));
+    await user.type(screen.getByLabelText("PIN for Ash"), "1357");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(
+      await screen.findByRole("heading", { name: "Hi, Ash" }),
     ).toBeInTheDocument();
   });
 });

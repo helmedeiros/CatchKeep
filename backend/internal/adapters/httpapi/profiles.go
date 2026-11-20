@@ -75,8 +75,8 @@ func tokenFrom(ctx context.Context) string {
 }
 
 func (s *server) sessionCookie(value string, maxAge int) string {
-	// Secure follows the serving scheme; it is off only while the host serves
-	// plain HTTP (before HTTPS lands in M1).
+	// Secure follows the serving scheme: the host serves plain HTTP on the
+	// home network (OD-04, decided), so it is off unless configured.
 	c := &http.Cookie{ //nolint:gosec // Secure is set from config, see above
 		Name:     sessionCookie,
 		Value:    value,
