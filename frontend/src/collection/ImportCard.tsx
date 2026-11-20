@@ -229,7 +229,9 @@ function Preview({
       {preview.invalidRows.length > 0 && (
         <details className="text-sm">
           <summary className="cursor-pointer">
-            {preview.invalidRows.length} notes about the file
+            {preview.invalidRows.length === 1
+              ? "1 note about the file"
+              : `${preview.invalidRows.length} notes about the file`}
           </summary>
           <ul className="mt-2 flex flex-col gap-1 text-slate-600 dark:text-slate-400">
             {preview.invalidRows.map((r) => (
