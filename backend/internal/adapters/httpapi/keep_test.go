@@ -134,3 +134,36 @@ func TestKeep_CapacityBands(t *testing.T) {
 		t.Fatalf("bands = %+v", got.Bands)
 	}
 }
+
+func TestKeep_CategoryRules(t *testing.T) {
+	wantStatus(t, newAPI(t).do(http.MethodGet, "/api/v1/category-rules", ""), http.StatusUnauthorized)
+	api := signedIn(t, "Ash")
+	rules := `{"rules":[{"category":"legendary","minimum":1,"favorite":false}]}`
+	wantStatus(t, api.do(http.MethodGet, "/api/v1/category-rules", ""), http.StatusConflict)
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/category-rules", rules), http.StatusConflict)
+
+	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/collection/confirmations", `{"features":["shiny","costume","background","dynamax","gigantamax"]}`), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/setup", `{"capacity":350,"goals":["collecting"]}`), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/category-rules", `{"rules":[{"category":"legendary","minimum":0,"favorite":false}]}`), http.StatusUnprocessableEntity)
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/category-rules", rules), http.StatusOK)
+
+	got := decode[struct {
+		Rules []struct {
+			Category string
+			Minimum  int
+		}
+	}](t, api.do(http.MethodGet, "/api/v1/category-rules", "").Body.Bytes())
+	if len(got.Rules) != 1 || got.Rules[0].Category != "legendary" || got.Rules[0].Minimum != 1 {
+		t.Fatalf("rules = %+v", got)
+	}
+	summary := decode[struct {
+		Groups []struct{ Species, Rule, Category string }
+	}](t, api.do(http.MethodGet, "/api/v1/keep-summary", "").Body.Bytes())
+	for _, g := range summary.Groups {
+		if g.Species == "Mewtwo" && (g.Rule != "category" || g.Category != "legendary") {
+			t.Fatalf("Mewtwo group = %+v, want the legendary category rule", g)
+		}
+	}
+}

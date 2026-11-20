@@ -188,6 +188,27 @@ func (e SetupGoals) Valid() bool {
 	}
 }
 
+// Defines values for SpeciesCategory.
+const (
+	Legendary  SpeciesCategory = "legendary"
+	Mythical   SpeciesCategory = "mythical"
+	UltraBeast SpeciesCategory = "ultra-beast"
+)
+
+// Valid indicates whether the value is a known member of the SpeciesCategory enum.
+func (e SpeciesCategory) Valid() bool {
+	switch e {
+	case Legendary:
+		return true
+	case Mythical:
+		return true
+	case UltraBeast:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TriState.
 const (
 	No      TriState = "no"
@@ -211,6 +232,7 @@ func (e TriState) Valid() bool {
 
 // Defines values for VariantGroupRule.
 const (
+	Category VariantGroupRule = "category"
 	Default  VariantGroupRule = "default"
 	Favorite VariantGroupRule = "favorite"
 	Rare     VariantGroupRule = "rare"
@@ -220,6 +242,8 @@ const (
 // Valid indicates whether the value is a known member of the VariantGroupRule enum.
 func (e VariantGroupRule) Valid() bool {
 	switch e {
+	case Category:
+		return true
 	case Default:
 		return true
 	case Favorite:
@@ -289,6 +313,22 @@ type CapacityBand struct {
 // CapacityBands defines model for CapacityBands.
 type CapacityBands struct {
 	Bands []CapacityBand `json:"bands"`
+}
+
+// CategoryRule defines model for CategoryRule.
+type CategoryRule struct {
+	Category SpeciesCategory `json:"category"`
+
+	// Favorite Every copy of every species in the category is kept.
+	Favorite bool `json:"favorite"`
+
+	// Minimum Copies kept across all variants of each species in the category; 0 when only a favorite.
+	Minimum int `json:"minimum"`
+}
+
+// CategoryRules defines model for CategoryRules.
+type CategoryRules struct {
+	Rules []CategoryRule `json:"rules"`
 }
 
 // Collection defines model for Collection.
@@ -566,6 +606,9 @@ type SignIn struct {
 	ProfileId ProfileId `json:"profileId"`
 }
 
+// SpeciesCategory defines model for SpeciesCategory.
+type SpeciesCategory string
+
 // SpeciesRule defines model for SpeciesRule.
 type SpeciesRule struct {
 	// Favorite A favorite species keeps every copy.
@@ -610,9 +653,10 @@ type TriState string
 
 // VariantGroup defines model for VariantGroup.
 type VariantGroup struct {
-	Background bool `json:"background"`
-	Costume    bool `json:"costume"`
-	Count      int  `json:"count"`
+	Background bool             `json:"background"`
+	Category   *SpeciesCategory `json:"category,omitempty"`
+	Costume    bool             `json:"costume"`
+	Count      int              `json:"count"`
 
 	// Default Minimum generated from storage and goals, before any species rule or favorite replaced it.
 	Default    int    `json:"default"`
@@ -652,6 +696,9 @@ type VariantGroupRule string
 // ImportId defines model for ImportId.
 type ImportId = string
 
+// SaveCategoryRulesJSONRequestBody defines body for SaveCategoryRules for application/json ContentType.
+type SaveCategoryRulesJSONRequestBody = CategoryRules
+
 // ConfirmAbsentJSONRequestBody defines body for ConfirmAbsent for application/json ContentType.
 type ConfirmAbsentJSONRequestBody = AbsenceConfirmation
 
@@ -684,6 +731,12 @@ type ServerInterface interface {
 	// GetCapacityBands How many copies the default keep rules keep for each storage size.
 	// (GET /capacity-bands)
 	GetCapacityBands(w http.ResponseWriter, r *http.Request)
+	// GetCategoryRules The trainer's keep rules for legendary, mythical and Ultra Beast species.
+	// (GET /category-rules)
+	GetCategoryRules(w http.ResponseWriter, r *http.Request)
+	// SaveCategoryRules Replace the category keep rules. Each applies to every species in its category as that species' own rule would, unless the species has its own rule (OD-02).
+	// (PUT /category-rules)
+	SaveCategoryRules(w http.ResponseWriter, r *http.Request)
 	// ListCollection Every active Pokémon of the signed-in trainer.
 	// (GET /collection)
 	ListCollection(w http.ResponseWriter, r *http.Request)
@@ -766,6 +819,34 @@ func (siw *ServerInterfaceWrapper) GetCapacityBands(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetCapacityBands(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCategoryRules operation middleware
+func (siw *ServerInterfaceWrapper) GetCategoryRules(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCategoryRules(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SaveCategoryRules operation middleware
+func (siw *ServerInterfaceWrapper) SaveCategoryRules(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SaveCategoryRules(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1293,6 +1374,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/setup", wrapper.SaveSetup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/species-rules", wrapper.GetSpeciesRules)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/species-rules", wrapper.SaveSpeciesRules)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/category-rules", wrapper.GetCategoryRules)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/category-rules", wrapper.SaveCategoryRules)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/teams", wrapper.ListTeams)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/teams", wrapper.CreateTeam)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/teams/{teamId}", wrapper.DeleteTeam)
@@ -1345,6 +1428,153 @@ type GetCapacityBandsdefaultJSONResponse struct {
 }
 
 func (response GetCapacityBandsdefaultJSONResponse) VisitGetCapacityBandsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCategoryRulesRequestObject struct {
+}
+
+type GetCategoryRulesResponseObject interface {
+	VisitGetCategoryRulesResponse(w http.ResponseWriter) error
+}
+
+type GetCategoryRules200JSONResponse CategoryRules
+
+func (response GetCategoryRules200JSONResponse) VisitGetCategoryRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCategoryRules401JSONResponse struct{ ErrorJSONResponse }
+
+func (response GetCategoryRules401JSONResponse) VisitGetCategoryRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCategoryRules409JSONResponse Error
+
+func (response GetCategoryRules409JSONResponse) VisitGetCategoryRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCategoryRulesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetCategoryRulesdefaultJSONResponse) VisitGetCategoryRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveCategoryRulesRequestObject struct {
+	Body *SaveCategoryRulesJSONRequestBody
+}
+
+type SaveCategoryRulesResponseObject interface {
+	VisitSaveCategoryRulesResponse(w http.ResponseWriter) error
+}
+
+type SaveCategoryRules200JSONResponse CategoryRules
+
+func (response SaveCategoryRules200JSONResponse) VisitSaveCategoryRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveCategoryRules401JSONResponse struct{ ErrorJSONResponse }
+
+func (response SaveCategoryRules401JSONResponse) VisitSaveCategoryRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveCategoryRules409JSONResponse Error
+
+func (response SaveCategoryRules409JSONResponse) VisitSaveCategoryRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveCategoryRules422JSONResponse Error
+
+func (response SaveCategoryRules422JSONResponse) VisitSaveCategoryRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveCategoryRulesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response SaveCategoryRulesdefaultJSONResponse) VisitSaveCategoryRulesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -2849,6 +3079,12 @@ type StrictServerInterface interface {
 	// GetCapacityBands How many copies the default keep rules keep for each storage size.
 	// (GET /capacity-bands)
 	GetCapacityBands(ctx context.Context, request GetCapacityBandsRequestObject) (GetCapacityBandsResponseObject, error)
+	// GetCategoryRules The trainer's keep rules for legendary, mythical and Ultra Beast species.
+	// (GET /category-rules)
+	GetCategoryRules(ctx context.Context, request GetCategoryRulesRequestObject) (GetCategoryRulesResponseObject, error)
+	// SaveCategoryRules Replace the category keep rules. Each applies to every species in its category as that species' own rule would, unless the species has its own rule (OD-02).
+	// (PUT /category-rules)
+	SaveCategoryRules(ctx context.Context, request SaveCategoryRulesRequestObject) (SaveCategoryRulesResponseObject, error)
 	// ListCollection Every active Pokémon of the signed-in trainer.
 	// (GET /collection)
 	ListCollection(ctx context.Context, request ListCollectionRequestObject) (ListCollectionResponseObject, error)
@@ -2973,6 +3209,61 @@ func (sh *strictHandler) GetCapacityBands(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetCapacityBandsResponseObject); ok {
 		if err := validResponse.VisitGetCapacityBandsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCategoryRules operation middleware
+func (sh *strictHandler) GetCategoryRules(w http.ResponseWriter, r *http.Request) {
+	var request GetCategoryRulesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCategoryRules(ctx, request.(GetCategoryRulesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCategoryRules")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCategoryRulesResponseObject); ok {
+		if err := validResponse.VisitGetCategoryRulesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SaveCategoryRules operation middleware
+func (sh *strictHandler) SaveCategoryRules(w http.ResponseWriter, r *http.Request) {
+	var request SaveCategoryRulesRequestObject
+
+	var body SaveCategoryRulesJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SaveCategoryRules(ctx, request.(SaveCategoryRulesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SaveCategoryRules")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SaveCategoryRulesResponseObject); ok {
+		if err := validResponse.VisitSaveCategoryRulesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -458,6 +458,60 @@ paths:
           $ref: "#/components/responses/Error"
         default:
           $ref: "#/components/responses/Error"
+  /category-rules:
+    get:
+      tags: [keep]
+      operationId: getCategoryRules
+      summary: The trainer's keep rules for legendary, mythical and Ultra Beast species.
+      security:
+        - session: []
+      responses:
+        "200":
+          description: The category rules; empty until the trainer sets one.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryRules"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      tags: [keep]
+      operationId: saveCategoryRules
+      summary: >-
+        Replace the category keep rules. Each applies to every species in
+        its category as that species' own rule would, unless the species
+        has its own rule (OD-02).
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryRules"
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryRules"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: Storage and goals are not set up yet (SETUP_REQUIRED).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
   /teams:
     get:
       tags: [keep]
@@ -1026,6 +1080,35 @@ components:
         favorite:
           type: boolean
           description: A favorite species keeps every copy.
+    SpeciesCategory:
+      type: string
+      enum: [legendary, mythical, ultra-beast]
+    CategoryRules:
+      type: object
+      additionalProperties: false
+      required: [rules]
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryRule"
+    CategoryRule:
+      type: object
+      additionalProperties: false
+      required: [category, minimum, favorite]
+      properties:
+        category:
+          $ref: "#/components/schemas/SpeciesCategory"
+        minimum:
+          type: integer
+          minimum: 0
+          maximum: 20000
+          description: >-
+            Copies kept across all variants of each species in the category;
+            0 when only a favorite.
+        favorite:
+          type: boolean
+          description: Every copy of every species in the category is kept.
     KeepSummary:
       type: object
       additionalProperties: false
@@ -1150,6 +1233,8 @@ components:
         rare:
           type: boolean
           description: Legendary, mythical or Ultra Beast species.
+        category:
+          $ref: "#/components/schemas/SpeciesCategory"
         default:
           type: integer
           minimum: 1
@@ -1161,7 +1246,7 @@ components:
           description: The trading goal added one to the generated minimum.
         rule:
           type: string
-          enum: [default, rare, species, favorite]
+          enum: [default, rare, category, species, favorite]
           description: The rule that decided this group's minimum.
         count:
           type: integer

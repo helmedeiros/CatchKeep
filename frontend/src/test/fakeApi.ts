@@ -67,6 +67,7 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
   let next = 0;
   let setup: Schemas["Setup"] | null = null;
   let speciesRules: Schemas["SpeciesRule"][] = [];
+  let categoryRules: Schemas["CategoryRule"][] = [];
   let teams: Schemas["Team"][] = [];
   const collection: Stored[] = [];
   const imports = new Map<string, FakeImport>();
@@ -265,6 +266,14 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
       }
       return jsonResponse(200, { rules: speciesRules });
     }
+    if (path === "/category-rules") {
+      if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
+      if (!setup) return err(409, "SETUP_REQUIRED", "Set up first.");
+      if (req.method === "PUT") {
+        categoryRules = (body as Schemas["CategoryRules"]).rules;
+      }
+      return jsonResponse(200, { rules: categoryRules });
+    }
     if (path === "/keep-summary") {
       if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
       if (!setup) return err(409, "SETUP_REQUIRED", "Set up first.");
@@ -335,8 +344,13 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
 
   /**
    * Groups by species once all five variant features are confirmed. Only
-   * Mewtwo is rare here.
+   * Mewtwo (legendary) and Mew (mythical) are rare here.
    */
+  const CATEGORIES: Record<string, Schemas["SpeciesCategory"]> = {
+    Mewtwo: "legendary",
+    Mew: "mythical",
+  };
+
   function keepSummary(s: Schemas["Setup"]): Schemas["KeepSummary"] {
     const band = s.capacity <= 1000 ? 1 : s.capacity <= 4000 ? 2 : 3;
     const ordinary = band;
@@ -359,8 +373,12 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
           Number(isProtected(b)) - Number(isProtected(a)) || b.cp - a.cp,
       );
       const protectedIds = best.filter(isProtected).map((p) => p.id);
-      const rare = species === "Mewtwo";
-      const own = speciesRules.find((r) => r.species === species);
+      const category = CATEGORIES[species];
+      const rare = category !== undefined;
+      const own =
+        speciesRules.find((r) => r.species === species) ??
+        categoryRules.find((r) => r.category === category);
+      const ownRule = own && "species" in own ? "species" : "category";
       const tradeBonus = rare && s.goals.includes("trading");
       const generated = (rare ? rareMinimum : ordinary) + Number(tradeBonus);
       const minimum = own?.favorite
@@ -368,13 +386,13 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
         : own
           ? own.minimum
           : generated;
-      const rule: Schemas["VariantGroup"]["rule"] = own?.favorite
-        ? "favorite"
-        : own
-          ? "species"
-          : rare
-            ? "rare"
-            : "default";
+      const rule: Schemas["VariantGroup"]["rule"] = own
+        ? own.favorite && ownRule === "species"
+          ? "favorite"
+          : ownRule
+        : rare
+          ? "rare"
+          : "default";
       return {
         species,
         form: "Normal",
@@ -387,6 +405,7 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
         shadow: false,
         purified: false,
         rare,
+        ...(category && { category }),
         default: generated,
         tradeBonus,
         rule,

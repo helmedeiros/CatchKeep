@@ -6,6 +6,7 @@ type Group = KeepSummary["groups"][number];
 const RULE_NAMES: Record<Group["rule"], string> = {
   default: "the default",
   rare: "the rare-species default",
+  category: "your category rule",
   species: "your species rule",
   favorite: "your favorite",
 };
