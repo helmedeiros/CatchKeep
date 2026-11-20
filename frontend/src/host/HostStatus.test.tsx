@@ -24,7 +24,7 @@ describe("HostStatus", () => {
     renderWithApi(<HostStatus />, fetchImpl);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "CatchKeep isn't reachable — is the host on and awake?",
+      "CatchKeep isn't reachable — is the computer running it on and awake?",
     );
   });
 

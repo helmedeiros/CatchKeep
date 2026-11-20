@@ -50,7 +50,11 @@ func adminOnly() Error {
 }
 
 func (s *server) GetHost(ctx context.Context, _ GetHostRequestObject) (GetHostResponseObject, error) {
-	return GetHost200JSONResponse{Admin: isAdmin(ctx)}, nil
+	out := GetHost200JSONResponse{Admin: isAdmin(ctx), Addresses: []string{}}
+	if out.Admin && s.services.Addresses != nil {
+		out.Addresses = append(out.Addresses, s.services.Addresses()...)
+	}
+	return out, nil
 }
 
 func (s *server) ResetPin(ctx context.Context, req ResetPinRequestObject) (ResetPinResponseObject, error) {

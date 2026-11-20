@@ -1,6 +1,7 @@
 import { Toaster } from "sonner";
 import { Home } from "./home/Home";
 import { HostStatus } from "./host/HostStatus";
+import { OtherDevices } from "./host/OtherDevices";
 import { SignedOut } from "./session/SignedOut";
 import { useMe } from "./session/useSession";
 import { card } from "./ui/styles";
@@ -21,6 +22,7 @@ export default function App() {
         <Session />
         <section aria-label="Host" className={card}>
           <HostStatus />
+          <OtherDevices />
         </section>
       </main>
       <Toaster position="top-center" richColors />

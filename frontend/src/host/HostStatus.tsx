@@ -28,7 +28,7 @@ export function HostStatus() {
         role="alert"
         className="rounded-lg bg-amber-100 px-4 py-3 text-sm text-amber-900"
       >
-        CatchKeep isn't reachable — is the host on and awake?
+        CatchKeep isn't reachable — is the computer running it on and awake?
       </p>
     );
   }

@@ -22,6 +22,10 @@ type Services struct {
 	Keep       *app.Keep
 	Teams      *app.Teams
 
+	// Addresses lists the web addresses other devices can use to reach the
+	// host; it may be nil.
+	Addresses func() []string
+
 	// SecureCookies marks the session cookie Secure. Enable it whenever the
 	// API is served over HTTPS.
 	SecureCookies bool
