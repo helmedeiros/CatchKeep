@@ -196,11 +196,7 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
     if (path === "/capacity-bands") {
       if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
       return jsonResponse(200, {
-        bands: [
-          { upTo: 1000, ordinary: 1, rare: 2 },
-          { upTo: 4000, ordinary: 2, rare: 4 },
-          { upTo: 20000, ordinary: 3, rare: 6 },
-        ],
+        bands: [...BANDS],
       });
     }
     if (path === "/setup") {
@@ -346,15 +342,23 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
    * Groups by species once all five variant features are confirmed. Only
    * Mewtwo (legendary) and Mew (mythical) are rare here.
    */
+  const BANDS = [
+    { upTo: 500, ordinary: 1, rare: 2 },
+    { upTo: 1500, ordinary: 1, rare: 3 },
+    { upTo: 3000, ordinary: 2, rare: 4 },
+    { upTo: 6000, ordinary: 2, rare: 5 },
+    { upTo: 20000, ordinary: 3, rare: 6 },
+  ] as const;
+
   const CATEGORIES: Record<string, Schemas["SpeciesCategory"]> = {
     Mewtwo: "legendary",
     Mew: "mythical",
   };
 
   function keepSummary(s: Schemas["Setup"]): Schemas["KeepSummary"] {
-    const band = s.capacity <= 1000 ? 1 : s.capacity <= 4000 ? 2 : 3;
-    const ordinary = band;
-    const rareMinimum = band * 2;
+    const band = BANDS.find((b) => s.capacity <= b.upTo) ?? BANDS[0];
+    const ordinary = band.ordinary;
+    const rareMinimum = band.rare;
     const groups = new Map<string, Stored[]>();
     let needsConfirmation = 0;
     for (const p of collection) {

@@ -48,6 +48,11 @@ func TestMinimums_ScaleWithCapacity(t *testing.T) {
 	if rare := domain.RareMinimum(2700); rare != 4 {
 		t.Fatalf("2,700 slots rare minimum = %d, want 4", rare)
 	}
+	for capacity, want := range map[int][2]int{1000: {1, 3}, 5000: {2, 5}, 9800: {3, 6}} {
+		if got := [2]int{domain.OrdinaryMinimum(capacity), domain.RareMinimum(capacity)}; got != want {
+			t.Errorf("%d slots: minimums %v, want %v", capacity, got, want)
+		}
+	}
 }
 
 func TestSummarizeKeeps_KeepsTheBestCopiesUpToTheMinimum(t *testing.T) {
