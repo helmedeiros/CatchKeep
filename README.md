@@ -2,13 +2,30 @@
 
 A Pokémon GO storage helper.
 
+Storage is never quite big enough. You can have 4,000 slots and 2,500 Pokémon and still feel squeezed: a Community Day adds hundreds in an afternoon, and staying under 80% turns into a string of hard choices made in a hurry. Which of these 40 Pidgey matter? Is this my only shadow Machop? Did I already keep a good one?
+
+Deciding what is worth keeping is only half of it. The hard part is knowing how much to clear, and when. Keep rules on their own never compare your total against the limit you want, and a heavy event week can fill the gap before you get round to cleaning up.
+
+CatchKeep takes both off your plate. It reads your Poke Genie export, keeps the best copies of every variant by rules you set once, and shows what you can safely let go, so you go into the next Community Day with room to spare instead of clearing storage at the last minute.
+
 ## What you can do today
 
-- Give each trainer their own PIN-protected profile, so collections never get mixed up.
-- Bring in your collection from a Poke Genie CSV export: see a preview first, then browse it strongest first. Anything the export can't tell (shiny, costume, background, Dynamax) stays "unknown" instead of being assumed absent.
-- Keep it current by importing a newer export: Pokémon you already have are updated (new CP after a power-up, for example) instead of counted twice. CatchKeep never merges on its own. Exact matches are confirmed in one tap, and anything less certain is shown side by side for you to decide.
-- Fill in what the export can't tell, one species at a time: "None of my 34 Pidgey are shiny, costumed or have a background." Only unknowns change; anything already known is kept.
-- Tell CatchKeep how much storage you have and what you keep Pokémon for (collecting, trading, battling), in your order of priority; it previews what the defaults keep as you type. It shows how many Pokémon your keep rules hold on to and how many are possible transfers, species by species. The best copies of each variant are kept, with more of legendary, mythical and Ultra Beast species. Lucky, shadow and purified copies count separately, so they are never traded away in place of ordinary ones, and anything not yet confirmed is never counted as a transfer. Tap a species to see each copy with its picture, marked keep (and why: protected, on a team) or possible transfer, with a short breakdown of the default your storage sets, your own rule and the minimum that won. Set your own rule there too: keep at least N, or mark it a favorite to keep every copy. Set one rule for every legendary, mythical or Ultra Beast species at once; a species with its own rule follows that instead. Protect any single Pokémon and it is always kept, even over a stronger copy. Group Pokémon into named teams (a raid team, your buddies) and every member is always kept.
+- **A profile per trainer.** Each trainer has a PIN-protected profile, so collections never get mixed up.
+- **Import from Poke Genie.** See a preview first, then browse your collection strongest first, with each Pokémon's picture, CP, HP, IVs and level. Anything the export can't tell (shiny, costume, background, Dynamax) stays "unknown" instead of being assumed absent.
+- **Re-import without duplicates.** Pokémon you already have are updated (new CP after a power-up, for example) instead of counted twice. Nothing is merged on its own: exact matches are confirmed in one tap, and anything less certain is shown side by side for you to decide.
+- **Confirm what the export can't tell.** One species at a time: "None of my 34 Pidgey are shiny, costumed or have a background." Only unknowns change.
+- **Storage and goals.** Say how many slots you have and what you keep Pokémon for (collecting, trading, battling), in order of priority. A preview shows what the defaults keep as you type.
+- **Keep rules that scale with your storage.** The best copies of each variant are kept, more for bigger storage and more of legendary, mythical and Ultra Beast species. Lucky, shadow and purified copies count separately, and anything not yet confirmed is never counted as a transfer.
+- **Possible transfers, species by species.** Tap a species to see every copy with its picture, marked keep or possible transfer, and why.
+- **Your own rules.** Keep at least N of a species, or mark it a favorite to keep every copy. Set one rule for all legendary, mythical or Ultra Beast species at once; a species with its own rule follows that instead.
+- **A rule inspector.** For each species: the default your storage sets, your own rules, protection, and the minimum that won.
+- **Protection and teams.** Protect any single Pokémon and it is always kept, even over a stronger copy. Group Pokémon into named teams (a raid team, your buddies) and every member is always kept.
+
+## Coming next
+
+- **A headroom goal.** "Stay under 80% of storage" and "free 400 slots before Community Day", with a warning when you drift past it.
+- **A cleanup plan.** How many to transfer to reach your goal, which ones, and in-game search strings to find them, with a checklist and undo.
+- **History and insights.** Every addition and transfer is recorded, so you can see how fast storage fills, how much an event brings in, and which species you always end up transferring.
 
 ## Status
 
