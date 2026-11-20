@@ -205,6 +205,21 @@ func TestHost_OnlyTheHostIsAdmin(t *testing.T) {
 	}
 }
 
+func TestHost_TellsOnlyTheHostTheAddressesForOtherDevices(t *testing.T) {
+	type host struct{ Addresses []string }
+	withAddresses := func() *apiClient {
+		return &apiClient{t: t, handler: httpapi.NewHandler(httpapi.Services{
+			Addresses: func() []string { return []string{"http://192.168.1.20:8080"} },
+		})}
+	}
+	if got := decode[host](t, withAddresses().do(http.MethodGet, "/api/v1/host", "").Body.Bytes()); len(got.Addresses) != 1 {
+		t.Fatalf("host sees %v", got.Addresses)
+	}
+	if got := decode[host](t, withAddresses().onOtherDevice().do(http.MethodGet, "/api/v1/host", "").Body.Bytes()); len(got.Addresses) != 0 {
+		t.Fatalf("another device sees %v", got.Addresses)
+	}
+}
+
 func TestProfiles_OnlyTheHostCreatesThem(t *testing.T) {
 	rec := newAPI(t).onOtherDevice().do(http.MethodPost, "/api/v1/profiles", `{"displayName":"Ash","pin":"2468"}`)
 	wantStatus(t, rec, http.StatusForbidden)

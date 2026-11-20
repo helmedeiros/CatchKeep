@@ -30,15 +30,18 @@ CatchKeep takes both off your plate. It reads your Poke Genie export, keeps the 
 
 ## Run it on your network
 
-CatchKeep runs on one host computer, and any device on the same network can use it:
+CatchKeep runs on one computer. Phones, tablets and other computers connected to the same network (the same Wi-Fi) use it through their web browser.
 
-```sh
-backend/bin/catchkeep serve -addr 0.0.0.0:8080 -web-dir frontend/dist
-```
+1. Start CatchKeep so it listens on your network:
 
-- **On the host,** open <http://localhost:8080>. Only the host can add trainers and reset forgotten PINs.
-- **On other devices,** open the host's IP address on the network, for example `http://192.168.1.20:8080`, and sign in with your PIN. `localhost` there would point at the device itself, not the host. On macOS, `ipconfig getifaddr en0` prints the host's address.
-- The connection is plain HTTP, so use it on a network you trust.
+   ```sh
+   backend/bin/catchkeep serve -addr 0.0.0.0:8080 -web-dir frontend/dist
+   ```
+
+2. On that computer, open <http://localhost:8080>. "localhost" means "this computer", so it only works there. This is also the only place where you can add trainers and reset forgotten PINs.
+3. Under **Use CatchKeep on other devices**, the page shows the address to open everywhere else, such as `http://192.168.1.20:8080`. The numbers are the computer's address on your network, called its IP address. Type it into the browser on a phone and sign in with your PIN.
+
+Keep the computer on and awake while others use it. The connection is not encrypted (plain HTTP), so use it on a network you trust.
 
 ## Coming next
 

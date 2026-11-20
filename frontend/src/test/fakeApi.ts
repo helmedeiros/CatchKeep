@@ -101,7 +101,12 @@ export function createFakeApi(
           .map(({ id, displayName }) => ({ id, displayName })),
       );
     }
-    if (path === "/host") return jsonResponse(200, { admin });
+    if (path === "/host") {
+      return jsonResponse(200, {
+        admin,
+        addresses: admin ? ["http://192.168.1.20:8080"] : [],
+      });
+    }
     const pinPath = path.match(/^\/profiles\/([^/]+)\/pin$/);
     if (pinPath && req.method === "PUT") {
       if (!admin)

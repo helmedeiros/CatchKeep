@@ -18,6 +18,7 @@ import (
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/csvimport"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/httpapi"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/ids"
+	"github.com/helmedeiros/catchkeep/backend/internal/adapters/netaddr"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/pinhash"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/refdata"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/sqlite"
@@ -97,7 +98,7 @@ func serve(ctx context.Context, cfg serveConfig, ready func(addr string)) error 
 	}
 
 	srv := &http.Server{
-		Handler:           newRootHandler(cfg, store),
+		Handler:           newRootHandler(cfg, store, ln.Addr()),
 		ReadHeaderTimeout: 5 * time.Second,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}
@@ -125,7 +126,7 @@ func serve(ctx context.Context, cfg serveConfig, ready func(addr string)) error 
 
 // newRootHandler routes /api/ to the API and everything else to the frontend
 // bundle when a web directory is configured.
-func newRootHandler(cfg serveConfig, store *sqlite.Store) http.Handler {
+func newRootHandler(cfg serveConfig, store *sqlite.Store, listen net.Addr) http.Handler {
 	trainers := sqlite.NewTrainers(store)
 	hasher := pinhash.NewArgon2()
 	clock := ids.SystemClock{}
@@ -140,6 +141,7 @@ func newRootHandler(cfg serveConfig, store *sqlite.Store) http.Handler {
 		Collection: app.NewCollection(collection, collection, clock),
 		Keep:       app.NewKeep(sqlite.NewSetups(store), collection, refdata.NewSpecies(), teams),
 		Teams:      app.NewTeams(teams, ulids),
+		Addresses:  func() []string { return netaddr.URLs(listen, net.InterfaceAddrs) },
 	})
 	if cfg.webDir == "" {
 		return api

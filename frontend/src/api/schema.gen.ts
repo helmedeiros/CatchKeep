@@ -431,6 +431,8 @@ export interface components {
         HostInfo: {
             /** @description This request comes from the computer running CatchKeep, which may create profiles and reset PINs. */
             admin: boolean;
+            /** @description Web addresses other devices on the network can open to reach CatchKeep. Only told to the computer running it; empty when CatchKeep only listens on that computer. */
+            addresses: string[];
         };
         NewPin: {
             pin: components["schemas"]["Pin"];
