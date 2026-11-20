@@ -38,7 +38,7 @@ export function useCreateProfile() {
   });
 }
 
-/** Whether this device is the Mac running CatchKeep, which manages profiles. */
+/** Whether this device is the host running CatchKeep, which manages profiles. */
 export function useHost() {
   const api = useApi();
   return useQuery({

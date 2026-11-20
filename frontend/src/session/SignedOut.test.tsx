@@ -74,7 +74,7 @@ describe("signing in", () => {
     ).toBeInTheDocument();
   });
 
-  it("on a phone, sends new trainers to the Mac instead of creating profiles", async () => {
+  it("on another device, sends new trainers to the host instead of creating profiles", async () => {
     const api = createFakeApi({ admin: false });
     api.addProfile("Ash", "2468");
     renderWithApi(<App />, api.fetch);
@@ -87,12 +87,12 @@ describe("signing in", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.getByText(
-        /add a trainer or reset a PIN on the Mac running CatchKeep/,
+        /add a trainer or reset a PIN on the computer running CatchKeep/,
       ),
     ).toBeInTheDocument();
   });
 
-  it("on the Mac, resets a forgotten PIN", async () => {
+  it("on the host, resets a forgotten PIN", async () => {
     const user = userEvent.setup();
     const api = createFakeApi();
     api.addProfile("Ash", "2468");

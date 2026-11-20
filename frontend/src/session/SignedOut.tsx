@@ -21,11 +21,11 @@ interface Profile {
   displayName: string;
 }
 
-const askTheMac =
-  "New here or forgot your PIN? You can add a trainer or reset a PIN on the Mac running CatchKeep.";
+const askTheHost =
+  "New here or forgot your PIN? You can add a trainer or reset a PIN on the computer running CatchKeep.";
 
 /**
- * Profile picker. Only the Mac running CatchKeep creates profiles and
+ * Profile picker. Only the computer running CatchKeep creates profiles and
  * resets PINs (OD-07); other devices just sign in.
  */
 export function SignedOut() {
@@ -50,7 +50,7 @@ export function SignedOut() {
       <section className={`${card} flex flex-col gap-2`}>
         <h2 className="text-lg font-semibold">No trainers yet</h2>
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Add the first trainer on the Mac running CatchKeep.
+          Add the first trainer on the computer running CatchKeep.
         </p>
       </section>
     );
@@ -107,7 +107,7 @@ export function SignedOut() {
           </button>
         </div>
       ) : (
-        <p className="mt-3 text-sm text-slate-500">{askTheMac}</p>
+        <p className="mt-3 text-sm text-slate-500">{askTheHost}</p>
       )}
     </section>
   );

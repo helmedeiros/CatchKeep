@@ -28,7 +28,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Whether this device is the host admin (the Mac running CatchKeep). */
+        /** Whether this device is the host admin (the computer running CatchKeep). */
         get: operations["getHost"];
         put?: never;
         post?: never;
@@ -50,7 +50,7 @@ export interface paths {
         put?: never;
         /**
          * Create a trainer profile protected by a PIN.
-         * @description Only the host admin, on the Mac running CatchKeep, may create profiles.
+         * @description Only the host admin, on the computer running CatchKeep, may create profiles.
          */
         post: operations["createProfile"];
         delete?: never;
@@ -71,7 +71,7 @@ export interface paths {
         get?: never;
         /**
          * Give a profile a new PIN.
-         * @description Only the host admin, on the Mac running CatchKeep, may reset PINs. The trainer is signed out everywhere and any lockout is lifted.
+         * @description Only the host admin, on the computer running CatchKeep, may reset PINs. The trainer is signed out everywhere and any lockout is lifted.
          */
         put: operations["resetPin"];
         post?: never;
@@ -429,7 +429,7 @@ export interface components {
             pin: components["schemas"]["Pin"];
         };
         HostInfo: {
-            /** @description This request comes from the Mac running CatchKeep, which may create profiles and reset PINs. */
+            /** @description This request comes from the computer running CatchKeep, which may create profiles and reset PINs. */
             admin: boolean;
         };
         NewPin: {

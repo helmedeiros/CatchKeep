@@ -40,7 +40,7 @@ paths:
     get:
       tags: [profiles]
       operationId: getHost
-      summary: Whether this device is the host admin (the Mac running CatchKeep).
+      summary: Whether this device is the host admin (the computer running CatchKeep).
       responses:
         "200":
           description: What this device may do.
@@ -70,7 +70,7 @@ paths:
       tags: [profiles]
       operationId: createProfile
       summary: Create a trainer profile protected by a PIN.
-      description: Only the host admin, on the Mac running CatchKeep, may create profiles.
+      description: Only the host admin, on the computer running CatchKeep, may create profiles.
       requestBody:
         required: true
         content:
@@ -104,7 +104,7 @@ paths:
       operationId: resetPin
       summary: Give a profile a new PIN.
       description: >-
-        Only the host admin, on the Mac running CatchKeep, may reset PINs. The
+        Only the host admin, on the computer running CatchKeep, may reset PINs. The
         trainer is signed out everywhere and any lockout is lifted.
       requestBody:
         required: true
@@ -781,7 +781,7 @@ components:
         admin:
           type: boolean
           description: >-
-            This request comes from the Mac running CatchKeep, which may
+            This request comes from the computer running CatchKeep, which may
             create profiles and reset PINs.
     NewPin:
       type: object

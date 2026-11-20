@@ -28,15 +28,17 @@ CatchKeep takes both off your plate. It reads your Poke Genie export, keeps the 
 - **A rule inspector.** For each species: the default your storage sets, your own rules, protection, and the minimum that won.
 - **Protection and teams.** Protect any single Pokémon and it is always kept, even over a stronger copy. Group Pokémon into named teams (a raid team, your buddies) and every member is always kept.
 
-## Use it at home
+## Run it on your network
 
-CatchKeep runs on one Mac and the family's phones use it over the home Wi-Fi:
+CatchKeep runs on one host computer, and any device on the same network can use it:
 
 ```sh
 backend/bin/catchkeep serve -addr 0.0.0.0:8080 -web-dir frontend/dist
 ```
 
-On the Mac, open <http://localhost:8080> to add trainers and reset forgotten PINs; only the Mac itself can do that. On a phone, open `http://<your-mac-name>.local:8080` and sign in with your PIN. The connection is plain HTTP, so keep it on your home network.
+- **On the host,** open <http://localhost:8080>. Only the host can add trainers and reset forgotten PINs.
+- **On other devices,** open the host's IP address on the network, for example `http://192.168.1.20:8080`, and sign in with your PIN. `localhost` there would point at the device itself, not the host. On macOS, `ipconfig getifaddr en0` prints the host's address.
+- The connection is plain HTTP, so use it on a network you trust.
 
 ## Coming next
 

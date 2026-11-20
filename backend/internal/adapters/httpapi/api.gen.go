@@ -470,7 +470,7 @@ type HealthStatus string
 
 // HostInfo defines model for HostInfo.
 type HostInfo struct {
-	// Admin This request comes from the Mac running CatchKeep, which may create profiles and reset PINs.
+	// Admin This request comes from the computer running CatchKeep, which may create profiles and reset PINs.
 	Admin bool `json:"admin"`
 }
 
@@ -874,7 +874,7 @@ type ServerInterface interface {
 	// GetHealth Report whether the API is up.
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
-	// GetHost Whether this device is the host admin (the Mac running CatchKeep).
+	// GetHost Whether this device is the host admin (the computer running CatchKeep).
 	// (GET /host)
 	GetHost(w http.ResponseWriter, r *http.Request)
 	// StageImport Upload a Poke Genie CSV export and get a preview. Nothing changes until it is committed.
@@ -3524,7 +3524,7 @@ type StrictServerInterface interface {
 	// GetHealth Report whether the API is up.
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
-	// GetHost Whether this device is the host admin (the Mac running CatchKeep).
+	// GetHost Whether this device is the host admin (the computer running CatchKeep).
 	// (GET /host)
 	GetHost(ctx context.Context, request GetHostRequestObject) (GetHostResponseObject, error)
 	// StageImport Upload a Poke Genie CSV export and get a preview. Nothing changes until it is committed.
