@@ -85,3 +85,29 @@ export function useSaveSpeciesRules() {
     },
   });
 }
+
+export type CategoryRule = components["schemas"]["CategoryRule"];
+const categoryRulesKey = ["setup", "category-rules"] as const;
+
+export function useCategoryRules(enabled: boolean) {
+  const api = useApi();
+  return useQuery({
+    queryKey: categoryRulesKey,
+    enabled,
+    queryFn: async () => unwrap(await api.GET("/category-rules")).rules,
+  });
+}
+
+/** Replaces every category rule; the keep summary follows. */
+export function useSaveCategoryRules() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (rules: CategoryRule[]) =>
+      unwrap(await api.PUT("/category-rules", { body: { rules } })).rules,
+    onSuccess: (saved) => {
+      queryClient.setQueryData(categoryRulesKey, saved);
+      return queryClient.invalidateQueries({ queryKey: summaryKey });
+    },
+  });
+}

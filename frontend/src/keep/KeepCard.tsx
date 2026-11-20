@@ -7,6 +7,7 @@ import {
   secondaryButton,
 } from "../ui/styles";
 import type { Pokemon } from "../collection/useCollection";
+import { CategoryRules } from "./CategoryRules";
 import { KeepGroups } from "./KeepGroups";
 import { SpeciesRuleList } from "./SpeciesRules";
 import {
@@ -307,6 +308,7 @@ function Numbers({
         </p>
       )}
       <SpeciesRuleList pokemon={pokemon} />
+      <CategoryRules />
       <KeepGroups groups={s.groups} pokemon={pokemon} />
     </>
   );

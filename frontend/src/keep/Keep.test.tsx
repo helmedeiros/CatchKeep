@@ -145,12 +145,14 @@ describe("keep rules", () => {
 
     const keep = screen.getByRole("region", { name: "Your keep rules" });
     const mewtwo = await within(keep).findByRole("button", {
-      name: /Mewtwo · rare/,
+      name: /Mewtwo · legendary/,
     });
     expect(mewtwo).toHaveTextContent("3 · keep 2 · 1 extra");
     await user.click(mewtwo);
     expect(
-      within(keep).getByRole("region", { name: "Why Mewtwo · rare keeps 2" }),
+      within(keep).getByRole("region", {
+        name: "Why Mewtwo · legendary keeps 2",
+      }),
     ).toHaveTextContent(
       /Default from your storage\s*2 copies of a rare species.*Minimum used\s*2, from the rare-species default/,
     );
@@ -321,6 +323,61 @@ describe("keep rules", () => {
     expect(
       within(keep).getByRole("region", { name: "Why Pidgey keeps 1" }),
     ).toHaveTextContent(/Protected\s*1 on a team/);
+  });
+
+  it("sets one rule for every mythical species, unless a species has its own", async () => {
+    const user = await withCollection([
+      "1,Mew,,151,,1000,100",
+      "2,Mew,,151,,1100,101",
+      "3,Mew,,151,,1200,102",
+      "4,Pidgey,,16,,120,30",
+    ]);
+    const setup = await saveSetup(user, "350", ["Collecting"]);
+    await user.click(within(setup).getByRole("button", { name: "Save" }));
+    const confirm = await screen.findByRole("region", {
+      name: "Confirm what the export can't tell",
+    });
+    await user.click(
+      within(confirm).getByRole("button", { name: "Confirm all 2 species" }),
+    );
+    await user.click(
+      within(confirm).getByRole("button", { name: "Yes, I checked them all" }),
+    );
+    const keep = screen.getByRole("region", { name: "Your keep rules" });
+    await user.click(
+      within(keep).getByRole("button", {
+        name: "Rules for legendary, mythical and Ultra Beasts",
+      }),
+    );
+    const mythical = within(keep).getByRole("form", {
+      name: "Keep rule for Mythical",
+    });
+    await user.type(within(mythical).getByLabelText("Keep at least"), "1");
+    await user.click(
+      within(mythical).getByRole("button", { name: "Save rule" }),
+    );
+
+    const mew = await within(keep).findByRole("button", {
+      name: /^Mew · mythical/,
+    });
+    await waitFor(() =>
+      expect(mew).toHaveTextContent("3 · keep 1 (mythical rule) · 2 extra"),
+    );
+    await user.click(mew);
+    expect(
+      within(keep).getByRole("region", { name: "Why Mew · mythical keeps 1" }),
+    ).toHaveTextContent(
+      /Mythical rule\s*Keep at least 1 of each mythical species.*Your rule\s*None.*Minimum used\s*1, from your mythical rule/,
+    );
+
+    const own = within(keep).getByRole("form", { name: "Keep rule for Mew" });
+    await user.type(within(own).getByLabelText("Keep at least"), "2");
+    await user.click(within(own).getByRole("button", { name: "Save rule" }));
+    await waitFor(() =>
+      expect(
+        within(keep).getByRole("button", { name: /^Mew · mythical/ }),
+      ).toHaveTextContent("keep 2 (your rule) · 1 extra"),
+    );
   });
 
   it("lets the trainer change the setup later", async () => {
