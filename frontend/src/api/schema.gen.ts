@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/host": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether this device is the host admin (the Mac running CatchKeep). */
+        get: operations["getHost"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles": {
         parameters: {
             query?: never;
@@ -31,8 +48,33 @@ export interface paths {
         /** List the profiles on this host, for the profile picker. */
         get: operations["listProfiles"];
         put?: never;
-        /** Create a trainer profile protected by a PIN. */
+        /**
+         * Create a trainer profile protected by a PIN.
+         * @description Only the host admin, on the Mac running CatchKeep, may create profiles.
+         */
         post: operations["createProfile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/{profileId}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileId: components["schemas"]["ProfileId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Give a profile a new PIN.
+         * @description Only the host admin, on the Mac running CatchKeep, may reset PINs. The trainer is signed out everywhere and any lockout is lifted.
+         */
+        put: operations["resetPin"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -386,6 +428,13 @@ export interface components {
             displayName: components["schemas"]["DisplayName"];
             pin: components["schemas"]["Pin"];
         };
+        HostInfo: {
+            /** @description This request comes from the Mac running CatchKeep, which may create profiles and reset PINs. */
+            admin: boolean;
+        };
+        NewPin: {
+            pin: components["schemas"]["Pin"];
+        };
         SignIn: {
             profileId: components["schemas"]["ProfileId"];
             pin: components["schemas"]["Pin"];
@@ -713,6 +762,27 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    getHost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What this device may do. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostInfo"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
     listProfiles: {
         parameters: {
             query?: never;
@@ -756,7 +826,36 @@ export interface operations {
                     "application/json": components["schemas"]["ProfileSummary"];
                 };
             };
+            403: components["responses"]["Error"];
             409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    resetPin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileId: components["schemas"]["ProfileId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewPin"];
+            };
+        };
+        responses: {
+            /** @description The new PIN is set. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
             422: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };

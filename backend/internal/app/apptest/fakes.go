@@ -59,6 +59,19 @@ func (s *Trainers) List(context.Context) ([]domain.Trainer, error) {
 	return out, nil
 }
 
+// SetPINHash implements ports.Trainers.
+func (s *Trainers) SetPINHash(_ context.Context, id domain.TrainerID, hash string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, ok := s.byID[id]
+	if !ok {
+		return domain.ErrTrainerNotFound
+	}
+	t.PINHash = hash
+	s.byID[id] = t
+	return nil
+}
+
 // PlainHasher is a reversible, insecure ports.PINHasher for tests only.
 type PlainHasher struct{}
 
@@ -156,6 +169,18 @@ func (s *SessionStore) Delete(_ context.Context, tokenHash string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.byHash, tokenHash)
+	return nil
+}
+
+// DeleteForTrainer implements ports.Sessions.
+func (s *SessionStore) DeleteForTrainer(_ context.Context, trainer domain.TrainerID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for hash, session := range s.byHash {
+		if session.TrainerID == trainer {
+			delete(s.byHash, hash)
+		}
+	}
 	return nil
 }
 

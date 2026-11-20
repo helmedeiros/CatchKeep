@@ -16,6 +16,9 @@ type Trainers interface {
 	Get(ctx context.Context, id domain.TrainerID) (domain.Trainer, error)
 	// List returns every trainer.
 	List(ctx context.Context) ([]domain.Trainer, error)
+	// SetPINHash replaces a trainer's PIN hash, or returns
+	// domain.ErrTrainerNotFound.
+	SetPINHash(ctx context.Context, id domain.TrainerID, hash string) error
 }
 
 // PINHasher hashes and verifies PINs.
@@ -41,6 +44,8 @@ type Sessions interface {
 	Get(ctx context.Context, tokenHash string) (domain.Session, error)
 	Touch(ctx context.Context, tokenHash string, at time.Time) error
 	Delete(ctx context.Context, tokenHash string) error
+	// DeleteForTrainer ends every session of the trainer.
+	DeleteForTrainer(ctx context.Context, trainer domain.TrainerID) error
 }
 
 // Tokens generates unguessable session tokens.

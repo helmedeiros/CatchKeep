@@ -48,3 +48,38 @@ func TestSessions_RequireAnExistingTrainer(t *testing.T) {
 		t.Fatal("session for unknown trainer accepted")
 	}
 }
+
+func TestSessions_DeleteForTrainerAndSetPINHash(t *testing.T) {
+	store, _ := openTemp(t)
+	trainers := sqlite.NewTrainers(store)
+	for _, id := range []domain.TrainerID{"T1", "T2"} {
+		if err := trainers.Create(t.Context(), domain.Trainer{ID: id, DisplayName: string(id), PINHash: "h"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sessions := sqlite.NewSessions(store)
+	for hash, id := range map[string]domain.TrainerID{"a": "T1", "b": "T1", "c": "T2"} {
+		if err := sessions.Create(t.Context(), domain.Session{TokenHash: hash, TrainerID: id}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := sessions.DeleteForTrainer(t.Context(), "T1"); err != nil {
+		t.Fatal(err)
+	}
+	for hash, gone := range map[string]bool{"a": true, "b": true, "c": false} {
+		if _, err := sessions.Get(t.Context(), hash); errors.Is(err, domain.ErrNoSession) != gone {
+			t.Errorf("session %s: err = %v, gone should be %v", hash, err, gone)
+		}
+	}
+
+	if err := trainers.SetPINHash(t.Context(), "T1", "new"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := trainers.Get(t.Context(), "T1"); got.PINHash != "new" {
+		t.Fatalf("PINHash = %q", got.PINHash)
+	}
+	if err := trainers.SetPINHash(t.Context(), "ghost", "x"); !errors.Is(err, domain.ErrTrainerNotFound) {
+		t.Fatalf("unknown trainer: err = %v", err)
+	}
+}

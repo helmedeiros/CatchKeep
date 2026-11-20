@@ -129,3 +129,34 @@ func TestSignOut_EndsTheSession(t *testing.T) {
 		t.Fatalf("err = %v, want ErrNoSession", err)
 	}
 }
+
+func TestResetPIN_SetsTheNewPINSignsOutEverywhereAndLiftsALockout(t *testing.T) {
+	f := newSessionsFixture(t)
+	token, _, err := f.sessions.SignIn(t.Context(), f.ash.ID, "2468")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 5 {
+		_, _, _ = f.sessions.SignIn(t.Context(), f.ash.ID, "1111")
+	}
+
+	if err := f.sessions.ResetPIN(t.Context(), f.ash.ID, "12"); !errors.Is(err, domain.ErrInvalidPIN) {
+		t.Fatalf("short PIN: err = %v", err)
+	}
+	if err := f.sessions.ResetPIN(t.Context(), "ghost", "1357"); !errors.Is(err, domain.ErrTrainerNotFound) {
+		t.Fatalf("unknown profile: err = %v", err)
+	}
+	if err := f.sessions.ResetPIN(t.Context(), f.ash.ID, "1357"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := f.sessions.Resolve(t.Context(), token); !errors.Is(err, domain.ErrNoSession) {
+		t.Fatalf("old session: err = %v, want signed out", err)
+	}
+	if _, _, err := f.sessions.SignIn(t.Context(), f.ash.ID, "2468"); !errors.Is(err, domain.ErrWrongPIN) {
+		t.Fatalf("old PIN: err = %v", err)
+	}
+	if _, _, err := f.sessions.SignIn(t.Context(), f.ash.ID, "1357"); err != nil {
+		t.Fatalf("new PIN: err = %v", err)
+	}
+}

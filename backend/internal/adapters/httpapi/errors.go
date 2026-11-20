@@ -23,6 +23,7 @@ const (
 	codePayloadTooLarge  = "PAYLOAD_TOO_LARGE"
 	codeTeamNameTaken    = "TEAM_NAME_TAKEN"
 	codeNeedsMapping     = "IMPORT_NEEDS_MAPPING"
+	codeAdminOnly        = "ADMIN_ONLY"
 )
 
 func errorBody(code, message string) Error {

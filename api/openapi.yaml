@@ -36,6 +36,20 @@ paths:
                 $ref: "#/components/schemas/Health"
         default:
           $ref: "#/components/responses/Error"
+  /host:
+    get:
+      tags: [profiles]
+      operationId: getHost
+      summary: Whether this device is the host admin (the Mac running CatchKeep).
+      responses:
+        "200":
+          description: What this device may do.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostInfo"
+        default:
+          $ref: "#/components/responses/Error"
   /profiles:
     get:
       tags: [profiles]
@@ -56,6 +70,7 @@ paths:
       tags: [profiles]
       operationId: createProfile
       summary: Create a trainer profile protected by a PIN.
+      description: Only the host admin, on the Mac running CatchKeep, may create profiles.
       requestBody:
         required: true
         content:
@@ -69,7 +84,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProfileSummary"
+        "403":
+          $ref: "#/components/responses/Error"
         "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+  /profiles/{profileId}/pin:
+    parameters:
+      - name: profileId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ProfileId"
+    put:
+      tags: [profiles]
+      operationId: resetPin
+      summary: Give a profile a new PIN.
+      description: >-
+        Only the host admin, on the Mac running CatchKeep, may reset PINs. The
+        trainer is signed out everywhere and any lockout is lifted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewPin"
+      responses:
+        "204":
+          description: The new PIN is set.
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
           $ref: "#/components/responses/Error"
         "422":
           $ref: "#/components/responses/Error"
@@ -723,6 +771,23 @@ components:
       properties:
         displayName:
           $ref: "#/components/schemas/DisplayName"
+        pin:
+          $ref: "#/components/schemas/Pin"
+    HostInfo:
+      type: object
+      additionalProperties: false
+      required: [admin]
+      properties:
+        admin:
+          type: boolean
+          description: >-
+            This request comes from the Mac running CatchKeep, which may
+            create profiles and reset PINs.
+    NewPin:
+      type: object
+      additionalProperties: false
+      required: [pin]
+      properties:
         pin:
           $ref: "#/components/schemas/Pin"
     SignIn:

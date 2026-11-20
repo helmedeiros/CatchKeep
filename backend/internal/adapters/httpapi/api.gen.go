@@ -468,6 +468,12 @@ type Health struct {
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// HostInfo defines model for HostInfo.
+type HostInfo struct {
+	// Admin This request comes from the Mac running CatchKeep, which may create profiles and reset PINs.
+	Admin bool `json:"admin"`
+}
+
 // IVs defines model for IVs.
 type IVs struct {
 	Attack  int `json:"attack"`
@@ -597,6 +603,14 @@ type Me struct {
 	//
 	// Examples: 01JD2Z8Q4M8V7Y6X5W4T3S2R1P
 	Id ProfileId `json:"id"`
+}
+
+// NewPin defines model for NewPin.
+type NewPin struct {
+	// Pin 4 to 8 digits.
+	//
+	// Examples: 2468
+	Pin Pin `json:"pin"`
 }
 
 // NewProfile defines model for NewProfile.
@@ -819,6 +833,9 @@ type MapImportColumnsJSONRequestBody = ColumnMappingInput
 // CreateProfileJSONRequestBody defines body for CreateProfile for application/json ContentType.
 type CreateProfileJSONRequestBody = NewProfile
 
+// ResetPinJSONRequestBody defines body for ResetPin for application/json ContentType.
+type ResetPinJSONRequestBody = NewPin
+
 // SignInJSONRequestBody defines body for SignIn for application/json ContentType.
 type SignInJSONRequestBody = SignIn
 
@@ -857,6 +874,9 @@ type ServerInterface interface {
 	// GetHealth Report whether the API is up.
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
+	// GetHost Whether this device is the host admin (the Mac running CatchKeep).
+	// (GET /host)
+	GetHost(w http.ResponseWriter, r *http.Request)
 	// StageImport Upload a Poke Genie CSV export and get a preview. Nothing changes until it is committed.
 	// (POST /imports)
 	StageImport(w http.ResponseWriter, r *http.Request)
@@ -884,6 +904,9 @@ type ServerInterface interface {
 	// CreateProfile Create a trainer profile protected by a PIN.
 	// (POST /profiles)
 	CreateProfile(w http.ResponseWriter, r *http.Request)
+	// ResetPin Give a profile a new PIN.
+	// (PUT /profiles/{profileId}/pin)
+	ResetPin(w http.ResponseWriter, r *http.Request, profileId ProfileId)
 	// SignOut Sign out of the current profile.
 	// (DELETE /session)
 	SignOut(w http.ResponseWriter, r *http.Request)
@@ -1026,6 +1049,20 @@ func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealth(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetHost operation middleware
+func (siw *ServerInterfaceWrapper) GetHost(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetHost(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1200,6 +1237,32 @@ func (siw *ServerInterfaceWrapper) CreateProfile(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateProfile(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResetPin operation middleware
+func (siw *ServerInterfaceWrapper) ResetPin(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "profileId" -------------
+	var profileId ProfileId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "profileId", r.PathValue("profileId"), &profileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "profileId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResetPin(w, r, profileId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1494,8 +1557,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/health", wrapper.GetHealth)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/host", wrapper.GetHost)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/profiles", wrapper.ListProfiles)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/profiles", wrapper.CreateProfile)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/profiles/{profileId}/pin", wrapper.ResetPin)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/session", wrapper.SignOut)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/session", wrapper.SignIn)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
@@ -1938,6 +2003,44 @@ type GetHealthdefaultJSONResponse struct {
 }
 
 func (response GetHealthdefaultJSONResponse) VisitGetHealthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetHostRequestObject struct {
+}
+
+type GetHostResponseObject interface {
+	VisitGetHostResponse(w http.ResponseWriter) error
+}
+
+type GetHost200JSONResponse HostInfo
+
+func (response GetHost200JSONResponse) VisitGetHostResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetHostdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetHostdefaultJSONResponse) VisitGetHostResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -2548,7 +2651,21 @@ func (response CreateProfile201JSONResponse) VisitCreateProfileResponse(w http.R
 	return err
 }
 
-type CreateProfile409JSONResponse struct{ ErrorJSONResponse }
+type CreateProfile403JSONResponse struct{ ErrorJSONResponse }
+
+func (response CreateProfile403JSONResponse) VisitCreateProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateProfile409JSONResponse Error
 
 func (response CreateProfile409JSONResponse) VisitCreateProfileResponse(w http.ResponseWriter) error {
 
@@ -2582,6 +2699,82 @@ type CreateProfiledefaultJSONResponse struct {
 }
 
 func (response CreateProfiledefaultJSONResponse) VisitCreateProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetPinRequestObject struct {
+	ProfileId ProfileId `json:"profileId"`
+	Body      *ResetPinJSONRequestBody
+}
+
+type ResetPinResponseObject interface {
+	VisitResetPinResponse(w http.ResponseWriter) error
+}
+
+type ResetPin204Response struct {
+}
+
+func (response ResetPin204Response) VisitResetPinResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ResetPin403JSONResponse struct{ ErrorJSONResponse }
+
+func (response ResetPin403JSONResponse) VisitResetPinResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetPin404JSONResponse Error
+
+func (response ResetPin404JSONResponse) VisitResetPinResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetPin422JSONResponse Error
+
+func (response ResetPin422JSONResponse) VisitResetPinResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetPindefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ResetPindefaultJSONResponse) VisitResetPinResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -3331,6 +3524,9 @@ type StrictServerInterface interface {
 	// GetHealth Report whether the API is up.
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
+	// GetHost Whether this device is the host admin (the Mac running CatchKeep).
+	// (GET /host)
+	GetHost(ctx context.Context, request GetHostRequestObject) (GetHostResponseObject, error)
 	// StageImport Upload a Poke Genie CSV export and get a preview. Nothing changes until it is committed.
 	// (POST /imports)
 	StageImport(ctx context.Context, request StageImportRequestObject) (StageImportResponseObject, error)
@@ -3358,6 +3554,9 @@ type StrictServerInterface interface {
 	// CreateProfile Create a trainer profile protected by a PIN.
 	// (POST /profiles)
 	CreateProfile(ctx context.Context, request CreateProfileRequestObject) (CreateProfileResponseObject, error)
+	// ResetPin Give a profile a new PIN.
+	// (PUT /profiles/{profileId}/pin)
+	ResetPin(ctx context.Context, request ResetPinRequestObject) (ResetPinResponseObject, error)
 	// SignOut Sign out of the current profile.
 	// (DELETE /session)
 	SignOut(ctx context.Context, request SignOutRequestObject) (SignOutResponseObject, error)
@@ -3620,6 +3819,30 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetHost operation middleware
+func (sh *strictHandler) GetHost(w http.ResponseWriter, r *http.Request) {
+	var request GetHostRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetHost(ctx, request.(GetHostRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetHost")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetHostResponseObject); ok {
+		if err := validResponse.VisitGetHostResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // StageImport operation middleware
 func (sh *strictHandler) StageImport(w http.ResponseWriter, r *http.Request) {
 	var request StageImportRequestObject
@@ -3860,6 +4083,39 @@ func (sh *strictHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateProfileResponseObject); ok {
 		if err := validResponse.VisitCreateProfileResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ResetPin operation middleware
+func (sh *strictHandler) ResetPin(w http.ResponseWriter, r *http.Request, profileId ProfileId) {
+	var request ResetPinRequestObject
+
+	request.ProfileId = profileId
+
+	var body ResetPinJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ResetPin(ctx, request.(ResetPinRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ResetPin")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ResetPinResponseObject); ok {
+		if err := validResponse.VisitResetPinResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
