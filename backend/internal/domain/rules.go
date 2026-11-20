@@ -27,6 +27,9 @@ const (
 // maxCapacity bounds storage well above the game's own limit.
 const maxCapacity = 20000
 
+// maxSpeciesRules is above the number of species in the game.
+const maxSpeciesRules = 2000
+
 // Setup is storage capacity and goals in priority order (step 1), plus
 // optional per-species and per-category rules (spec V1-SET-02, V1-SET-03).
 type Setup struct {
@@ -70,6 +73,9 @@ func (s Setup) Validate() error {
 			return fmt.Errorf("%w: goal %q is listed twice", ErrInvalidSetup, g)
 		}
 		seen[g] = true
+	}
+	if len(s.Species) > maxSpeciesRules {
+		return fmt.Errorf("%w: at most %d species rules", ErrInvalidSetup, maxSpeciesRules)
 	}
 	species := map[string]bool{}
 	for _, r := range s.Species {

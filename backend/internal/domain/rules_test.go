@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/helmedeiros/catchkeep/backend/internal/domain"
@@ -173,6 +174,7 @@ func TestSetup_ValidateSpeciesRules(t *testing.T) {
 		"negative minimum": {{Species: "Kyurem", Minimum: -1}},
 		"absurd minimum":   {{Species: "Kyurem", Minimum: 100000}},
 		"repeated":         {{Species: "Kyurem", Minimum: 2}, {Species: "Kyurem", Favorite: true}},
+		"too many":         tooManyRules(),
 	} {
 		s := base
 		s.Species = rules
@@ -380,4 +382,12 @@ func TestSummarizeKeeps_CategoryRulesApplyToEachSpeciesUnlessItHasItsOwn(t *test
 	check(domain.SummarizeKeeps(pokemon, setup, categorize),
 		map[string]int{"Mew": 3, "Celebi": 1},
 		map[string]domain.Rule{"Mew": domain.RuleSpecies, "Celebi": domain.RuleCategory})
+}
+
+func tooManyRules() []domain.SpeciesRule {
+	out := make([]domain.SpeciesRule, 2001)
+	for i := range out {
+		out[i] = domain.SpeciesRule{Species: fmt.Sprint("S", i), Minimum: 1}
+	}
+	return out
 }

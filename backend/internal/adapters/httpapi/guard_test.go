@@ -85,3 +85,28 @@ func TestGuard_AllowsBodylessChangesAndCSVImportsFromTheApp(t *testing.T) {
 	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+id+"/commit", ""), http.StatusOK)
 	wantStatus(t, api.do(http.MethodDelete, "/api/v1/session", ""), http.StatusNoContent)
 }
+
+func TestGuard_SendsSecurityHeaders(t *testing.T) {
+	rec := newAPI(t).do(http.MethodGet, "/api/v1/health", "")
+	for header, want := range map[string]string{
+		"X-Content-Type-Options":  "nosniff",
+		"X-Frame-Options":         "DENY",
+		"Referrer-Policy":         "no-referrer",
+		"Cache-Control":           "no-store",
+		"Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+	} {
+		if got := rec.Header().Get(header); got != want {
+			t.Errorf("%s = %q, want %q", header, got, want)
+		}
+	}
+}
+
+func TestGuard_CapsRequestBodies(t *testing.T) {
+	api := newAPI(t)
+	big := `{"displayName":"` + strings.Repeat("A", 2<<20) + `","pin":"2468"}`
+	rec := raw(t, api, http.MethodPost, "/api/v1/profiles", big, func(*http.Request) {})
+	wantStatus(t, rec, http.StatusRequestEntityTooLarge)
+	if code := errorCode(t, rec); code != "PAYLOAD_TOO_LARGE" {
+		t.Fatalf("code = %q", code)
+	}
+}

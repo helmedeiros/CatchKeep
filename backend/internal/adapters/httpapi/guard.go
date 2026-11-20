@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"mime"
 	"net"
 	"net/http"
@@ -8,6 +9,42 @@ import (
 	"slices"
 	"strings"
 )
+
+// maxJSONBytes bounds JSON request bodies; the largest real one, answers
+// for every row of a big re-import, stays well under it (spec SEC-09).
+const maxJSONBytes = 1 << 20
+
+// secureHeaders tells browsers not to sniff, frame, cache or refer API
+// responses.
+func secureHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("Cache-Control", "no-store")
+		h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// limitBody caps request bodies: uploads at their own limit, everything
+// else at maxJSONBytes.
+func limitBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		limit := int64(maxJSONBytes)
+		if r.URL.Path == BaseURL+"/imports" {
+			limit = maxImportBytes + 1
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, limit)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func tooLarge(err error) bool {
+	var limit *http.MaxBytesError
+	return errors.As(err, &limit)
+}
 
 // loopbackNames are the names of the computer running CatchKeep as seen
 // from itself.
