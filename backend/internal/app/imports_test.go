@@ -376,3 +376,33 @@ func TestMap_RejectsRecognizedExports(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestMark_SetsOnePokemonsFeaturesAndOnlyForItsTrainer(t *testing.T) {
+	f := newImportsFixture()
+	preview, _ := f.imports.Stage(t.Context(), ash, strings.NewReader("Dialga,1,2,3,100\nDialga,4,5,6,120\n"))
+	if _, err := f.imports.Commit(t.Context(), ash, preview.ID); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := f.collection.List(t.Context(), ash)
+	target, other := list[0], list[1]
+
+	got, err := f.collection.Mark(t.Context(), ash, target.ID, map[domain.Field]bool{domain.FieldPurified: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != target.ID || got.Current().Tri(domain.FieldPurified) != domain.Yes || got.Current().Tri(domain.FieldShadow) != domain.No {
+		t.Fatalf("marked = %v", got.Current())
+	}
+	list, _ = f.collection.List(t.Context(), ash)
+	for _, p := range list {
+		if p.ID == other.ID && p.Current().Tri(domain.FieldPurified) != domain.Unknown {
+			t.Fatal("the other Dialga changed too")
+		}
+	}
+	if _, err := f.collection.Mark(t.Context(), "misty", target.ID, map[domain.Field]bool{domain.FieldShiny: true}); !errors.Is(err, domain.ErrPokemonNotFound) {
+		t.Fatalf("another trainer: err = %v", err)
+	}
+	if _, err := f.collection.Mark(t.Context(), ash, target.ID, map[domain.Field]bool{domain.FieldCP: true}); !errors.Is(err, domain.ErrNotConfirmable) {
+		t.Fatalf("not a feature: err = %v", err)
+	}
+}

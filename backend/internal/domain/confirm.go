@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -56,4 +57,44 @@ func formOf(s Snapshot) string {
 		return f
 	}
 	return "Normal"
+}
+
+// MarkableFields are the yes/no features a trainer can set for one Pokémon.
+var MarkableFields = []Field{
+	FieldShiny, FieldLucky, FieldShadow, FieldPurified, FieldCostume, FieldBackground, FieldDynamax, FieldGigantamax,
+}
+
+// MarkFeatures records the trainer's own yes or no for features of one
+// Pokémon, as they see it in the game. Their answer outranks any export.
+// A Pokémon is never both shadow and purified, so a yes for one is a no for
+// the other.
+func MarkFeatures(p Pokemon, marks map[Field]bool, at time.Time) (PokemonUpdate, error) {
+	if len(marks) == 0 {
+		return PokemonUpdate{}, ErrNotConfirmable
+	}
+	if marks[FieldShadow] && marks[FieldPurified] {
+		return PokemonUpdate{}, fmt.Errorf("%w: a Pokémon cannot be both shadow and purified", ErrNotConfirmable)
+	}
+	answers := map[Field]bool{}
+	for f, v := range marks {
+		if !slices.Contains(MarkableFields, f) {
+			return PokemonUpdate{}, fmt.Errorf("%w: %q", ErrNotConfirmable, f)
+		}
+		answers[f] = v
+	}
+	if answers[FieldShadow] {
+		answers[FieldPurified] = false
+	}
+	if answers[FieldPurified] {
+		answers[FieldShadow] = false
+	}
+	u := PokemonUpdate{PokemonID: p.ID}
+	for _, f := range MarkableFields {
+		if v, ok := answers[f]; ok {
+			u.Observations = append(u.Observations, Observation{
+				Field: f, Value: strconv.FormatBool(v), Source: SourceManual, SourceRef: "marked by the trainer", ObservedAt: at,
+			})
+		}
+	}
+	return u, nil
 }

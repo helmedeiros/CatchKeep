@@ -362,6 +362,46 @@ paths:
           $ref: "#/components/responses/Error"
         default:
           $ref: "#/components/responses/Error"
+  /collection/{pokemonId}/features:
+    put:
+      tags: [collection]
+      operationId: markFeatures
+      summary: >-
+        Say whether one Pokémon is shiny, lucky, shadow, purified, costumed,
+        has a background, or is Dynamax or Gigantamax, as seen in the game.
+      description: >-
+        The trainer's answer outranks any export, now and on later imports.
+        A Pokémon is never both shadow and purified: yes for one is no for the
+        other. Features left out keep their current value.
+      security:
+        - session: []
+      parameters:
+        - name: pokemonId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeatureMarks"
+      responses:
+        "200":
+          description: Saved; the Pokémon as it is now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pokemon"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
   /collection/{pokemonId}/protection:
     put:
       tags: [collection]
@@ -1237,6 +1277,27 @@ components:
           maxItems: 100
           items:
             type: string
+    FeatureMarks:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        shiny:
+          type: boolean
+        lucky:
+          type: boolean
+        shadow:
+          type: boolean
+        purified:
+          type: boolean
+        costume:
+          type: boolean
+        background:
+          type: boolean
+        dynamax:
+          type: boolean
+        gigantamax:
+          type: boolean
     Protection:
       type: object
       additionalProperties: false

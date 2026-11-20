@@ -238,6 +238,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/collection/{pokemonId}/features": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Say whether one Pokémon is shiny, lucky, shadow, purified, costumed, has a background, or is Dynamax or Gigantamax, as seen in the game.
+         * @description The trainer's answer outranks any export, now and on later imports. A Pokémon is never both shadow and purified: yes for one is no for the other. Features left out keep their current value.
+         */
+        put: operations["markFeatures"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/collection/{pokemonId}/protection": {
         parameters: {
             query?: never;
@@ -613,6 +633,16 @@ export interface components {
         TeamInput: {
             name: string;
             memberIds: string[];
+        };
+        FeatureMarks: {
+            shiny?: boolean;
+            lucky?: boolean;
+            shadow?: boolean;
+            purified?: boolean;
+            costume?: boolean;
+            background?: boolean;
+            dynamax?: boolean;
+            gigantamax?: boolean;
         };
         Protection: {
             protected: boolean;
@@ -1096,6 +1126,36 @@ export interface operations {
                 };
             };
             401: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    markFeatures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pokemonId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeatureMarks"];
+            };
+        };
+        responses: {
+            /** @description Saved; the Pokémon as it is now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pokemon"];
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            422: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };
     };

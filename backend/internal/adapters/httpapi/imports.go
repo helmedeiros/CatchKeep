@@ -345,6 +345,36 @@ func toPokemon(p domain.Pokemon) Pokemon {
 	return out
 }
 
+func (s *server) MarkFeatures(ctx context.Context, req MarkFeaturesRequestObject) (MarkFeaturesResponseObject, error) {
+	trainer, err := s.trainer(ctx)
+	if errors.Is(err, errNotSignedIn) {
+		return MarkFeatures401JSONResponse{unauthenticated()}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	marks := map[domain.Field]bool{}
+	for f, v := range map[domain.Field]*bool{
+		domain.FieldShiny: req.Body.Shiny, domain.FieldLucky: req.Body.Lucky, domain.FieldShadow: req.Body.Shadow,
+		domain.FieldPurified: req.Body.Purified, domain.FieldCostume: req.Body.Costume, domain.FieldBackground: req.Body.Background,
+		domain.FieldDynamax: req.Body.Dynamax, domain.FieldGigantamax: req.Body.Gigantamax,
+	} {
+		if v != nil {
+			marks[f] = *v
+		}
+	}
+	p, err := s.services.Collection.Mark(ctx, trainer, domain.PokemonID(req.PokemonId), marks)
+	switch {
+	case errors.Is(err, domain.ErrPokemonNotFound):
+		return MarkFeatures404JSONResponse(errorBody(codeNotFound, "That Pokémon is not in your collection.")), nil
+	case errors.Is(err, domain.ErrNotConfirmable):
+		return MarkFeatures422JSONResponse(errorBody(codeValidationFailed, err.Error())), nil
+	case err != nil:
+		return nil, err
+	}
+	return MarkFeatures200JSONResponse(toPokemon(p)), nil
+}
+
 func (s *server) SetProtection(ctx context.Context, req SetProtectionRequestObject) (SetProtectionResponseObject, error) {
 	trainer, err := s.trainer(ctx)
 	if errors.Is(err, errNotSignedIn) {
