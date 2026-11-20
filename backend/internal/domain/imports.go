@@ -58,6 +58,13 @@ type ImportBatch struct {
 	PossibleMatchCount int
 	// Resolutions are the trainer's duplicate review answers, by line.
 	Resolutions map[int]Resolution
+	// Table is the file as read when it is not a recognized export, and
+	// Mapping how its columns were mapped; Parsed is empty until then.
+	Table       *Table
+	Mapping     ColumnMapping
 	CreatedAt   time.Time
 	CommittedAt time.Time
 }
+
+// NeedsMapping reports a table whose columns are not mapped yet.
+func (b ImportBatch) NeedsMapping() bool { return b.Table != nil && b.Mapping == nil }
