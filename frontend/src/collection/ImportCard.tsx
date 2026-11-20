@@ -1,12 +1,14 @@
 import { type ChangeEvent, useState } from "react";
 import { toast } from "sonner";
 import { alert, card, primaryButton, secondaryButton } from "../ui/styles";
+import { ColumnMapper } from "./ColumnMapper";
 import { DuplicateReview } from "./DuplicateReview";
 import {
   type ImportPreview,
   type MatchAnswer,
   useAnswerMatches,
   useCommitImport,
+  useMapColumns,
   useStageImport,
 } from "./useCollection";
 
@@ -14,7 +16,9 @@ export function ImportCard({ hasPokemon }: { hasPokemon: boolean }) {
   const stage = useStageImport();
   const commit = useCommitImport();
   const answer = useAnswerMatches();
+  const map = useMapColumns();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [remapping, setRemapping] = useState(false);
 
   const choose = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -31,6 +35,32 @@ export function ImportCard({ hasPokemon }: { hasPokemon: boolean }) {
       },
     });
 
+  if (preview && (preview.needsMapping || remapping)) {
+    return (
+      <ColumnMapper
+        key={preview.id}
+        preview={preview}
+        busy={map.isPending}
+        error={map.isError ? map.error.message : null}
+        onRead={(mapping) =>
+          map.mutate(
+            { importId: preview.id, mapping },
+            {
+              onSuccess: (p) => {
+                setRemapping(false);
+                setPreview(p);
+              },
+            },
+          )
+        }
+        onCancel={() => {
+          setRemapping(false);
+          setPreview(null);
+        }}
+      />
+    );
+  }
+
   if (preview) {
     return (
       <Preview
@@ -44,6 +74,9 @@ export function ImportCard({ hasPokemon }: { hasPokemon: boolean }) {
         }
         answerError={answer.isError ? answer.error.message : null}
         onCancel={() => setPreview(null)}
+        onRemap={
+          preview.source === "csv" ? () => setRemapping(true) : undefined
+        }
         busy={commit.isPending || answer.isPending}
       />
     );
@@ -57,6 +90,7 @@ export function ImportCard({ hasPokemon }: { hasPokemon: boolean }) {
       {!hasPokemon && (
         <p className="text-sm text-slate-600 dark:text-slate-400">
           Export your Pokémon from Poke Genie as CSV, then choose the file here.
+          A CSV from another app works too: you'll match its columns first.
           You'll see a preview before anything is added.
         </p>
       )}
@@ -100,6 +134,7 @@ function Preview({
   onAnswer,
   answerError,
   onCancel,
+  onRemap,
   busy,
 }: {
   preview: ImportPreview;
@@ -107,6 +142,7 @@ function Preview({
   onAnswer: (answers: MatchAnswer[]) => void;
   answerError: string | null;
   onCancel: () => void;
+  onRemap: (() => void) | undefined;
   busy: boolean;
 }) {
   const [reviewing, setReviewing] = useState(false);
@@ -218,6 +254,11 @@ function Preview({
       >
         {nothingToDo ? "Nothing to add yet" : commitLabel(preview)}
       </button>
+      {onRemap && (
+        <button type="button" className={secondaryButton} onClick={onRemap}>
+          Change how columns are read
+        </button>
+      )}
       <button type="button" className={secondaryButton} onClick={onCancel}>
         Cancel
       </button>

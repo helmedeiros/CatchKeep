@@ -18,6 +18,7 @@ CatchKeep takes both off your plate. It reads your Poke Genie export, keeps the 
 
 - **A profile per trainer.** Each trainer has a PIN-protected profile, so collections never get mixed up.
 - **Import from Poke Genie.** See a preview first, then browse your collection strongest first, with each Pokémon's picture, CP, HP, IVs and level. Anything the export can't tell (shiny, costume, background, Dynamax) stays "unknown" instead of being assumed absent.
+- **Or any other CSV.** A spreadsheet or another app's export works too: match each column to what it holds (only the species is required), see the preview, and CatchKeep remembers the match for your next file with the same columns.
 - **Re-import without duplicates.** Pokémon you already have are updated (new CP after a power-up, for example) instead of counted twice. Nothing is merged on its own: exact matches are confirmed in one tap, and anything less certain is shown side by side for you to decide.
 - **Confirm what the export can't tell.** One species at a time: "None of my 34 Pidgey are shiny, costumed or have a background." Only unknowns change.
 - **Storage and goals.** Say how many slots you have and what you keep Pokémon for (collecting, trading, battling), in order of priority. A preview shows what the defaults keep as you type.

@@ -23,6 +23,9 @@ interface Stored extends Row {
 }
 interface FakeImport {
   rows: Row[];
+  /** A file that is not a Poke Genie export, read once mapped. */
+  table?: { header: string[]; records: string[][] };
+  mapping?: Schemas["ColumnMapEntry"][];
   status: "staged" | "committed";
   answers: Map<number, Schemas["MatchAnswer"]>;
   done?: { newCount: number; updatedCount: number; pending: number };
@@ -71,6 +74,7 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
   let teams: Schemas["Team"][] = [];
   const collection: Stored[] = [];
   const imports = new Map<string, FakeImport>();
+  const mappings = new Map<string, Schemas["ColumnMapEntry"][]>();
   const err = (status: number, code: string, message: string) =>
     jsonResponse(status, { error: { code, message, correlationId: "test" } });
 
@@ -142,11 +146,25 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
       if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
       const [header, ...lines] = text.trim().split("\n");
       if (!header?.includes("Pokemon Number")) {
-        return err(
-          422,
-          "UNSUPPORTED_FILE",
-          "this file is not a Poke Genie CSV export",
-        );
+        const columns = header?.split(",") ?? [];
+        if (columns.length < 2 || lines.length === 0) {
+          return err(
+            422,
+            "UNSUPPORTED_FILE",
+            "this file is not a CSV export CatchKeep can read: it needs a header row with at least two columns and one Pokémon per line",
+          );
+        }
+        const id = `01JD2Z8Q4M8V7Y6X5W4T3S2T${String(imports.size).padStart(2, "0")}`;
+        const imp: FakeImport = {
+          rows: [],
+          status: "staged",
+          answers: new Map(),
+          table: { header: columns, records: lines.map((l) => l.split(",")) },
+        };
+        const saved = mappings.get(signature(columns));
+        if (saved) mapTable(imp, saved);
+        imports.set(id, imp);
+        return jsonResponse(201, preview(id));
       }
       const rows = lines.map((l) => {
         const c = l.split(",");
@@ -166,10 +184,29 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
       imports.set(id, { rows, status: "staged", answers: new Map() });
       return jsonResponse(201, preview(id));
     }
+    const mapPath = path.match(/^\/imports\/([^/]+)\/mapping$/);
+    if (mapPath && req.method === "PUT") {
+      const imp = imports.get(mapPath[1] ?? "");
+      if (!imp?.table) return err(404, "NOT_FOUND", "import not found");
+      const entries = (body as Schemas["ColumnMappingInput"]).mapping;
+      if (!entries.some((e) => e.field === "species")) {
+        return err(422, "VALIDATION_FAILED", "choose the species column");
+      }
+      mapTable(imp, entries);
+      mappings.set(signature(imp.table.header), entries);
+      return jsonResponse(200, preview(mapPath[1] ?? ""));
+    }
     const commit = path.match(/^\/imports\/([^/]+)\/commit$/);
     if (commit && req.method === "POST") {
       const imp = imports.get(commit[1] ?? "");
       if (!imp) return err(404, "NOT_FOUND", "import not found");
+      if (imp.table && !imp.mapping) {
+        return err(
+          409,
+          "IMPORT_NEEDS_MAPPING",
+          "Map the file's columns first.",
+        );
+      }
       const r = review(imp);
       for (const row of r.add) {
         next += 1;
@@ -439,13 +476,52 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
     };
   }
 
+  function signature(header: string[]) {
+    return header.map((h) => h.trim().toLowerCase()).join("\n");
+  }
+
+  /** Reads species, Pokédex number, CP and HP columns; ignores the rest. */
+  function mapTable(imp: FakeImport, entries: Schemas["ColumnMapEntry"][]) {
+    const table = imp.table;
+    if (!table) return;
+    const at = (field: string) =>
+      table.header.indexOf(
+        entries.find((e) => e.field === field)?.column ?? "",
+      );
+    imp.mapping = entries;
+    imp.rows = table.records.map((r) => ({
+      species: r[at("species")] ?? "",
+      dexNumber: Number(r[at("dex_number")] ?? 0),
+      cp: Number(r[at("cp")] ?? 0),
+      hp: Number(r[at("hp")] ?? 0),
+      lucky: false,
+    }));
+  }
+
+  /** Suggests fields from a few common column names. */
+  function suggest(header: string[]): Schemas["ColumnMapEntry"][] {
+    const names: Record<string, Schemas["MappableField"]> = {
+      name: "species",
+      species: "species",
+      cp: "cp",
+      "combat power": "cp",
+      hp: "hp",
+    };
+    return header.flatMap((column) => {
+      const field = names[column.trim().toLowerCase()];
+      return field ? [{ column, field }] : [];
+    });
+  }
+
   function preview(id: string): Schemas["ImportPreview"] {
     const imp = imports.get(id);
-    const r = imp && !imp.done ? review(imp) : null;
+    const r =
+      imp && !imp.done && !(imp.table && !imp.mapping) ? review(imp) : null;
+    const table = imp?.table;
     return {
       id,
       status: imp?.status ?? "staged",
-      source: "poke-genie",
+      source: table ? "csv" : "poke-genie",
       totalRows: imp?.rows.length ?? 0,
       newCount: imp?.done?.newCount ?? r?.add.length ?? 0,
       updatedCount: imp?.done?.updatedCount ?? r?.update.length ?? 0,
@@ -460,9 +536,16 @@ export function createFakeApi(options: { lockAfter?: number } = {}) {
         "dynamax",
         "gigantamax",
       ],
-      needsMapping: false,
-      columns: [],
-      mapping: [],
+      needsMapping: table !== undefined && imp?.mapping === undefined,
+      columns: (table?.header ?? []).map((name, i) => ({
+        name,
+        samples:
+          table?.records
+            .map((r) => r[i] ?? "")
+            .filter((v) => v !== "")
+            .slice(0, 3) ?? [],
+      })),
+      mapping: table ? (imp?.mapping ?? suggest(table.header)) : [],
     };
   }
 

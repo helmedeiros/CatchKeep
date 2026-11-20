@@ -66,6 +66,27 @@ export function useAnswerMatches() {
   });
 }
 
+export type ColumnMapEntry = components["schemas"]["ColumnMapEntry"];
+
+export function useMapColumns() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async ({
+      importId,
+      mapping,
+    }: {
+      importId: string;
+      mapping: ColumnMapEntry[];
+    }) =>
+      unwrap(
+        await api.PUT("/imports/{importId}/mapping", {
+          params: { path: { importId } },
+          body: { mapping },
+        }),
+      ),
+  });
+}
+
 export type ConfirmableFeature = components["schemas"]["ConfirmableFeature"];
 
 export function useConfirmAbsent() {

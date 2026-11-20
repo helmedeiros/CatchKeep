@@ -6,7 +6,7 @@ import (
 )
 
 // ErrUnrecognizedExport means an uploaded file is not a supported export.
-var ErrUnrecognizedExport = errors.New("this file is not a Poke Genie CSV export")
+var ErrUnrecognizedExport = errors.New("this file is not a CSV export CatchKeep can read: it needs a header row with at least two columns and one Pokémon per line")
 
 // ImportRow is one Pokémon read from an export, as observations.
 type ImportRow struct {
