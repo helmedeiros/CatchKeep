@@ -43,6 +43,10 @@ export function PokemonRow({
           {p.attributes.lucky === "yes" && <Badge>Lucky</Badge>}
           {p.attributes.shadow === "yes" && <Badge>Shadow</Badge>}
           {p.attributes.purified === "yes" && <Badge>Purified</Badge>}
+          {p.attributes.costume === "yes" && <Badge>Costume</Badge>}
+          {p.attributes.background === "yes" && <Badge>Background</Badge>}
+          {p.attributes.dynamax === "yes" && <Badge>Dynamax</Badge>}
+          {p.attributes.gigantamax === "yes" && <Badge>Gigantamax</Badge>}
           {p.attributes.favorite === "yes" && <Badge>★</Badge>}
           {p.catchDate && <span>Caught {p.catchDate}</span>}
           {children}
