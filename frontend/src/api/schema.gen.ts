@@ -135,6 +135,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/imports/{importId}/mapping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: components["parameters"]["ImportId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Say which field each column of an unrecognized file holds.
+         * @description Reads the staged file with this mapping, replacing any earlier mapping and answers, and remembers it so the trainer's next file with the same columns is read the same way (V1-IMP-02). Columns left out are ignored. One column must hold the species.
+         */
+        put: operations["mapImportColumns"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/imports/{importId}/answers": {
         parameters: {
             query?: never;
@@ -433,8 +455,11 @@ export interface components {
             id: string;
             /** @enum {string} */
             status: "staged" | "committed";
-            /** @enum {string} */
-            source: "poke-genie";
+            /**
+             * @description poke-genie for a recognized export; csv for any other file, read with a column mapping.
+             * @enum {string}
+             */
+            source: "poke-genie" | "csv";
             totalRows: number;
             /** @description Rows that will be added (or were added, once committed). */
             newCount: number;
@@ -449,7 +474,26 @@ export interface components {
             ignoredColumns: string[];
             /** @description Features this export cannot establish; they stay unknown. */
             unknownFields: string[];
+            /** @description The file is not a recognized export and its columns are not mapped yet; nothing is read and it cannot be committed until they are. */
+            needsMapping: boolean;
+            /** @description The columns of an unrecognized file with a few values each; empty for a recognized export. */
+            columns: components["schemas"]["ImportColumn"][];
+            /** @description How an unrecognized file's columns are mapped, or a suggestion from their names while it still needs mapping. */
+            mapping: components["schemas"]["ColumnMapEntry"][];
         };
+        ImportColumn: {
+            name: string;
+            samples: string[];
+        };
+        ColumnMapEntry: {
+            column: string;
+            field: components["schemas"]["MappableField"];
+        };
+        ColumnMappingInput: {
+            mapping: components["schemas"]["ColumnMapEntry"][];
+        };
+        /** @enum {string} */
+        MappableField: "species" | "dex_number" | "form" | "gender" | "cp" | "hp" | "level" | "iv_attack" | "iv_defense" | "iv_stamina" | "catch_date" | "shiny" | "lucky" | "shadow" | "purified" | "costume" | "background" | "dynamax" | "gigantamax" | "in_game_favorite";
         PossibleMatch: {
             /** @description 1-based line number in the file, counting the header. */
             row: number;
@@ -867,6 +911,37 @@ export interface operations {
             401: components["responses"]["Error"];
             404: components["responses"]["Error"];
             409: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    mapImportColumns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                importId: components["parameters"]["ImportId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ColumnMappingInput"];
+            };
+        };
+        responses: {
+            /** @description Mapped; the preview of the rows read. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };
     };

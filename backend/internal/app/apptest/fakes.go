@@ -170,14 +170,18 @@ func (g *SequentialTokens) NewToken() string { return "token-" + g.NewID() }
 
 // CollectionStore is an in-memory ports.ImportBatches and ports.CollectionReader.
 type CollectionStore struct {
-	mu      sync.Mutex
-	batches map[string]domain.ImportBatch
-	pokemon map[domain.TrainerID][]domain.Pokemon
+	mu       sync.Mutex
+	batches  map[string]domain.ImportBatch
+	pokemon  map[domain.TrainerID][]domain.Pokemon
+	mappings map[string]domain.ColumnMapping
 }
 
 // NewCollectionStore returns an empty store.
 func NewCollectionStore() *CollectionStore {
-	return &CollectionStore{batches: map[string]domain.ImportBatch{}, pokemon: map[domain.TrainerID][]domain.Pokemon{}}
+	return &CollectionStore{
+		batches: map[string]domain.ImportBatch{}, pokemon: map[domain.TrainerID][]domain.Pokemon{},
+		mappings: map[string]domain.ColumnMapping{},
+	}
 }
 
 // Save implements ports.ImportBatches.
@@ -207,6 +211,22 @@ func (s *CollectionStore) SaveResolutions(_ context.Context, b domain.ImportBatc
 	stored.Resolutions = b.Resolutions
 	s.batches[b.ID] = stored
 	return nil
+}
+
+// SaveMapping implements ports.ImportBatches.
+func (s *CollectionStore) SaveMapping(_ context.Context, b domain.ImportBatch) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.batches[b.ID] = b
+	s.mappings[string(b.TrainerID)+"/"+b.Table.Signature()] = b.Mapping
+	return nil
+}
+
+// SavedMapping implements ports.ImportBatches.
+func (s *CollectionStore) SavedMapping(_ context.Context, trainer domain.TrainerID, signature string) (domain.ColumnMapping, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.mappings[string(trainer)+"/"+signature], nil
 }
 
 // Commit implements ports.ImportBatches.

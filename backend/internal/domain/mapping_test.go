@@ -87,3 +87,11 @@ func TestImportBatch_NeedsMappingUntilMapped(t *testing.T) {
 		t.Fatal("a recognized export needs no mapping")
 	}
 }
+
+func TestColumnMapping_RebindMatchesColumnsIgnoringCaseAndSpacing(t *testing.T) {
+	saved := domain.ColumnMapping{"Pokemon": domain.FieldSpecies, "CP": domain.FieldCP, "Gone": domain.FieldHP}
+	got := saved.Rebind(domain.Table{Header: []string{"pokemon ", " cp", "Note"}})
+	if len(got) != 2 || got["pokemon"] != domain.FieldSpecies || got["cp"] != domain.FieldCP {
+		t.Fatalf("rebound = %v", got)
+	}
+}

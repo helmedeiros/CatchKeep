@@ -222,6 +222,43 @@ paths:
           $ref: "#/components/responses/Error"
         default:
           $ref: "#/components/responses/Error"
+  /imports/{importId}/mapping:
+    parameters:
+      - $ref: "#/components/parameters/ImportId"
+    put:
+      tags: [imports]
+      operationId: mapImportColumns
+      summary: Say which field each column of an unrecognized file holds.
+      description: >-
+        Reads the staged file with this mapping, replacing any earlier
+        mapping and answers, and remembers it so the trainer's next file with
+        the same columns is read the same way (V1-IMP-02). Columns left out
+        are ignored. One column must hold the species.
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ColumnMappingInput"
+      responses:
+        "200":
+          description: Mapped; the preview of the rows read.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportPreview"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
   /imports/{importId}/answers:
     parameters:
       - $ref: "#/components/parameters/ImportId"
@@ -844,6 +881,9 @@ components:
           invalidRows,
           ignoredColumns,
           unknownFields,
+          needsMapping,
+          columns,
+          mapping,
         ]
       properties:
         id:
@@ -853,7 +893,10 @@ components:
           enum: [staged, committed]
         source:
           type: string
-          enum: [poke-genie]
+          enum: [poke-genie, csv]
+          description: >-
+            poke-genie for a recognized export; csv for any other file, read
+            with a column mapping.
         totalRows:
           type: integer
           minimum: 0
@@ -888,6 +931,79 @@ components:
           description: Features this export cannot establish; they stay unknown.
           items:
             type: string
+        needsMapping:
+          type: boolean
+          description: >-
+            The file is not a recognized export and its columns are not
+            mapped yet; nothing is read and it cannot be committed until
+            they are.
+        columns:
+          type: array
+          description: The columns of an unrecognized file with a few values each; empty for a recognized export.
+          items:
+            $ref: "#/components/schemas/ImportColumn"
+        mapping:
+          type: array
+          description: >-
+            How an unrecognized file's columns are mapped, or a suggestion
+            from their names while it still needs mapping.
+          items:
+            $ref: "#/components/schemas/ColumnMapEntry"
+    ImportColumn:
+      type: object
+      additionalProperties: false
+      required: [name, samples]
+      properties:
+        name:
+          type: string
+        samples:
+          type: array
+          maxItems: 3
+          items:
+            type: string
+    ColumnMapEntry:
+      type: object
+      additionalProperties: false
+      required: [column, field]
+      properties:
+        column:
+          type: string
+        field:
+          $ref: "#/components/schemas/MappableField"
+    ColumnMappingInput:
+      type: object
+      additionalProperties: false
+      required: [mapping]
+      properties:
+        mapping:
+          type: array
+          items:
+            $ref: "#/components/schemas/ColumnMapEntry"
+    MappableField:
+      type: string
+      enum:
+        [
+          species,
+          dex_number,
+          form,
+          gender,
+          cp,
+          hp,
+          level,
+          iv_attack,
+          iv_defense,
+          iv_stamina,
+          catch_date,
+          shiny,
+          lucky,
+          shadow,
+          purified,
+          costume,
+          background,
+          dynamax,
+          gigantamax,
+          in_game_favorite,
+        ]
     PossibleMatch:
       type: object
       additionalProperties: false

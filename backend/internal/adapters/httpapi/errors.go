@@ -22,6 +22,7 @@ const (
 	codeUnsupportedFile  = "UNSUPPORTED_FILE"
 	codePayloadTooLarge  = "PAYLOAD_TOO_LARGE"
 	codeTeamNameTaken    = "TEAM_NAME_TAKEN"
+	codeNeedsMapping     = "IMPORT_NEEDS_MAPPING"
 )
 
 func errorBody(code, message string) Error {

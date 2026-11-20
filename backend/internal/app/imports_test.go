@@ -17,7 +17,7 @@ type fakeParser struct{}
 
 func (fakeParser) Parse(r io.Reader) (domain.ParsedExport, error) {
 	b, _ := io.ReadAll(r)
-	if strings.HasPrefix(string(b), "garbage") {
+	if strings.HasPrefix(string(b), "garbage") || strings.HasPrefix(strings.ToLower(string(b)), "mon,") {
 		return domain.ParsedExport{}, domain.ErrUnrecognizedExport
 	}
 	out := domain.ParsedExport{Source: "poke-genie", IgnoredColumns: []string{"Dust"}, UnknownFields: []domain.Field{domain.FieldShiny}}
@@ -39,6 +39,37 @@ func (fakeParser) Parse(r io.Reader) (domain.ParsedExport, error) {
 	return out, nil
 }
 
+// fakeTables reads any comma-separated text as a table; values pass
+// through as observations of their mapped field.
+type fakeTables struct{}
+
+func (fakeTables) ReadTable(r io.Reader) (domain.Table, error) {
+	b, _ := io.ReadAll(r)
+	if strings.HasPrefix(string(b), "garbage") {
+		return domain.Table{}, domain.ErrUnrecognizedExport
+	}
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	t := domain.Table{Header: strings.Split(lines[0], ",")}
+	for _, l := range lines[1:] {
+		t.Records = append(t.Records, strings.Split(l, ","))
+	}
+	return t, nil
+}
+
+func (fakeTables) ParseTable(t domain.Table, m domain.ColumnMapping, at time.Time) domain.ParsedExport {
+	out := domain.ParsedExport{Source: "csv"}
+	for i, r := range t.Records {
+		obs := []domain.Observation{{Field: domain.FieldForm, Value: "Normal", Source: domain.SourceCSV, ObservedAt: at}}
+		for j, h := range t.Header {
+			if f, ok := m[h]; ok && j < len(r) {
+				obs = append(obs, domain.Observation{Field: f, Value: r[j], Source: domain.SourceCSV, ObservedAt: at})
+			}
+		}
+		out.Rows = append(out.Rows, domain.ImportRow{Line: i + 2, Observations: obs})
+	}
+	return out
+}
+
 type importsFixture struct {
 	imports    *app.Imports
 	collection *app.Collection
@@ -50,7 +81,7 @@ func newImportsFixture() importsFixture {
 	clock := apptest.NewFixedClock(time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC))
 	ids := apptest.NewSequentialIDs()
 	return importsFixture{
-		imports:    app.NewImports(fakeParser{}, store, store, ids, clock),
+		imports:    app.NewImports(fakeParser{}, fakeTables{}, store, store, ids, clock),
 		collection: app.NewCollection(store, store, clock),
 		store:      store,
 	}
@@ -271,5 +302,77 @@ func TestConfirmAbsent_SetsUnknownFeaturesOfOneSpeciesToNo(t *testing.T) {
 	}
 	if _, err := f.collection.ConfirmAbsent(t.Context(), ash, "Pidgey", "Normal", []domain.Field{domain.FieldCP}); !errors.Is(err, domain.ErrNotConfirmable) {
 		t.Fatalf("CP: err = %v", err)
+	}
+}
+
+const spreadsheet = "Mon,Combat Power,Note\nPidgey,120,a\nRattata,90,b\n"
+
+func TestStage_AsksToMapAFileItDoesNotRecognize(t *testing.T) {
+	f := newImportsFixture()
+
+	p, err := f.imports.Stage(t.Context(), ash, strings.NewReader(spreadsheet))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.NeedsMapping || p.TotalRows != 0 || len(p.Columns) != 3 || p.Columns[1].Name != "Combat Power" || p.Columns[1].Samples[0] != "120" {
+		t.Fatalf("preview = %+v; the columns with samples, nothing read yet", p)
+	}
+	if p.Mapping["Combat Power"] != domain.FieldCP {
+		t.Errorf("suggested mapping = %v", p.Mapping)
+	}
+	if _, err := f.imports.Commit(t.Context(), ash, p.ID); !errors.Is(err, domain.ErrImportNeedsMapping) {
+		t.Fatalf("commit before mapping: err = %v", err)
+	}
+	if _, err := f.imports.Resolve(t.Context(), ash, p.ID, nil); !errors.Is(err, domain.ErrImportNeedsMapping) {
+		t.Fatalf("answers before mapping: err = %v", err)
+	}
+	if list, _ := f.collection.List(t.Context(), ash); len(list) != 0 {
+		t.Fatal("staging changed the collection")
+	}
+}
+
+func TestMap_ReadsTheFileAndRemembersTheMappingForTheNextOne(t *testing.T) {
+	f := newImportsFixture()
+	p, _ := f.imports.Stage(t.Context(), ash, strings.NewReader(spreadsheet))
+	mapping := domain.ColumnMapping{"Mon": domain.FieldSpecies, "Combat Power": domain.FieldCP}
+
+	if _, err := f.imports.Map(t.Context(), ash, p.ID, domain.ColumnMapping{"Combat Power": domain.FieldCP}); !errors.Is(err, domain.ErrInvalidMapping) {
+		t.Fatalf("mapping without species: err = %v", err)
+	}
+	mapped, err := f.imports.Map(t.Context(), ash, p.ID, mapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mapped.NeedsMapping || mapped.NewCount != 2 || mapped.Mapping["Mon"] != domain.FieldSpecies || len(mapped.Columns) != 3 {
+		t.Fatalf("preview = %+v", mapped)
+	}
+	if _, err := f.imports.Commit(t.Context(), ash, p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := f.collection.List(t.Context(), ash); len(list) != 2 {
+		t.Fatalf("collection = %d Pokémon, want 2", len(list))
+	}
+	if _, err := f.imports.Map(t.Context(), ash, p.ID, mapping); !errors.Is(err, domain.ErrImportAlreadyCommitted) {
+		t.Fatalf("mapping a committed import: err = %v", err)
+	}
+
+	next, err := f.imports.Stage(t.Context(), ash, strings.NewReader("mon, combat power ,NOTE\nEevee,300,c\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.NeedsMapping || next.NewCount != 1 {
+		t.Fatalf("preview = %+v; the same columns reuse the saved mapping", next)
+	}
+	other, _ := f.imports.Stage(t.Context(), "misty", strings.NewReader(spreadsheet))
+	if !other.NeedsMapping {
+		t.Fatal("another trainer's saved mapping was applied")
+	}
+}
+
+func TestMap_RejectsRecognizedExports(t *testing.T) {
+	f := newImportsFixture()
+	p, _ := f.imports.Stage(t.Context(), ash, strings.NewReader("Pidgey,1,2,3,100\n"))
+	if _, err := f.imports.Map(t.Context(), ash, p.ID, domain.ColumnMapping{"Mon": domain.FieldSpecies}); !errors.Is(err, domain.ErrInvalidMapping) {
+		t.Fatalf("err = %v", err)
 	}
 }

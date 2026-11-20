@@ -256,3 +256,44 @@ func TestCollection_SetProtectedIsScopedToTheTrainer(t *testing.T) {
 		t.Fatal("P1 is still protected")
 	}
 }
+
+func TestImportBatches_KeepTheTableAndRememberMappingsPerTrainer(t *testing.T) {
+	store, _ := openTemp(t)
+	withTrainers(t, store, "ash", "misty")
+	coll := sqlite.NewCollection(store)
+	tbl := domain.Table{Header: []string{"Mon", "CP"}, Records: [][]string{{"Pidgey", "120"}}}
+	b := domain.ImportBatch{ID: "B1", TrainerID: "ash", Status: domain.ImportStaged, CreatedAt: at, Table: &tbl}
+	if err := coll.Save(t.Context(), b); err != nil {
+		t.Fatal(err)
+	}
+	got, err := coll.Get(t.Context(), "ash", "B1")
+	if err != nil || !got.NeedsMapping() || got.Table.Records[0][1] != "120" {
+		t.Fatalf("Get = %+v, %v; the table waits for a mapping", got, err)
+	}
+
+	b.Mapping = domain.ColumnMapping{"Mon": domain.FieldSpecies}
+	b.Parsed = stagedBatch().Parsed
+	b.NewCount = 1
+	b.Resolutions = map[int]domain.Resolution{2: {Line: 2}}
+	if err := coll.SaveMapping(t.Context(), b); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = coll.Get(t.Context(), "ash", "B1")
+	if got.NeedsMapping() || got.Mapping["Mon"] != domain.FieldSpecies || len(got.Parsed.Rows) != 1 || got.NewCount != 1 || len(got.Resolutions) != 1 {
+		t.Fatalf("Get = %+v", got)
+	}
+	if m, err := coll.SavedMapping(t.Context(), "ash", tbl.Signature()); err != nil || m["Mon"] != domain.FieldSpecies {
+		t.Fatalf("saved mapping = %v, %v", m, err)
+	}
+	if m, _ := coll.SavedMapping(t.Context(), "misty", tbl.Signature()); m != nil {
+		t.Fatalf("misty sees ash's mapping %v", m)
+	}
+
+	b.Mapping = domain.ColumnMapping{"Mon": domain.FieldSpecies, "CP": domain.FieldCP}
+	if err := coll.SaveMapping(t.Context(), b); err != nil {
+		t.Fatal(err)
+	}
+	if m, _ := coll.SavedMapping(t.Context(), "ash", tbl.Signature()); m["CP"] != domain.FieldCP {
+		t.Fatalf("a newer mapping replaces the saved one: %v", m)
+	}
+}

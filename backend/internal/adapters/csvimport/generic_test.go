@@ -38,8 +38,10 @@ func TestGeneric_ReadTableKeepsTheHeaderAndEveryLine(t *testing.T) {
 	if tbl.Header[0] != "Pokémon" || len(tbl.Header) != 11 || len(tbl.Records) != 5 {
 		t.Fatalf("table = %q with %d records", tbl.Header, len(tbl.Records))
 	}
-	if _, err := (csvimport.Generic{}).ReadTable(strings.NewReader("")); !errors.Is(err, domain.ErrUnrecognizedExport) {
-		t.Fatalf("empty file: err = %v", err)
+	for name, file := range map[string]string{"empty": "", "one column": "garbage\nmore\n", "header only": "a,b\n"} {
+		if _, err := (csvimport.Generic{}).ReadTable(strings.NewReader(file)); !errors.Is(err, domain.ErrUnrecognizedExport) {
+			t.Errorf("%s: err = %v", name, err)
+		}
 	}
 }
 

@@ -1,8 +1,10 @@
 package app
 
 import (
+	"bytes"
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -32,11 +34,26 @@ type ImportPreview struct {
 	Problems       []domain.ImportProblem
 	IgnoredColumns []string
 	UnknownFields  []domain.Field
+	// NeedsMapping is set for a file CatchKeep does not recognize until
+	// the trainer maps its columns. Columns and Mapping (the current one,
+	// or a suggestion) are set for any such file.
+	NeedsMapping bool
+	Columns      []ColumnPreview
+	Mapping      domain.ColumnMapping
 }
+
+// ColumnPreview is one column of an unrecognized file with a few values.
+type ColumnPreview struct {
+	Name    string
+	Samples []string
+}
+
+const columnSamples = 3
 
 // Imports stages exports for review and commits them to the collection.
 type Imports struct {
 	parser     ports.ExportParser
+	tables     ports.TableParser
 	batches    ports.ImportBatches
 	collection ports.CollectionReader
 	ids        ports.IDs
@@ -44,18 +61,32 @@ type Imports struct {
 }
 
 // NewImports wires the import use cases.
-func NewImports(parser ports.ExportParser, batches ports.ImportBatches, collection ports.CollectionReader, ids ports.IDs, clock ports.Clock) *Imports {
-	return &Imports{parser: parser, batches: batches, collection: collection, ids: ids, clock: clock}
+func NewImports(parser ports.ExportParser, tables ports.TableParser, batches ports.ImportBatches, collection ports.CollectionReader, ids ports.IDs, clock ports.Clock) *Imports {
+	return &Imports{parser: parser, tables: tables, batches: batches, collection: collection, ids: ids, clock: clock}
 }
 
-// Stage reads an export and stores it for review. The collection is unchanged.
+// Stage reads an export and stores it for review. The collection is
+// unchanged. A file that is not a recognized export is staged as a table:
+// with the trainer's saved mapping for its columns if there is one,
+// otherwise waiting for one (spec V1-IMP-02).
 func (u *Imports) Stage(ctx context.Context, trainer domain.TrainerID, r io.Reader) (ImportPreview, error) {
-	parsed, err := u.parser.Parse(r)
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return ImportPreview{}, fmt.Errorf("read export: %w", err)
+	}
+	batch := domain.ImportBatch{ID: u.ids.NewID(), TrainerID: trainer, Status: domain.ImportStaged, CreatedAt: u.clock.Now()}
+	batch.Parsed, err = u.parser.Parse(bytes.NewReader(data))
+	if errors.Is(err, domain.ErrUnrecognizedExport) {
+		err = u.stageTable(ctx, &batch, data)
+	}
 	if err != nil {
 		return ImportPreview{}, err
 	}
-	batch := domain.ImportBatch{
-		ID: u.ids.NewID(), TrainerID: trainer, Status: domain.ImportStaged, Parsed: parsed, CreatedAt: u.clock.Now(),
+	if batch.NeedsMapping() {
+		if err := u.batches.Save(ctx, batch); err != nil {
+			return ImportPreview{}, fmt.Errorf("save import: %w", err)
+		}
+		return previewOf(batch), nil
 	}
 	review, err := u.review(ctx, batch)
 	if err != nil {
@@ -67,6 +98,53 @@ func (u *Imports) Stage(ctx context.Context, trainer domain.TrainerID, r io.Read
 	return stagedPreview(batch, review), nil
 }
 
+func (u *Imports) stageTable(ctx context.Context, batch *domain.ImportBatch, data []byte) error {
+	table, err := u.tables.ReadTable(bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	batch.Table, batch.Parsed = &table, domain.ParsedExport{Source: domain.MappedSource}
+	saved, err := u.batches.SavedMapping(ctx, batch.TrainerID, table.Signature())
+	if err != nil {
+		return err
+	}
+	if m := saved.Rebind(table); len(saved) > 0 && m.Validate(table) == nil {
+		batch.Mapping = m
+		batch.Parsed = u.tables.ParseTable(table, m, batch.CreatedAt)
+	}
+	return nil
+}
+
+// Map reads a staged table with the trainer's column mapping, replacing any
+// earlier mapping and answers, and remembers it for files with the same
+// columns.
+func (u *Imports) Map(ctx context.Context, trainer domain.TrainerID, id string, m domain.ColumnMapping) (ImportPreview, error) {
+	batch, err := u.batches.Get(ctx, trainer, id)
+	if err != nil {
+		return ImportPreview{}, err
+	}
+	switch {
+	case batch.Status == domain.ImportCommitted:
+		return ImportPreview{}, domain.ErrImportAlreadyCommitted
+	case batch.Table == nil:
+		return ImportPreview{}, fmt.Errorf("%w: this export is read without a mapping", domain.ErrInvalidMapping)
+	}
+	if err := m.Validate(*batch.Table); err != nil {
+		return ImportPreview{}, err
+	}
+	batch.Mapping, batch.Resolutions = m, nil
+	batch.Parsed = u.tables.ParseTable(*batch.Table, m, batch.CreatedAt)
+	review, err := u.review(ctx, batch)
+	if err != nil {
+		return ImportPreview{}, err
+	}
+	batch = withCounts(batch, review)
+	if err := u.batches.SaveMapping(ctx, batch); err != nil {
+		return ImportPreview{}, fmt.Errorf("save mapping: %w", err)
+	}
+	return stagedPreview(batch, review), nil
+}
+
 // Get returns the trainer's import. A staged import is reviewed against the
 // collection as it is now.
 func (u *Imports) Get(ctx context.Context, trainer domain.TrainerID, id string) (ImportPreview, error) {
@@ -74,7 +152,7 @@ func (u *Imports) Get(ctx context.Context, trainer domain.TrainerID, id string) 
 	if err != nil {
 		return ImportPreview{}, err
 	}
-	if batch.Status == domain.ImportCommitted {
+	if batch.Status == domain.ImportCommitted || batch.NeedsMapping() {
 		return previewOf(batch), nil
 	}
 	review, err := u.review(ctx, batch)
@@ -92,8 +170,8 @@ func (u *Imports) Resolve(ctx context.Context, trainer domain.TrainerID, id stri
 	if err != nil {
 		return ImportPreview{}, err
 	}
-	if batch.Status == domain.ImportCommitted {
-		return ImportPreview{}, domain.ErrImportAlreadyCommitted
+	if err := ready(batch); err != nil {
+		return ImportPreview{}, err
 	}
 	review, err := u.review(ctx, batch)
 	if err != nil {
@@ -128,8 +206,8 @@ func (u *Imports) Commit(ctx context.Context, trainer domain.TrainerID, id strin
 	if err != nil {
 		return ImportPreview{}, err
 	}
-	if batch.Status == domain.ImportCommitted {
-		return ImportPreview{}, domain.ErrImportAlreadyCommitted
+	if err := ready(batch); err != nil {
+		return ImportPreview{}, err
 	}
 	review, err := u.review(ctx, batch)
 	if err != nil {
@@ -155,6 +233,17 @@ func (u *Imports) review(ctx context.Context, b domain.ImportBatch) (domain.Impo
 	return domain.ReviewImport(existing, b.Parsed.Rows, b.Resolutions), nil
 }
 
+// ready rejects imports that are committed or not mapped yet.
+func ready(b domain.ImportBatch) error {
+	switch {
+	case b.Status == domain.ImportCommitted:
+		return domain.ErrImportAlreadyCommitted
+	case b.NeedsMapping():
+		return domain.ErrImportNeedsMapping
+	}
+	return nil
+}
+
 func withCounts(b domain.ImportBatch, r domain.ImportReview) domain.ImportBatch {
 	b.NewCount, b.UpdatedCount, b.PossibleMatchCount = len(r.Add), len(r.Update), r.Pending()
 	return b
@@ -173,12 +262,22 @@ func previewOf(b domain.ImportBatch) ImportPreview {
 			skipped++
 		}
 	}
-	return ImportPreview{
+	p := ImportPreview{
 		ID: b.ID, Status: b.Status, Source: b.Parsed.Source,
 		TotalRows: len(b.Parsed.Rows) + skipped, NewCount: b.NewCount, UpdatedCount: b.UpdatedCount,
 		PossibleMatchCount: b.PossibleMatchCount,
 		Problems:           b.Parsed.Problems, IgnoredColumns: b.Parsed.IgnoredColumns, UnknownFields: b.Parsed.UnknownFields,
+		NeedsMapping: b.NeedsMapping(), Mapping: b.Mapping,
 	}
+	if b.Table != nil {
+		for _, h := range b.Table.Header {
+			p.Columns = append(p.Columns, ColumnPreview{Name: h, Samples: b.Table.Samples(h, columnSamples)})
+		}
+		if p.Mapping == nil {
+			p.Mapping = domain.SuggestMapping(b.Table.Header)
+		}
+	}
+	return p
 }
 
 // Collection reads and confirms a trainer's Pokémon.
