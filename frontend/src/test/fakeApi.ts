@@ -365,6 +365,11 @@ export function createFakeApi(
       }
       return jsonResponse(200, { rules: categoryRules });
     }
+    if (path === "/plan") {
+      if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
+      if (!setup) return err(409, "SETUP_REQUIRED", "Set up first.");
+      return plan(setup, new URL(req.url).searchParams);
+    }
     if (path === "/keep-summary") {
       if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
       if (!setup) return err(409, "SETUP_REQUIRED", "Set up first.");
@@ -568,6 +573,59 @@ export function createFakeApi(
     return header.flatMap((column) => {
       const field = names[column.trim().toLowerCase()];
       return field ? [{ column, field }] : [];
+    });
+  }
+
+  /** Least valuable first here means lowest CP. */
+  function plan(s: Schemas["Setup"], q: URLSearchParams) {
+    const kind = (q.get("kind") ?? "limit") as Schemas["TargetKind"];
+    const value = Number(q.get("value") ?? 0);
+    const occupied = s.inGameCount || collection.length;
+    const limit = Math.floor((s.capacity * (s.limit ?? 80)) / 100);
+    const free = Math.max(0, s.capacity - occupied);
+    if (kind !== "limit" && value < 1) {
+      return err(422, "VALIDATION_FAILED", "choose a number");
+    }
+    const wanted =
+      kind === "limit"
+        ? Math.max(0, occupied - limit)
+        : kind === "free_more"
+          ? value
+          : kind === "reach_free"
+            ? Math.max(0, value - free)
+            : Math.ceil((value * occupied) / 100);
+    const summary = keepSummary(s);
+    const byId = new Map(collection.map((p) => [p.id, p]));
+    const items = summary.groups
+      .flatMap((g) =>
+        g.surplusIds.map((id) => ({
+          pokemonId: id,
+          keptInGroup: g.keptIds.length,
+          rule: g.rule,
+          favorite: "unknown" as const,
+        })),
+      )
+      .sort(
+        (a, b) =>
+          (byId.get(a.pokemonId)?.cp ?? 0) - (byId.get(b.pokemonId)?.cp ?? 0),
+      );
+    const transfers = items.slice(0, wanted);
+    return jsonResponse(200, {
+      use: {
+        capacity: s.capacity,
+        occupied,
+        free,
+        estimated: !s.inGameCount,
+        limit,
+      },
+      kind,
+      ...(kind !== "limit" && { value }),
+      wanted,
+      maxFeasible: items.length,
+      shortfall: wanted - transfers.length,
+      favorites: 0,
+      favoritesUnknown: transfers.length,
+      transfers,
     });
   }
 

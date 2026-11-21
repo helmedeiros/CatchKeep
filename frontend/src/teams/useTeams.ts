@@ -2,12 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { unwrap } from "../api/errors";
 import type { components } from "../api/schema.gen";
 import { useApi } from "../api/useApi";
+import { rulesKey } from "../keep/useKeep";
 
 export type Team = components["schemas"]["Team"];
 export type TeamInput = components["schemas"]["TeamInput"];
 
 const teamsKey = ["teams"] as const;
-const summaryKey = ["collection", "keep-summary"] as const;
 
 export function useTeams() {
   const api = useApi();
@@ -25,7 +25,7 @@ function useTeamMutation<T, R>(fn: (input: T) => Promise<R>) {
     onSuccess: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: teamsKey }),
-        queryClient.invalidateQueries({ queryKey: summaryKey }),
+        queryClient.invalidateQueries({ queryKey: rulesKey }),
       ]),
   });
 }

@@ -8,8 +8,10 @@ export type Goal = Setup["goals"][number];
 export type KeepSummary = components["schemas"]["KeepSummary"];
 
 const setupKey = ["setup"] as const;
-// Under "collection" so anything that changes the collection refreshes it.
-const summaryKey = ["collection", "keep-summary"] as const;
+// Under "collection" so anything that changes the collection refreshes
+// them; rule changes refresh everything under rulesKey.
+export const rulesKey = ["collection", "rules"] as const;
+const summaryKey = [...rulesKey, "keep-summary"] as const;
 
 /** The trainer's setup, or null until one is saved. */
 export function useSetup() {
@@ -46,7 +48,7 @@ export function useSaveSetup() {
       unwrap(await api.PUT("/setup", { body })),
     onSuccess: (saved) => {
       queryClient.setQueryData(setupKey, saved);
-      return queryClient.invalidateQueries({ queryKey: summaryKey });
+      return queryClient.invalidateQueries({ queryKey: rulesKey });
     },
   });
 }
@@ -81,7 +83,7 @@ export function useSaveSpeciesRules() {
       unwrap(await api.PUT("/species-rules", { body: { rules } })).rules,
     onSuccess: (saved) => {
       queryClient.setQueryData(speciesRulesKey, saved);
-      return queryClient.invalidateQueries({ queryKey: summaryKey });
+      return queryClient.invalidateQueries({ queryKey: rulesKey });
     },
   });
 }
@@ -107,7 +109,7 @@ export function useSaveCategoryRules() {
       unwrap(await api.PUT("/category-rules", { body: { rules } })).rules,
     onSuccess: (saved) => {
       queryClient.setQueryData(categoryRulesKey, saved);
-      return queryClient.invalidateQueries({ queryKey: summaryKey });
+      return queryClient.invalidateQueries({ queryKey: rulesKey });
     },
   });
 }
