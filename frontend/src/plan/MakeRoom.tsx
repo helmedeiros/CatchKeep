@@ -41,7 +41,6 @@ export function MakeRoom({ pokemon }: { pokemon: Pokemon[] }) {
 
   return (
     <section aria-label="Make room" className={`${card} flex flex-col gap-3`}>
-      <h3 className="font-semibold">Make room</h3>
       {plan.data && <Use plan={plan.data} />}
       <fieldset className="flex flex-col gap-1.5 text-sm">
         <legend className="mb-1">How much room do you want?</legend>

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import App from "../App";
 import { createFakeApi } from "../test/fakeApi";
 import { renderWithApi } from "../test/render";
+import { goTo, importField } from "../test/places";
 
 const HEADER = "Index,Name,Form,Pokemon Number,Gender,CP,HP";
 
@@ -14,7 +15,7 @@ describe("marking one Pokémon's features", () => {
     api.signIn("Ash");
     renderWithApi(<App />, api.fetch);
     await user.upload(
-      await screen.findByLabelText("Choose your Poke Genie export"),
+      await importField(user),
       new File(
         [
           [HEADER, "1,Dialga,,483,,2759,150", "2,Dialga,,483,,2249,140"].join(
@@ -31,6 +32,7 @@ describe("marking one Pokémon's features", () => {
     await user.click(
       within(preview).getByRole("button", { name: "Add 2 Pokémon" }),
     );
+    await goTo(user, "Collection");
     const list = await screen.findByRole("list", { name: "Collection" });
     const [strong, weak] = within(list).getAllByRole("listitem");
     if (!strong || !weak) throw new Error("two rows expected");

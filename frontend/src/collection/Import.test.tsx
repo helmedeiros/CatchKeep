@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import App from "../App";
 import { createFakeApi } from "../test/fakeApi";
 import { renderWithApi } from "../test/render";
+import { goTo, importField } from "../test/places";
 
 const HEADER = "Index,Name,Form,Pokemon Number,Gender,CP,HP";
 const csv = (rows: string[]) =>
@@ -19,7 +20,7 @@ describe("importing a collection", () => {
     renderWithApi(<App />, api.fetch);
 
     await user.upload(
-      await screen.findByLabelText("Choose your Poke Genie export"),
+      await importField(user),
       csv([
         "1,Pidgey,,16,,120,30",
         "2,Mewtwo,,150,,4178,180",
@@ -44,6 +45,7 @@ describe("importing a collection", () => {
     expect(
       await screen.findByText("Added 3 Pokémon to your collection."),
     ).toBeInTheDocument();
+    await goTo(user, "Collection");
     const list = await screen.findByRole("list", { name: "Collection" });
     const items = within(list).getAllByRole("listitem");
     expect(items[0]).toHaveTextContent("Mewtwo");
@@ -66,7 +68,7 @@ describe("importing a collection", () => {
     renderWithApi(<App />, api.fetch);
 
     await user.upload(
-      await screen.findByLabelText("Choose your Poke Genie export"),
+      await importField(user),
       new File(["just some notes"], "notes.csv", { type: "text/csv" }),
     );
 
@@ -81,16 +83,14 @@ describe("importing a collection", () => {
     api.signIn("Ash");
     renderWithApi(<App />, api.fetch);
 
-    await user.upload(
-      await screen.findByLabelText("Choose your Poke Genie export"),
-      csv(["1,Pidgey,,16,,120,30"]),
-    );
+    await user.upload(await importField(user), csv(["1,Pidgey,,16,,120,30"]));
     await user.click(await screen.findByRole("button", { name: "Cancel" }));
 
     expect(
       screen.queryByRole("region", { name: "Import preview" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("No Pokémon yet.")).toBeInTheDocument();
+    await goTo(user, "Collection");
+    expect(await screen.findByText("No Pokémon yet.")).toBeInTheDocument();
   });
 
   it("reads another app's CSV once the trainer matches its columns, and remembers them", async () => {
@@ -105,10 +105,7 @@ describe("importing a collection", () => {
         { type: "text/csv" },
       );
 
-    await user.upload(
-      await screen.findByLabelText("Choose your Poke Genie export"),
-      sheet(),
-    );
+    await user.upload(await importField(user), sheet());
     const mapper = await screen.findByRole("form", {
       name: "Match your columns",
     });
@@ -143,13 +140,11 @@ describe("importing a collection", () => {
     await user.click(
       within(preview).getByRole("button", { name: "Add 2 Pokémon" }),
     );
+    await goTo(user, "Collection");
     const list = await screen.findByRole("list", { name: "Collection" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
 
-    await user.upload(
-      screen.getByLabelText("Choose your Poke Genie export"),
-      sheet(),
-    );
+    await user.upload(await importField(user), sheet());
     expect(
       await screen.findByRole("region", { name: "Import preview" }),
     ).toBeInTheDocument();

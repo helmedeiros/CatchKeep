@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import App from "../App";
 import { createFakeApi } from "../test/fakeApi";
 import { renderWithApi } from "../test/render";
+import { importField, inPlace } from "../test/places";
 
 const HEADER = "Index,Name,Form,Pokemon Number,Gender,CP,HP";
 
@@ -13,7 +14,7 @@ async function withCollection(rows: string[]) {
   api.signIn("Ash");
   renderWithApi(<App />, api.fetch);
   await user.upload(
-    await screen.findByLabelText("Choose your Poke Genie export"),
+    await importField(user),
     new File([[HEADER, ...rows].join("\n")], "export.csv", {
       type: "text/csv",
     }),
@@ -22,7 +23,7 @@ async function withCollection(rows: string[]) {
   await user.click(
     within(preview).getByRole("button", { name: /^Add \d+ Pokémon$/ }),
   );
-  await screen.findByRole("list", { name: "Collection" });
+  await screen.findAllByText(/to your collection\.$/);
   return user;
 }
 
@@ -34,9 +35,7 @@ describe("confirming what the export can't tell", () => {
       "3,Rattata,,19,,50,20",
     ]);
 
-    const panel = screen.getByRole("region", {
-      name: "Confirm what the export can't tell",
-    });
+    const panel = await inPlace(user, "Confirm what the export can't tell");
     await user.click(within(panel).getByRole("checkbox", { name: "Dynamax" }));
     const pidgey = within(panel).getByRole("group", { name: "Pidgey" });
     expect(pidgey).toHaveTextContent("2 Pokémon");
@@ -63,9 +62,7 @@ describe("confirming what the export can't tell", () => {
 
   it("needs at least one feature chosen", async () => {
     const user = await withCollection(["1,Pidgey,,16,,120,30"]);
-    const panel = screen.getByRole("region", {
-      name: "Confirm what the export can't tell",
-    });
+    const panel = await inPlace(user, "Confirm what the export can't tell");
 
     for (const name of [
       "Shiny",
@@ -89,9 +86,7 @@ describe("confirming what the export can't tell", () => {
       "1,Pidgey,,16,,120,30",
       "2,Rattata,,19,,50,20",
     ]);
-    const panel = screen.getByRole("region", {
-      name: "Confirm what the export can't tell",
-    });
+    const panel = await inPlace(user, "Confirm what the export can't tell");
 
     await user.click(
       within(panel).getByRole("button", { name: "Confirm all 2 species" }),

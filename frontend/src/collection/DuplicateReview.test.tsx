@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import App from "../App";
 import { createFakeApi } from "../test/fakeApi";
 import { renderWithApi } from "../test/render";
+import { goTo, importField } from "../test/places";
 
 const HEADER = "Index,Name,Form,Pokemon Number,Gender,CP,HP";
 const csv = (rows: string[]) =>
@@ -15,10 +16,7 @@ async function importAndAdd(
   user: ReturnType<typeof userEvent.setup>,
   rows: string[],
 ) {
-  await user.upload(
-    await screen.findByLabelText("Choose your Poke Genie export"),
-    csv(rows),
-  );
+  await user.upload(await importField(user), csv(rows));
   const preview = await screen.findByRole("region", { name: "Import preview" });
   await user.click(
     within(preview).getByRole("button", { name: /^Add \d+ Pokémon$/ }),
@@ -27,10 +25,7 @@ async function importAndAdd(
 }
 
 async function stage(user: ReturnType<typeof userEvent.setup>, rows: string[]) {
-  await user.upload(
-    await screen.findByLabelText("Choose your Poke Genie export"),
-    csv(rows),
-  );
+  await user.upload(await importField(user), csv(rows));
   return screen.findByRole("region", { name: "Import preview" });
 }
 
@@ -66,6 +61,7 @@ describe("re-importing an updated export", () => {
     expect(
       await screen.findByText("Added 1 and updated 2 Pokémon."),
     ).toBeInTheDocument();
+    await goTo(user, "Collection");
     const list = await screen.findByRole("list", { name: "Collection" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(3);
     expect(list).toHaveTextContent("CP 300");
@@ -121,6 +117,7 @@ describe("re-importing an updated export", () => {
     expect(
       await screen.findByText("Added 1 and updated 1 Pokémon."),
     ).toBeInTheDocument();
+    await goTo(user, "Collection");
     const list = await screen.findByRole("list", { name: "Collection" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(3);
   });

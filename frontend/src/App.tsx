@@ -10,7 +10,7 @@ import { card } from "./ui/styles";
 export default function App() {
   return (
     <div className="min-h-dvh bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <main className="mx-auto flex max-w-md flex-col gap-4 px-4 py-8">
+      <main className="mx-auto flex max-w-md flex-col gap-4 px-4 py-8 sm:max-w-3xl">
         <header className="flex items-center gap-3">
           <img src="/favicon.svg" alt="" className="size-10" />
           <div>
@@ -21,11 +21,6 @@ export default function App() {
           </div>
         </header>
         <Session />
-        <section aria-label="Host" className={card}>
-          <HostStatus />
-          <OtherDevices />
-          <StartAtLogin />
-        </section>
       </main>
       <Toaster position="top-center" richColors />
     </div>
@@ -34,11 +29,17 @@ export default function App() {
 
 function Session() {
   const me = useMe();
-  if (me.isPending) {
-    return null;
-  }
   if (me.data) {
     return <Home displayName={me.data.displayName} />;
   }
-  return <SignedOut />;
+  return (
+    <>
+      {!me.isPending && <SignedOut />}
+      <section aria-label="Host" className={card}>
+        <HostStatus />
+        <OtherDevices />
+        <StartAtLogin />
+      </section>
+    </>
+  );
 }

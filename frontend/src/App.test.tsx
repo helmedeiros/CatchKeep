@@ -1,6 +1,7 @@
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import App from "./App";
+import { createFakeApi } from "./test/fakeApi";
 import { renderWithApi } from "./test/render";
 
 describe("App", () => {
@@ -16,7 +17,7 @@ describe("App", () => {
   });
 
   it("shows whether the host is reachable", async () => {
-    renderWithApi(<App />);
+    renderWithApi(<App />, createFakeApi().fetch);
 
     expect(await screen.findByText("Connected")).toBeInTheDocument();
   });
