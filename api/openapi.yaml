@@ -1380,6 +1380,7 @@ components:
           favorites,
           favoritesUnknown,
           transfers,
+          searches,
         ]
       properties:
         use:
@@ -1412,6 +1413,53 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PlanItem"
+        searches:
+          type: array
+          description: One Pokémon GO search per species, in plan order (V1-CLN-04).
+          items:
+            $ref: "#/components/schemas/SpeciesSearch"
+    SpeciesSearch:
+      type: object
+      additionalProperties: false
+      required: [species, query, pokemonIds, collisions, items]
+      properties:
+        species:
+          type: string
+        query:
+          type: string
+          description: >-
+            Finds every planned Pokémon of this species in the game, e.g.
+            "16&cp90,cp120"; empty when the Pokédex number is not known.
+          examples: ["16&cp90,cp120"]
+        pokemonIds:
+          type: array
+          items:
+            type: string
+        collisions:
+          type: array
+          description: Pokémon to keep that the query would also find.
+          items:
+            type: string
+        items:
+          type: array
+          description: Narrower searches for planned Pokémon that share a CP with one to keep.
+          items:
+            $ref: "#/components/schemas/ItemSearch"
+    ItemSearch:
+      type: object
+      additionalProperties: false
+      required: [pokemonId, query, collisions]
+      properties:
+        pokemonId:
+          type: string
+        query:
+          type: string
+          description: A narrower search, or empty when the species search finds it alone.
+        collisions:
+          type: array
+          description: Pokémon even the narrower search finds; check them in the game.
+          items:
+            type: string
     StorageUse:
       type: object
       additionalProperties: false

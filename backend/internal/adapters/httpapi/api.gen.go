@@ -618,6 +618,16 @@ type InvalidRow struct {
 	Row int `json:"row"`
 }
 
+// ItemSearch defines model for ItemSearch.
+type ItemSearch struct {
+	// Collisions Pokémon even the narrower search finds; check them in the game.
+	Collisions []string `json:"collisions"`
+	PokemonId  string   `json:"pokemonId"`
+
+	// Query A narrower search, or empty when the species search finds it alone.
+	Query string `json:"query"`
+}
+
 // KeepSummary defines model for KeepSummary.
 type KeepSummary struct {
 	// Groups One per fully known variant, largest surplus first.
@@ -722,6 +732,9 @@ type Plan struct {
 
 	// MaxFeasible How many the keep rules allow to transfer.
 	MaxFeasible int `json:"maxFeasible"`
+
+	// Searches One Pokémon GO search per species, in plan order (V1-CLN-04).
+	Searches []SpeciesSearch `json:"searches"`
 
 	// Shortfall How many short of the target, when the rules allow fewer.
 	Shortfall int        `json:"shortfall"`
@@ -867,6 +880,22 @@ type SpeciesRule struct {
 // SpeciesRules defines model for SpeciesRules.
 type SpeciesRules struct {
 	Rules []SpeciesRule `json:"rules"`
+}
+
+// SpeciesSearch defines model for SpeciesSearch.
+type SpeciesSearch struct {
+	// Collisions Pokémon to keep that the query would also find.
+	Collisions []string `json:"collisions"`
+
+	// Items Narrower searches for planned Pokémon that share a CP with one to keep.
+	Items      []ItemSearch `json:"items"`
+	PokemonIds []string     `json:"pokemonIds"`
+
+	// Query Finds every planned Pokémon of this species in the game, e.g. "16&cp90,cp120"; empty when the Pokédex number is not known.
+	//
+	// Examples: 16&cp90,cp120
+	Query   string `json:"query"`
+	Species string `json:"species"`
 }
 
 // StorageUse defines model for StorageUse.

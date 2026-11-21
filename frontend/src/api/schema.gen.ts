@@ -696,6 +696,28 @@ export interface components {
             /** @description Suggestions whose star the export could not tell. */
             favoritesUnknown: number;
             transfers: components["schemas"]["PlanItem"][];
+            /** @description One Pokémon GO search per species, in plan order (V1-CLN-04). */
+            searches: components["schemas"]["SpeciesSearch"][];
+        };
+        SpeciesSearch: {
+            species: string;
+            /**
+             * @description Finds every planned Pokémon of this species in the game, e.g. "16&cp90,cp120"; empty when the Pokédex number is not known.
+             * @example 16&cp90,cp120
+             */
+            query: string;
+            pokemonIds: string[];
+            /** @description Pokémon to keep that the query would also find. */
+            collisions: string[];
+            /** @description Narrower searches for planned Pokémon that share a CP with one to keep. */
+            items: components["schemas"]["ItemSearch"][];
+        };
+        ItemSearch: {
+            pokemonId: string;
+            /** @description A narrower search, or empty when the species search finds it alone. */
+            query: string;
+            /** @description Pokémon even the narrower search finds; check them in the game. */
+            collisions: string[];
         };
         StorageUse: {
             capacity: number;
