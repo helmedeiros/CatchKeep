@@ -24,7 +24,7 @@ export function PokemonItem({
           aria-expanded={open}
           aria-label={`Details for ${label}`}
           onClick={() => setOpen((v) => !v)}
-          className="rounded-lg px-2 py-1 text-xs font-semibold text-teal-800 ring-1 ring-slate-300 hover:bg-teal-50 dark:text-teal-300 dark:ring-slate-700 dark:hover:bg-slate-800"
+          className="rounded-full px-2 py-1 text-xs font-semibold text-accent ring-1 ring-line hover:bg-highlight"
         >
           {open ? "Hide details" : "Details"}
         </button>

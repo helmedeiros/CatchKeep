@@ -25,14 +25,14 @@ export function HostStatus() {
   });
 
   if (health.isPending) {
-    return <p className="text-sm text-slate-500">Checking host…</p>;
+    return <p className="text-sm text-muted">Checking host…</p>;
   }
 
   if (health.error instanceof WrongAddress) {
     return (
       <p
         role="alert"
-        className="rounded-lg bg-amber-100 px-4 py-3 text-sm text-amber-900"
+        className="rounded-xl bg-warn/15 px-4 py-3 text-sm text-warn"
       >
         Open CatchKeep using the address shown on the computer running it, under
         “Use CatchKeep on other devices”.
@@ -44,7 +44,7 @@ export function HostStatus() {
     return (
       <p
         role="alert"
-        className="rounded-lg bg-amber-100 px-4 py-3 text-sm text-amber-900"
+        className="rounded-xl bg-warn/15 px-4 py-3 text-sm text-warn"
       >
         CatchKeep isn't reachable — is the computer running it on and awake?
       </p>
@@ -53,11 +53,9 @@ export function HostStatus() {
 
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span aria-hidden="true" className="size-2 rounded-full bg-emerald-500" />
-      <span className="font-medium text-emerald-700 dark:text-emerald-400">
-        Connected
-      </span>
-      <span className="text-slate-500">Version {health.data.version}</span>
+      <span aria-hidden="true" className="size-2 rounded-full bg-good" />
+      <span className="font-medium text-good">Connected</span>
+      <span className="text-muted">Version {health.data.version}</span>
     </div>
   );
 }

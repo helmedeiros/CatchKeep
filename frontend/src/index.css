@@ -1,10 +1,78 @@
 @import "tailwindcss";
+@import "@fontsource-variable/figtree";
 
+/*
+ * The chosen direction (ck-pwk.1): Teal on paper by day, Night raid in dark
+ * mode, Figtree in both. Components use these tokens, never raw colours, so
+ * dark mode follows the device on its own.
+ */
 :root {
   color-scheme: light dark;
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
+  --ck-ground: #f7f9f8;
+  --ck-surface: #ffffff;
+  --ck-soft: #ebf0ee;
+  --ck-highlight: #e3f1ee;
+  --ck-ink: #06525c;
+  --ck-muted: #4f6b6e;
+  --ck-accent: #06525c;
+  --ck-accent-ink: #ffffff;
+  --ck-line: #dce5e3;
+  --ck-good: #1f8a6e;
+  --ck-warn: #c2562b;
+  --ck-shadow: 0 1px 2px rgb(6 82 92 / 0.06), 0 8px 24px rgb(6 82 92 / 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ck-ground: #0a0d14;
+    --ck-surface: #131824;
+    --ck-soft: #18233a;
+    --ck-highlight: #131f33;
+    --ck-ink: #e9edf3;
+    --ck-muted: #9aa6b8;
+    --ck-accent: #5ab9fc;
+    --ck-accent-ink: #0a0d14;
+    --ck-line: #222a3b;
+    --ck-good: #4fd18b;
+    --ck-warn: #ff7a59;
+    --ck-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+  }
+}
+
+@theme inline {
+  --font-sans:
+    "Figtree Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-ground: var(--ck-ground);
+  --color-surface: var(--ck-surface);
+  --color-soft: var(--ck-soft);
+  --color-highlight: var(--ck-highlight);
+  --color-ink: var(--ck-ink);
+  --color-muted: var(--ck-muted);
+  --color-accent: var(--ck-accent);
+  --color-accent-ink: var(--ck-accent-ink);
+  --color-line: var(--ck-line);
+  --color-good: var(--ck-good);
+  --color-warn: var(--ck-warn);
+  --shadow-card: var(--ck-shadow);
+}
+
+body {
+  background: var(--ck-ground);
+  color: var(--ck-ink);
+  font-family: var(--font-sans);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  button,
+  a {
+    transition:
+      background-color 120ms,
+      color 120ms,
+      box-shadow 120ms,
+      transform 80ms;
+  }
+  button:not(:disabled):active,
+  a:active {
+    transform: translateY(1px);
+  }
 }

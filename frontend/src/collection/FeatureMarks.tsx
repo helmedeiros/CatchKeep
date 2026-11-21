@@ -40,9 +40,9 @@ export function FeatureMarks({
     <div
       role="group"
       aria-label={`Special features of ${label}`}
-      className="flex flex-col gap-2 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800/60"
+      className="flex flex-col gap-2 rounded-xl bg-soft p-3 text-sm"
     >
-      <p className="text-slate-600 dark:text-slate-400">
+      <p className="text-muted">
         Set what the game shows for this Pokémon. Your answer wins over the
         export, even on later imports.
       </p>
@@ -59,7 +59,7 @@ export function FeatureMarks({
               <span className="font-medium">
                 {name}
                 {value === "unknown" && (
-                  <span className="font-normal text-slate-500"> · Not set</span>
+                  <span className="font-normal text-muted"> · Not set</span>
                 )}
               </span>
               <div className="flex gap-1">
@@ -72,10 +72,10 @@ export function FeatureMarks({
                       aria-pressed={pressed}
                       disabled={mark.isPending}
                       onClick={() => set(feature, answer)}
-                      className={`flex-1 rounded-lg px-2 py-1 font-medium ${
+                      className={`flex-1 rounded-full px-2 py-1 font-medium ${
                         pressed
-                          ? "bg-teal-700 text-white"
-                          : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-teal-50 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700"
+                          ? "bg-accent text-accent-ink"
+                          : "bg-surface text-muted ring-1 ring-line hover:bg-highlight"
                       }`}
                     >
                       {answer ? "Yes" : "No"}

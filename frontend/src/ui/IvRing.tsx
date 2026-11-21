@@ -3,10 +3,10 @@ export function IvRing({ percent }: { percent: number | null }) {
   const r = 15.9155; // circumference 100
   const tone =
     percent === null
-      ? "text-slate-300 dark:text-slate-700"
+      ? "text-muted"
       : percent >= 80
-        ? "text-green-600"
-        : "text-sky-600";
+        ? "text-good"
+        : "text-accent";
   return (
     <span
       className={`relative grid size-12 shrink-0 place-items-center ${tone}`}
@@ -19,7 +19,7 @@ export function IvRing({ percent }: { percent: number | null }) {
           r={r}
           fill="none"
           strokeWidth="3.5"
-          className="stroke-slate-200 dark:stroke-slate-800"
+          className="stroke-soft"
         />
         {percent !== null && (
           <circle
@@ -33,7 +33,7 @@ export function IvRing({ percent }: { percent: number | null }) {
           />
         )}
       </svg>
-      <span className="text-xs font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+      <span className="text-xs font-semibold tabular-nums text-ink">
         {percent === null ? "?" : percent}
       </span>
     </span>

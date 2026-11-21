@@ -8,7 +8,7 @@ const INITIAL_ROWS = 30;
 
 export function CollectionView({ pokemon }: { pokemon: Pokemon[] }) {
   if (pokemon.length === 0) {
-    return <p className="px-1 text-sm text-slate-500">No Pokémon yet.</p>;
+    return <p className="px-1 text-sm text-muted">No Pokémon yet.</p>;
   }
   return (
     <section className={`${card} flex flex-col gap-2 p-0`}>
@@ -31,7 +31,7 @@ const List = forwardRef<HTMLUListElement, HTMLAttributes<HTMLUListElement>>(
       {...props}
       ref={ref}
       aria-label="Collection"
-      className="divide-y divide-slate-100 dark:divide-slate-800"
+      className="divide-y divide-line"
     />
   ),
 );

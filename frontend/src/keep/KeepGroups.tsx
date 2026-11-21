@@ -55,7 +55,7 @@ export function KeepGroups({
     <>
       <ul
         aria-label="Possible transfers by species"
-        className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800"
+        className="flex flex-col divide-y divide-line"
       >
         {shown.map((g) => (
           <GroupRow key={variantKey(g)} group={g} byId={byId} />
@@ -93,7 +93,7 @@ function GroupRow({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 rounded-xl p-1 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+        className="flex w-full items-center gap-3 rounded-xl p-1 text-left hover:bg-soft"
       >
         <Sprite
           size="sm"
@@ -102,7 +102,7 @@ function GroupRow({
           shiny={g.shiny}
         />
         <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
-        <span className="shrink-0 text-sm tabular-nums text-slate-500">
+        <span className="shrink-0 text-sm tabular-nums text-muted">
           {g.count} · keep {g.keep}
           {g.rule === "species" && " (your rule)"}
           {g.rule === "category" &&
@@ -128,7 +128,7 @@ function GroupRow({
       {open && (
         <ul
           aria-label={`${name} copies`}
-          className="mt-1 flex flex-col divide-y divide-slate-100 pl-2 dark:divide-slate-800"
+          className="mt-1 flex flex-col divide-y divide-line pl-2"
         >
           {[...g.keptIds, ...g.surplusIds].map((id, i) => {
             const p = byId.get(id);
@@ -160,9 +160,7 @@ function keepReason(p: Pokemon, teams: Team[] | undefined): string {
 
 function Tag({ tone, children }: { tone: "keep" | "go"; children: string }) {
   const colors =
-    tone === "keep"
-      ? "bg-teal-100 text-teal-900 dark:bg-teal-900 dark:text-teal-100"
-      : "bg-rose-100 text-rose-900 dark:bg-rose-900 dark:text-rose-100";
+    tone === "keep" ? "bg-good/15 text-good" : "bg-warn/15 text-warn";
   return (
     <span className={`rounded-full px-2 py-0.5 font-medium ${colors}`}>
       {children}

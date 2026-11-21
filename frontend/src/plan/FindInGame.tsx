@@ -32,10 +32,10 @@ export function FindInGame({
   return (
     <section
       aria-label="Find them in the game"
-      className="flex flex-col gap-2 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800/60"
+      className="flex flex-col gap-2 rounded-xl bg-soft p-3 text-sm"
     >
       <h5 className="font-semibold">Find them in the game</h5>
-      <p className="text-slate-600 dark:text-slate-400">
+      <p className="text-muted">
         Copy a search, paste it into the search bar above your Pokémon list in
         the game, then select and transfer what it finds.
       </p>
@@ -64,12 +64,12 @@ function SpeciesSearch({
         {s.species} · {s.pokemonIds.length} to transfer
       </p>
       {s.query === "" ? (
-        <p className="text-slate-600 dark:text-slate-400">
+        <p className="text-muted">
           Find these by hand: the export has no Pokédex number for them.
         </p>
       ) : (
         <div className="flex items-center gap-2">
-          <code className="min-w-0 flex-1 truncate rounded-lg bg-white px-3 py-2 font-mono dark:bg-slate-900">
+          <code className="min-w-0 flex-1 truncate rounded-full bg-surface px-3 py-2 font-mono">
             {s.query}
           </code>
           <button
@@ -83,7 +83,7 @@ function SpeciesSearch({
         </div>
       )}
       {kept.length > 0 && (
-        <p className="text-amber-800 dark:text-amber-300">
+        <p className="text-warn">
           This search also finds {kept.length} {s.species} you keep (
           {kept.map(label).join("; ")}). Check CP and HP before transferring
           {s.items.length > 0 ? ", or use the narrower searches below." : "."}
@@ -100,7 +100,7 @@ function SpeciesSearch({
             </p>
             {it.query !== "" && (
               <div className="flex items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded-lg bg-white px-3 py-1.5 font-mono dark:bg-slate-900">
+                <code className="min-w-0 flex-1 truncate rounded-full bg-surface px-3 py-1.5 font-mono">
                   {it.query}
                 </code>
                 <button

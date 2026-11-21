@@ -55,7 +55,7 @@ export function SpeciesRuleList({ pokemon }: { pokemon: Pokemon[] }) {
   return (
     <section aria-label="Your species rules" className="flex flex-col gap-1">
       <h4 className="text-sm font-semibold">Your species rules</h4>
-      <ul className="flex flex-col divide-y divide-slate-100 text-sm dark:divide-slate-800">
+      <ul className="flex flex-col divide-y divide-line text-sm">
         {list.map((r) => (
           <li key={r.species} className="flex items-center gap-3 py-1.5">
             <Sprite

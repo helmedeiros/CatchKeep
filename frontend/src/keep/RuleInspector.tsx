@@ -73,7 +73,7 @@ export function RuleInspector({
   return (
     <section
       aria-label={`Why ${name} keeps ${g.keep}`}
-      className="mt-2 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800/60"
+      className="mt-2 rounded-xl bg-soft p-3 text-sm"
     >
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
         <Row term="Default from your storage">{generated(g)}</Row>
@@ -98,7 +98,7 @@ export function RuleInspector({
 function Row({ term, children }: { term: string; children: ReactNode }) {
   return (
     <div className="contents">
-      <dt className="text-slate-500">{term}</dt>
+      <dt className="text-muted">{term}</dt>
       <dd className="tabular-nums">{children}</dd>
     </div>
   );

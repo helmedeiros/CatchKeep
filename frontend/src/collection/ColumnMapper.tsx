@@ -57,18 +57,18 @@ export function ColumnMapper({
       }}
     >
       <h3 className="font-semibold">Match your columns</h3>
-      <p className="text-sm text-slate-600 dark:text-slate-400">
+      <p className="text-sm text-muted">
         This isn't a Poke Genie export, so say what each column holds. Only the
         species is required; skipped columns are ignored. CatchKeep remembers
         this for your next file with the same columns.
       </p>
-      <ul className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+      <ul className="flex flex-col divide-y divide-line">
         {preview.columns.map((c) => (
           <li key={c.name} className="flex flex-col gap-1.5 py-2 text-sm">
             <div className="min-w-0">
               <p className="truncate font-medium">{c.name}</p>
               {c.samples.length > 0 && (
-                <p className="truncate text-xs text-slate-500">
+                <p className="truncate text-xs text-muted">
                   e.g. {c.samples.join(", ")}
                 </p>
               )}
@@ -89,7 +89,7 @@ export function ColumnMapper({
           </li>
         ))}
       </ul>
-      {issue && <p className="text-sm text-slate-500">{issue}</p>}
+      {issue && <p className="text-sm text-muted">{issue}</p>}
       {error && (
         <p role="alert" className={alert}>
           {error}

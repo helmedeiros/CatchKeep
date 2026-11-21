@@ -88,7 +88,7 @@ export function ImportCard({ hasPokemon }: { hasPokemon: boolean }) {
         {hasPokemon ? "Update from a new export" : "Bring in your collection"}
       </h3>
       {!hasPokemon && (
-        <p className="text-sm text-slate-600 dark:text-slate-400">
+        <p className="text-sm text-muted">
           Export your Pokémon from Poke Genie as CSV, then choose the file here.
           A CSV from another app works too: you'll match its columns first.
           You'll see a preview before anything is added.
@@ -104,7 +104,7 @@ export function ImportCard({ hasPokemon }: { hasPokemon: boolean }) {
         />
       </label>
       {stage.isPending && (
-        <p className="text-sm text-slate-500">Reading the export…</p>
+        <p className="text-sm text-muted">Reading the export…</p>
       )}
       {stage.isError && (
         <p role="alert" className={alert}>
@@ -189,7 +189,7 @@ function Preview({
           <div className="flex flex-col gap-2">
             {exact.length > 0 && (
               <>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
+                <p className="text-sm text-muted">
                   {exact.length} match exactly one Pokémon you already have:
                   same species, form, gender, IVs and catch date.
                 </p>
@@ -233,7 +233,7 @@ function Preview({
               ? "1 note about the file"
               : `${preview.invalidRows.length} notes about the file`}
           </summary>
-          <ul className="mt-2 flex flex-col gap-1 text-slate-600 dark:text-slate-400">
+          <ul className="mt-2 flex flex-col gap-1 text-muted">
             {preview.invalidRows.map((r) => (
               <li key={`${r.row}-${r.message}`}>
                 Line {r.row}: {r.message}
@@ -243,7 +243,7 @@ function Preview({
         </details>
       )}
       {preview.unknownFields.length > 0 && (
-        <p className="rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900 dark:bg-sky-950 dark:text-sky-100">
+        <p className="rounded-xl bg-highlight px-3 py-2 text-sm text-ink">
           This export can't tell {preview.unknownFields.join(", ")}. CatchKeep
           treats them as unknown, never as "no".
         </p>

@@ -80,7 +80,7 @@ export function ConfirmFeatures({ pokemon }: { pokemon: Pokemon[] }) {
       className={`${card} flex flex-col gap-3`}
     >
       <h3 className="font-semibold">Confirm what the export can't tell</h3>
-      <p className="text-sm text-slate-600 dark:text-slate-400">
+      <p className="text-sm text-muted">
         Until you confirm them, CatchKeep treats these as unknown and keeps
         those Pokémon safe. Check a species in the game, then confirm that none
         of them have:
@@ -92,22 +92,22 @@ export function ConfirmFeatures({ pokemon }: { pokemon: Pokemon[] }) {
               type="checkbox"
               checked={chosen.includes(f)}
               onChange={() => toggle(f)}
-              className="size-4 accent-teal-700"
+              className="size-4 accent-accent"
             />
             {label}
           </label>
         ))}
       </div>
       {chosen.length === 0 ? (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted">
           Choose at least one feature to confirm.
         </p>
       ) : groups.length === 0 ? (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted">
           Nothing left to confirm for these features.
         </p>
       ) : (
-        <ul className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+        <ul className="flex flex-col divide-y divide-line">
           {visible.map((g) => {
             const name =
               g.form === "Normal" ? g.species : `${g.species} · ${g.form}`;
@@ -125,13 +125,13 @@ export function ConfirmFeatures({ pokemon }: { pokemon: Pokemon[] }) {
                   />
                   <p className="min-w-0 flex-1 truncate">
                     <span className="font-medium">{name}</span>{" "}
-                    <span className="text-sm text-slate-500">
+                    <span className="text-sm text-muted">
                       {g.unknown} Pokémon
                     </span>
                   </p>
                   <button
                     type="button"
-                    className="shrink-0 rounded-lg bg-teal-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+                    className="shrink-0 rounded-full bg-accent px-3 py-1.5 text-sm font-semibold text-accent-ink hover:bg-accent/90 disabled:opacity-50"
                     disabled={confirm.isPending}
                     onClick={() => submit(g)}
                   >
@@ -162,7 +162,7 @@ export function ConfirmFeatures({ pokemon }: { pokemon: Pokemon[] }) {
         </button>
       )}
       {confirmingAll && chosen.length > 0 && groups.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+        <div className="flex flex-col gap-2 rounded-xl bg-warn/10 p-3 text-sm text-warn">
           <p>
             None of your {total} Pokémon in these {groups.length} species will
             be counted as {describe(chosen)}. Only do this if you've checked
@@ -171,7 +171,7 @@ export function ConfirmFeatures({ pokemon }: { pokemon: Pokemon[] }) {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="rounded-lg bg-teal-700 px-3 py-1.5 font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+              className="rounded-full bg-accent px-3 py-1.5 font-semibold text-accent-ink hover:bg-accent/90 disabled:opacity-50"
               disabled={confirm.isPending}
               onClick={submitAll}
             >

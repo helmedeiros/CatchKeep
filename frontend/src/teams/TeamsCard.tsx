@@ -40,13 +40,13 @@ export function TeamsCard({ pokemon }: { pokemon: Pokemon[] }) {
     <section aria-label="Your teams" className={`${card} flex flex-col gap-3`}>
       <div>
         <h3 className="font-semibold">Your teams</h3>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted">
           Every Pokémon on a team is always kept.
         </p>
       </div>
       {teams.isError && <p className={alert}>Couldn't load your teams.</p>}
       {teams.data && teams.data.length > 0 && (
-        <ul className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+        <ul className="flex flex-col divide-y divide-line">
           {teams.data.map((t) =>
             editing === t.id ? (
               <li key={t.id} className="py-2">
@@ -127,7 +127,7 @@ function TeamSummary({
     >
       <div className="min-w-0 flex-1">
         <p className="font-medium">{t.name}</p>
-        <p className="text-sm text-slate-500">{t.memberIds.length} Pokémon</p>
+        <p className="text-sm text-muted">{t.memberIds.length} Pokémon</p>
       </div>
       <div className="flex -space-x-2">
         {t.memberIds.slice(0, 6).map((id) => {
@@ -232,7 +232,7 @@ function TeamEditor({
       }}
     >
       <label className="flex flex-col gap-1 text-sm">
-        <span className="text-slate-600 dark:text-slate-400">Team name</span>
+        <span className="text-muted">Team name</span>
         <input
           className={input}
           maxLength={40}
@@ -241,10 +241,7 @@ function TeamEditor({
         />
       </label>
       {members.length > 0 && (
-        <ul
-          aria-label="Members"
-          className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800"
-        >
+        <ul aria-label="Members" className="flex flex-col divide-y divide-line">
           {members.map((id) => {
             const p = byId.get(id);
             return (
@@ -272,7 +269,7 @@ function TeamEditor({
         </ul>
       )}
       <label className="flex flex-col gap-1 text-sm">
-        <span className="text-slate-600 dark:text-slate-400">Add Pokémon</span>
+        <span className="text-muted">Add Pokémon</span>
         <input
           type="search"
           className={input}
@@ -282,10 +279,7 @@ function TeamEditor({
         />
       </label>
       {matches.length > 0 && (
-        <ul
-          aria-label="Matches"
-          className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800"
-        >
+        <ul aria-label="Matches" className="flex flex-col divide-y divide-line">
           {matches.map((p) => (
             <li key={p.id} className="py-2">
               <PokemonRow

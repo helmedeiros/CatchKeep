@@ -49,7 +49,7 @@ export function MakeRoom({ pokemon }: { pokemon: Pokemon[] }) {
             <input
               type="radio"
               name="target"
-              className="size-4 accent-teal-700"
+              className="size-4 accent-accent"
               checked={kind === t.kind}
               onChange={() => {
                 setKind(t.kind);
@@ -97,15 +97,15 @@ function Use({ plan: { use } }: { plan: Plan }) {
   return (
     <div className="flex flex-col gap-1.5 text-sm">
       <div
-        className="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
+        className="h-2.5 overflow-hidden rounded-full bg-soft"
         aria-hidden="true"
       >
         <div
-          className={`h-full ${over ? "bg-amber-500" : "bg-teal-600"}`}
+          className={`h-full ${over ? "bg-warn" : "bg-accent"}`}
           style={{ width: `${Math.min(100, pct)}%` }}
         />
       </div>
-      <p className="text-slate-600 dark:text-slate-400">
+      <p className="text-muted">
         {use.occupied} of {use.capacity} slots used ({pct}%); your limit is{" "}
         {limitPct}% ({use.limit} slots).
         {use.estimated &&
@@ -120,7 +120,7 @@ function Suggestions({ plan, pokemon }: { plan: Plan; pokemon: Pokemon[] }) {
   const byId = useMemo(() => new Map(pokemon.map((p) => [p.id, p])), [pokemon]);
   if (plan.wanted === 0) {
     return (
-      <p className="rounded-xl bg-teal-50 px-3 py-2 text-sm dark:bg-teal-950">
+      <p className="rounded-xl bg-highlight px-3 py-2 text-sm">
         {plan.kind === "limit"
           ? "You're under your limit. Nothing to transfer."
           : "You already have that much room. Nothing to transfer."}
@@ -134,25 +134,25 @@ function Suggestions({ plan, pokemon }: { plan: Plan; pokemon: Pokemon[] }) {
         Transfer {plan.transfers.length} Pokémon
       </h4>
       {plan.shortfall > 0 && (
-        <p className="text-sm text-amber-800 dark:text-amber-300">
+        <p className="text-sm text-warn">
           Your keep rules allow {plan.maxFeasible}, so that's {plan.shortfall}{" "}
           short of your target. Lower a species rule or protect fewer Pokémon to
           free more.
         </p>
       )}
       {plan.favorites > 0 && (
-        <p className="text-sm text-slate-600 dark:text-slate-400">
+        <p className="text-sm text-muted">
           {plan.favorites} of these are starred in the game: unstar them first.
         </p>
       )}
       <FindInGame searches={plan.searches} byId={byId} />
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-muted">
         Weakest first: lowest IVs, then CP, then oldest catch. Every one keeps
         your rules: better copies of each stay.
       </p>
       <ul
         aria-label="Suggested transfers"
-        className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800"
+        className="flex flex-col divide-y divide-line"
       >
         {shown.map((t) => {
           const p = byId.get(t.pokemonId);
@@ -160,7 +160,7 @@ function Suggestions({ plan, pokemon }: { plan: Plan; pokemon: Pokemon[] }) {
             p && (
               <li key={t.pokemonId} className="py-2">
                 <PokemonItem pokemon={p}>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                  <span className="rounded-full bg-soft px-2 py-0.5 font-medium text-muted">
                     {t.keptInGroup} better {p.species} kept
                   </span>
                 </PokemonItem>

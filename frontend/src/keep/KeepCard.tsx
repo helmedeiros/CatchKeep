@@ -74,7 +74,7 @@ function NextSteps({ onDismiss }: { onDismiss: () => void }) {
   return (
     <section
       aria-label="Optional next steps"
-      className="flex flex-col gap-2 rounded-xl bg-teal-50 p-3 text-sm dark:bg-teal-950"
+      className="flex flex-col gap-2 rounded-xl bg-highlight p-3 text-sm"
     >
       <p>
         You're set. If you like, fine-tune it: tap a species below to set your
@@ -184,7 +184,7 @@ function SetupForm({
               type="checkbox"
               checked={goals.includes(g)}
               onChange={() => toggle(g)}
-              className="size-4 accent-teal-700"
+              className="size-4 accent-accent"
             />
             {name}
           </label>
@@ -192,15 +192,11 @@ function SetupForm({
       </fieldset>
       {goals.length > 1 && (
         <div className="flex flex-col gap-1.5 text-sm">
-          <p className="text-slate-600 dark:text-slate-400">
-            Priority: {priority(goals)}
-          </p>
+          <p className="text-muted">Priority: {priority(goals)}</p>
           <ol aria-label="Goal priority" className="flex flex-col gap-1">
             {goals.map((g, i) => (
               <li key={g} className="flex items-center gap-2">
-                <span className="w-5 tabular-nums text-slate-500">
-                  {i + 1}.
-                </span>
+                <span className="w-5 tabular-nums text-muted">{i + 1}.</span>
                 <span className="flex-1">{label(g)}</span>
                 <button
                   type="button"
@@ -226,7 +222,7 @@ function SetupForm({
         </div>
       )}
       {capacityOk && (
-        <p className="text-sm text-slate-600 dark:text-slate-400">
+        <p className="text-sm text-muted">
           {defaultsText(bands.data, capacity, goals.includes("trading"))}
         </p>
       )}
@@ -241,7 +237,7 @@ function SetupForm({
           value={inGame}
           onChange={(e) => setInGame(e.target.value)}
         />
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-muted">
           The game shows it at the top of your Pokémon list, like 2500/4000.
           Without it, CatchKeep counts what you imported.
         </span>
@@ -257,12 +253,12 @@ function SetupForm({
           value={limitText}
           onChange={(e) => setLimitText(e.target.value)}
         />
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-muted">
           Room left for new catches, like a Community Day. 80% is a good start.
         </span>
       </label>
       {problem && slots !== "" && (
-        <p className="text-sm text-slate-500">{problem}</p>
+        <p className="text-sm text-muted">{problem}</p>
       )}
       {save.isError && (
         <p role="alert" className={alert}>
@@ -316,7 +312,7 @@ function Summary({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-semibold">Your keep rules</h3>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted">
             {setup.capacity} slots · {priority(setup.goals)}
           </p>
         </div>
@@ -342,7 +338,7 @@ function Numbers({
 }) {
   return (
     <>
-      <p className="text-sm text-slate-600 dark:text-slate-400">
+      <p className="text-sm text-muted">
         Keeping the best {s.minimum} of each variant and {s.rareMinimum} of
         legendary, mythical and Ultra Beast ones. Shiny, lucky, shadow and other
         variants each count on their own.
@@ -353,12 +349,12 @@ function Numbers({
         <Stat value={s.needsConfirmation} label="waiting for confirmation" />
       </div>
       {s.protected > 0 && (
-        <p className="text-sm text-slate-600 dark:text-slate-400">
+        <p className="text-sm text-muted">
           {s.protected} protected by you, always kept.
         </p>
       )}
       {s.needsConfirmation > 0 && (
-        <p className="text-sm text-slate-600 dark:text-slate-400">
+        <p className="text-sm text-muted">
           Pokémon with unconfirmed features are always kept. Confirm them on
           Home to see what you can let go.
         </p>
@@ -372,9 +368,9 @@ function Numbers({
 
 function Stat({ value, label }: { value: number; label: string }) {
   return (
-    <div className="rounded-xl bg-slate-50 px-2 py-3 dark:bg-slate-950">
+    <div className="rounded-xl bg-soft px-2 py-3">
       <p className="text-xl font-semibold tabular-nums">{value}</p>
-      <p className="text-xs text-slate-500">{label}</p>
+      <p className="text-xs text-muted">{label}</p>
     </div>
   );
 }
