@@ -488,7 +488,17 @@ For each record `r` and each unknown tri-state attribute `a` (shiny, costume, ba
 
 Consequence to surface in UI and in testing: with a CSV lacking shiny/costume/background, many records may be protected pending confirmation. **[Proposed]** Provide bulk confirmation per species ("None of my 34 Pidgey are shiny, costumed or have a background") recorded as `manual` observations. This is the main V1 usability risk; validate with real user data early (§17, M2).
 
-### 7.4 Optimization model
+### 7.4 Selection (decided in M4)
+
+With OD-02 decided (a category rule acts as each species' own rule), every rule's set `S_r` lies within one species, and the keep rules already keep, per group, the protected copies and then the best others up to the floor. Any subset of the remaining possible transfers therefore satisfies every rule at once, so:
+
+- `MaxFeasible` is the number of possible transfers (eligible, not kept);
+- the plan recommends `N = min(T, MaxFeasible)` of them, least valuable first: lowest IV total, then lowest CP, then oldest catch date, then app ID (a total order, so the same input always gives the same plan);
+- an independent checker re-verifies every plan (no kept, protected, team or unconfirmed Pokémon, and each group keeps `min(m, |S|)`) before it is returned; a failure is a bug.
+
+No solver, timeouts or fallback are needed (OD-09 moot). Storage upgrades are never suggested (OD-10 decided). The model below is kept for reference should overlapping rules return.
+
+### 7.4.1 Optimization model (reference)
 
 Decision variable `x_i ∈ {0,1}` per eligible record (1 = transfer). Ineligible records are fixed at 0.
 
@@ -967,8 +977,8 @@ Fixture corpus: supplied PNGs + new captures for every screen kind × protected 
 | OD-06 | Ranking sources (raid, PvP, Max), access and reuse terms                                                                                                                                                                                                                                                                                                                                                      | V3 start             | GameInfo Top Attackers as raid candidate only                          |
 | OD-07 | ~~SMTP for reset emails (which account/provider)~~ Decided: no email; only the computer running CatchKeep creates profiles and resets PINs                                                                                                                                                                                                                                                                    | V1 auth (M1)         | In-person delivery only                                                |
 | OD-08 | Encrypt backups with passphrase?                                                                                                                                                                                                                                                                                                                                                                              | V1 backup (M6)       | Unencrypted, labeled sensitive                                         |
-| OD-09 | Planner performance thresholds and timeouts                                                                                                                                                                                                                                                                                                                                                                   | After M4 benchmark   | §14.1 provisional values                                               |
-| OD-10 | Storage upgrade increment for upgrade comparison                                                                                                                                                                                                                                                                                                                                                              | V1 cleanup (M4)      | Configurable constant                                                  |
+| OD-09 | ~~Planner performance thresholds and timeouts~~ Decided: moot, the planner ranks instead of solving (§7.4)                                                                                                                                                                                                                                                                                                    | After M4 benchmark   | §14.1 provisional values                                               |
+| OD-10 | ~~Storage upgrade increment for upgrade comparison~~ Decided: no storage upgrade suggestions                                                                                                                                                                                                                                                                                                                  | V1 cleanup (M4)      | Configurable constant                                                  |
 | OD-11 | Bulk attribute confirmation UX (§7.3) acceptable to users?                                                                                                                                                                                                                                                                                                                                                    | M2 usability check   | Per-species bulk confirm                                               |
 
 ---
