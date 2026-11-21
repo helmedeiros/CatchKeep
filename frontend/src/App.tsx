@@ -28,7 +28,7 @@ export default function App() {
 function Session() {
   const me = useMe();
   if (me.data) {
-    return <Home displayName={me.data.displayName} />;
+    return <Home displayName={me.data.displayName} profileId={me.data.id} />;
   }
   return (
     <>

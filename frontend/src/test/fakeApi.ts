@@ -1,4 +1,5 @@
 import type { components } from "../api/schema.gen";
+import { onboardedKey } from "../onboarding/seen";
 import { jsonResponse } from "./render";
 
 interface Profile {
@@ -69,11 +70,18 @@ const toPokemon = (id: string, p: Row): Schemas["Pokemon"] => {
  * imports and the collection. A staged row "might be" every collected
  * Pokémon of the same species; with one candidate it is an exact match.
  */
-/** admin: whether the app runs on the host Mac (default true). */
+/**
+ * admin: whether the app runs on the host (default true). onboarded:
+ * whether profiles have already seen the introduction (default true).
+ */
 export function createFakeApi(
-  options: { lockAfter?: number; admin?: boolean } = {},
+  options: { lockAfter?: number; admin?: boolean; onboarded?: boolean } = {},
 ) {
   const admin = options.admin ?? true;
+  const introduced = (id: string) => {
+    if (options.onboarded ?? true)
+      window.localStorage.setItem(onboardedKey(id), "1");
+  };
   const profiles: Profile[] = [];
   let signedIn: Profile | null = null;
   let failures = 0;
@@ -157,6 +165,7 @@ export function createFakeApi(
         pin: body.pin,
       };
       profiles.push(p);
+      introduced(p.id);
       return jsonResponse(201, { id: p.id, displayName: p.displayName });
     }
     if (path === "/session" && req.method === "POST") {
@@ -698,15 +707,14 @@ export function createFakeApi(
         pin,
       };
       profiles.push(p);
+      introduced(p.id);
       signedIn = p;
     },
     addProfile(displayName: string, pin: string) {
       next += 1;
-      profiles.push({
-        id: `01JD2Z8Q4M8V7Y6X5W4T3S2R${String(next).padStart(2, "0")}`,
-        displayName,
-        pin,
-      });
+      const id = `01JD2Z8Q4M8V7Y6X5W4T3S2R${String(next).padStart(2, "0")}`;
+      profiles.push({ id, displayName, pin });
+      introduced(id);
     },
   };
 }
