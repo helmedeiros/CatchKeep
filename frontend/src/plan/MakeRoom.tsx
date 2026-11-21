@@ -4,6 +4,7 @@ import type { Pokemon } from "../collection/useCollection";
 import { useSetup } from "../keep/useKeep";
 import { alert, card, input, secondaryButton } from "../ui/styles";
 import { FindInGame } from "./FindInGame";
+import { StorageBar } from "./StorageBar";
 import { type Plan, type TargetKind, usePlan } from "./usePlan";
 
 const SHOWN = 30;
@@ -41,7 +42,7 @@ export function MakeRoom({ pokemon }: { pokemon: Pokemon[] }) {
 
   return (
     <section aria-label="Make room" className={`${card} flex flex-col gap-3`}>
-      {plan.data && <Use plan={plan.data} />}
+      {plan.data && <StorageBar use={plan.data.use} />}
       <fieldset className="flex flex-col gap-1.5 text-sm">
         <legend className="mb-1">How much room do you want?</legend>
         {TARGETS.map((t) => (
@@ -85,33 +86,6 @@ export function MakeRoom({ pokemon }: { pokemon: Pokemon[] }) {
       )}
       {plan.data && <Suggestions plan={plan.data} pokemon={pokemon} />}
     </section>
-  );
-}
-
-function Use({ plan: { use } }: { plan: Plan }) {
-  const pct =
-    use.capacity > 0 ? Math.round((use.occupied / use.capacity) * 100) : 0;
-  const limitPct =
-    use.capacity > 0 ? Math.round((use.limit / use.capacity) * 100) : 0;
-  const over = use.occupied > use.limit;
-  return (
-    <div className="flex flex-col gap-1.5 text-sm">
-      <div
-        className="h-2.5 overflow-hidden rounded-full bg-soft"
-        aria-hidden="true"
-      >
-        <div
-          className={`h-full ${over ? "bg-warn" : "bg-accent"}`}
-          style={{ width: `${Math.min(100, pct)}%` }}
-        />
-      </div>
-      <p className="text-muted">
-        {use.occupied} of {use.capacity} slots used ({pct}%); your limit is{" "}
-        {limitPct}% ({use.limit} slots).
-        {use.estimated &&
-          " This is an estimate from your import; add the number the game shows in your setup for an exact one."}
-      </p>
-    </div>
   );
 }
 

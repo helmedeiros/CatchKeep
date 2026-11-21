@@ -4,12 +4,14 @@ import { navigate, usePath } from "../app/router";
 import { CollectionView } from "../collection/CollectionView";
 import { ConfirmFeatures } from "../collection/ConfirmFeatures";
 import { ImportCard } from "../collection/ImportCard";
+import { countUnconfirmed } from "../collection/pokemon";
 import { type Pokemon, useCollection } from "../collection/useCollection";
 import { HostStatus } from "../host/HostStatus";
 import { OtherDevices } from "../host/OtherDevices";
 import { StartAtLogin } from "../host/StartAtLogin";
 import { KeepCard } from "../keep/KeepCard";
 import { MakeRoom } from "../plan/MakeRoom";
+import { NextStep } from "./NextStep";
 import { useSignOut } from "../session/useSession";
 import { TeamsCard } from "../teams/TeamsCard";
 import { alert, card, secondaryButton } from "../ui/styles";
@@ -61,8 +63,11 @@ export function Home({ displayName }: { displayName: string }) {
       default:
         place = (
           <Place title={`Hi, ${displayName}`}>
+            <NextStep pokemon={pokemon} />
             {pokemon.length === 0 && <ImportCard hasPokemon={false} />}
-            <ConfirmFeatures pokemon={pokemon} />
+            {countUnconfirmed(pokemon) > 0 && (
+              <ConfirmFeatures pokemon={pokemon} />
+            )}
             {pokemon.length > 0 && <Shortcuts pokemon={pokemon} />}
           </Place>
         );

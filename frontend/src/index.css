@@ -19,6 +19,7 @@
   --ck-line: #dce5e3;
   --ck-good: #1f8a6e;
   --ck-warn: #c2562b;
+  --ck-keepy: #bfe3dc;
   --ck-shadow: 0 1px 2px rgb(6 82 92 / 0.06), 0 8px 24px rgb(6 82 92 / 0.06);
 }
 
@@ -35,6 +36,7 @@
     --ck-line: #222a3b;
     --ck-good: #4fd18b;
     --ck-warn: #ff7a59;
+    --ck-keepy: #ffd249;
     --ck-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
   }
 }
