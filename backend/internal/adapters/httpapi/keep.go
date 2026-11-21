@@ -33,7 +33,10 @@ func (s *server) SaveSetup(ctx context.Context, req SaveSetupRequestObject) (Sav
 	if err != nil {
 		return nil, err
 	}
-	setup := domain.Setup{Capacity: req.Body.Capacity, Goals: make([]domain.Goal, 0, len(req.Body.Goals))}
+	setup := domain.Setup{
+		Capacity: req.Body.Capacity, Goals: make([]domain.Goal, 0, len(req.Body.Goals)),
+		InGameCount: deref(req.Body.InGameCount), Limit: deref(req.Body.Limit),
+	}
 	for _, g := range req.Body.Goals {
 		setup.Goals = append(setup.Goals, domain.Goal(g))
 	}
@@ -93,7 +96,48 @@ func toSetup(s domain.Setup) Setup {
 	for _, g := range s.Goals {
 		out.Goals = append(out.Goals, SetupGoals(g))
 	}
+	if s.InGameCount > 0 {
+		out.InGameCount = &s.InGameCount
+	}
+	if s.Limit > 0 {
+		out.Limit = &s.Limit
+	}
 	return out
+}
+
+func (s *server) GetPlan(ctx context.Context, req GetPlanRequestObject) (GetPlanResponseObject, error) {
+	trainer, err := s.trainer(ctx)
+	if errors.Is(err, errNotSignedIn) {
+		return GetPlan401JSONResponse{unauthenticated()}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	target := domain.Target{Kind: domain.TargetKind(req.Params.Kind), Value: deref(req.Params.Value)}
+	plan, err := s.services.Keep.Plan(ctx, trainer, target)
+	switch {
+	case errors.Is(err, domain.ErrSetupNotFound):
+		return GetPlan409JSONResponse(errorBody(codeSetupRequired, "Set up your storage and goals first.")), nil
+	case errors.Is(err, domain.ErrInvalidTarget):
+		return GetPlan422JSONResponse(errorBody(codeValidationFailed, err.Error())), nil
+	case err != nil:
+		return nil, err
+	}
+	out := Plan{
+		Use: StorageUse{
+			Capacity: plan.Use.Capacity, Occupied: plan.Use.Occupied, Free: plan.Use.Free,
+			Estimated: plan.Use.Estimated, Limit: plan.Use.Limit,
+		},
+		Kind: req.Params.Kind, Value: req.Params.Value, Wanted: plan.Wanted, MaxFeasible: plan.MaxFeasible,
+		Shortfall: plan.Shortfall, Favorites: plan.Favorites, FavoritesUnknown: plan.FavoritesUnknown,
+		Transfers: make([]PlanItem, 0, len(plan.Transfers)),
+	}
+	for _, it := range plan.Transfers {
+		out.Transfers = append(out.Transfers, PlanItem{
+			PokemonId: string(it.ID), KeptInGroup: it.KeptInGroup, Rule: PlanItemRule(it.Rule), Favorite: toTri(it.Favorite),
+		})
+	}
+	return GetPlan200JSONResponse(out), nil
 }
 
 func (s *server) GetCapacityBands(ctx context.Context, _ GetCapacityBandsRequestObject) (GetCapacityBandsResponseObject, error) {

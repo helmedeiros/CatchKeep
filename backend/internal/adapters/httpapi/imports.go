@@ -163,11 +163,23 @@ func (s *server) MapImportColumns(ctx context.Context, req MapImportColumnsReque
 	return MapImportColumns200JSONResponse(toPreview(p)), nil
 }
 
-func deref(s *string) string {
-	if s == nil {
-		return ""
+func deref[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
 	}
-	return *s
+	return *p
+}
+
+func toTri(t domain.TriState) TriState {
+	switch t {
+	case domain.Yes:
+		return Yes
+	case domain.No:
+		return No
+	default:
+		return Unknown
+	}
 }
 
 func toResolution(a MatchAnswer) (domain.Resolution, bool) {
@@ -296,16 +308,7 @@ func toPossibleMatch(m domain.PossibleMatch) PossibleMatch {
 
 func toPokemon(p domain.Pokemon) Pokemon {
 	cur := p.Current()
-	tri := func(f domain.Field) TriState {
-		switch cur.Tri(f) {
-		case domain.Yes:
-			return Yes
-		case domain.No:
-			return No
-		default:
-			return Unknown
-		}
-	}
+	tri := func(f domain.Field) TriState { return toTri(cur.Tri(f)) }
 	intPtr := func(f domain.Field) *int {
 		if v, ok := cur.Int(f); ok {
 			return &v

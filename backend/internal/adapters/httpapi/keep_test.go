@@ -188,3 +188,36 @@ func TestCollection_MarksOnePokemonsFeatures(t *testing.T) {
 		t.Fatalf("marked = %+v", got)
 	}
 }
+
+func TestKeep_PlanSuggestsTransfersForATarget(t *testing.T) {
+	wantStatus(t, newAPI(t).do(http.MethodGet, "/api/v1/plan?kind=limit", ""), http.StatusUnauthorized)
+	api := signedIn(t, "Ash")
+	wantStatus(t, api.do(http.MethodGet, "/api/v1/plan?kind=limit", ""), http.StatusConflict)
+
+	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/collection/confirmations", `{"features":["shiny","costume","background","dynamax","gigantamax"]}`), http.StatusOK)
+	wantStatus(t, api.do(http.MethodPut, "/api/v1/setup", `{"capacity":350,"goals":["collecting"],"inGameCount":300,"limit":80}`), http.StatusOK)
+	setup := decode[struct{ InGameCount, Limit int }](t, api.do(http.MethodGet, "/api/v1/setup", "").Body.Bytes())
+	if setup.InGameCount != 300 || setup.Limit != 80 {
+		t.Fatalf("setup = %+v", setup)
+	}
+
+	type plan struct {
+		Use                            struct{ Occupied, Limit int }
+		Wanted, MaxFeasible, Shortfall int
+		Transfers                      []struct {
+			PokemonID string `json:"pokemonId"`
+		}
+	}
+	got := decode[plan](t, api.do(http.MethodGet, "/api/v1/plan?kind=limit", "").Body.Bytes())
+	if got.Use.Occupied != 300 || got.Use.Limit != 280 || got.Wanted != 20 || got.Shortfall != got.Wanted-len(got.Transfers) {
+		t.Fatalf("plan = %+v", got)
+	}
+	free := decode[plan](t, api.do(http.MethodGet, "/api/v1/plan?kind=free_more&value=1", "").Body.Bytes())
+	if free.Wanted != 1 || len(free.Transfers) != min(1, free.MaxFeasible) {
+		t.Fatalf("plan = %+v", free)
+	}
+	wantStatus(t, api.do(http.MethodGet, "/api/v1/plan?kind=free_more", ""), http.StatusUnprocessableEntity)
+	wantStatus(t, api.do(http.MethodGet, "/api/v1/plan?kind=percent&value=500", ""), http.StatusUnprocessableEntity)
+}

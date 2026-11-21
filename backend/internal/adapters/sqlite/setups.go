@@ -43,8 +43,8 @@ func (r *Setups) GetSetup(ctx context.Context, trainer domain.TrainerID) (domain
 		s                          domain.Setup
 		goals, species, categories string
 	)
-	err := r.db.QueryRowContext(ctx, `SELECT capacity, goals, species, categories FROM trainer_setups WHERE trainer_id = ?`, string(trainer)).
-		Scan(&s.Capacity, &goals, &species, &categories)
+	err := r.db.QueryRowContext(ctx, `SELECT capacity, goals, species, categories, in_game_count, storage_limit FROM trainer_setups WHERE trainer_id = ?`, string(trainer)).
+		Scan(&s.Capacity, &goals, &species, &categories, &s.InGameCount, &s.Limit)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Setup{}, domain.ErrSetupNotFound
 	}
@@ -95,10 +95,11 @@ func (r *Setups) SaveSetup(ctx context.Context, trainer domain.TrainerID, s doma
 	}
 	return inTx(ctx, r.db, trainer, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO trainer_setups (trainer_id, capacity, goals, species, categories) VALUES (?, ?, ?, ?, ?)
+			INSERT INTO trainer_setups (trainer_id, capacity, goals, species, categories, in_game_count, storage_limit) VALUES (?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT (trainer_id) DO UPDATE SET capacity = excluded.capacity, goals = excluded.goals,
-				species = excluded.species, categories = excluded.categories`,
-			string(trainer), s.Capacity, string(goals), string(species), string(categories)); err != nil {
+				species = excluded.species, categories = excluded.categories,
+				in_game_count = excluded.in_game_count, storage_limit = excluded.storage_limit`,
+			string(trainer), s.Capacity, string(goals), string(species), string(categories), s.InGameCount, s.Limit); err != nil {
 			return fmt.Errorf("save setup: %w", err)
 		}
 		return nil

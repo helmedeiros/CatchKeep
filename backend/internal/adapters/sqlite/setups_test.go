@@ -18,7 +18,7 @@ func TestSetups_SaveReplaceAndGetPerTrainer(t *testing.T) {
 		t.Fatalf("before saving: err = %v", err)
 	}
 	first := domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}}
-	second := domain.Setup{Capacity: 2700, Goals: []domain.Goal{domain.GoalBattling, domain.GoalTrading}}
+	second := domain.Setup{Capacity: 2700, Goals: []domain.Goal{domain.GoalBattling, domain.GoalTrading}, InGameCount: 2500, Limit: 75}
 	if err := setups.SaveSetup(t.Context(), "ash", first); err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +27,7 @@ func TestSetups_SaveReplaceAndGetPerTrainer(t *testing.T) {
 	}
 
 	got, err := setups.GetSetup(t.Context(), "ash")
-	if err != nil || got.Capacity != 2700 || !slices.Equal(got.Goals, second.Goals) {
+	if err != nil || got.Capacity != 2700 || !slices.Equal(got.Goals, second.Goals) || got.InGameCount != 2500 || got.Limit != 75 {
 		t.Fatalf("GetSetup = %+v, %v", got, err)
 	}
 	if _, err := setups.GetSetup(t.Context(), "misty"); !errors.Is(err, domain.ErrSetupNotFound) {

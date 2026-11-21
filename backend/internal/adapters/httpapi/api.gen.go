@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -203,6 +204,33 @@ func (e MatchCandidateOrigin) Valid() bool {
 	}
 }
 
+// Defines values for PlanItemRule.
+const (
+	PlanItemRuleCategory PlanItemRule = "category"
+	PlanItemRuleDefault  PlanItemRule = "default"
+	PlanItemRuleFavorite PlanItemRule = "favorite"
+	PlanItemRuleRare     PlanItemRule = "rare"
+	PlanItemRuleSpecies  PlanItemRule = "species"
+)
+
+// Valid indicates whether the value is a known member of the PlanItemRule enum.
+func (e PlanItemRule) Valid() bool {
+	switch e {
+	case PlanItemRuleCategory:
+		return true
+	case PlanItemRuleDefault:
+		return true
+	case PlanItemRuleFavorite:
+		return true
+	case PlanItemRuleRare:
+		return true
+	case PlanItemRuleSpecies:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PokemonGender.
 const (
 	Female PokemonGender = "female"
@@ -278,6 +306,30 @@ func (e SpeciesCategory) Valid() bool {
 	case Mythical:
 		return true
 	case UltraBeast:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TargetKind.
+const (
+	FreeMore  TargetKind = "free_more"
+	Limit     TargetKind = "limit"
+	Percent   TargetKind = "percent"
+	ReachFree TargetKind = "reach_free"
+)
+
+// Valid indicates whether the value is a known member of the TargetKind enum.
+func (e TargetKind) Valid() bool {
+	switch e {
+	case FreeMore:
+		return true
+	case Limit:
+		return true
+	case Percent:
+		return true
+	case ReachFree:
 		return true
 	default:
 		return false
@@ -657,6 +709,44 @@ type NewProfile struct {
 // Examples: 2468
 type Pin = string
 
+// Plan defines model for Plan.
+type Plan struct {
+	// Favorites Suggestions starred in the game; unstar them first.
+	Favorites int `json:"favorites"`
+
+	// FavoritesUnknown Suggestions whose star the export could not tell.
+	FavoritesUnknown int `json:"favoritesUnknown"`
+
+	// Kind limit gets back under the storage limit; free_more frees value more slots; reach_free reaches value free slots; percent frees value percent of the Pokémon in storage.
+	Kind TargetKind `json:"kind"`
+
+	// MaxFeasible How many the keep rules allow to transfer.
+	MaxFeasible int `json:"maxFeasible"`
+
+	// Shortfall How many short of the target, when the rules allow fewer.
+	Shortfall int        `json:"shortfall"`
+	Transfers []PlanItem `json:"transfers"`
+	Use       StorageUse `json:"use"`
+	Value     *int       `json:"value,omitempty"`
+
+	// Wanted How many to transfer for the target.
+	Wanted int `json:"wanted"`
+}
+
+// PlanItem defines model for PlanItem.
+type PlanItem struct {
+	// Favorite Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
+	Favorite TriState `json:"favorite"`
+
+	// KeptInGroup Copies of its variant that stay.
+	KeptInGroup int          `json:"keptInGroup"`
+	PokemonId   string       `json:"pokemonId"`
+	Rule        PlanItemRule `json:"rule"`
+}
+
+// PlanItemRule defines model for PlanItem.Rule.
+type PlanItemRule string
+
 // Pokemon defines model for Pokemon.
 type Pokemon struct {
 	Attributes Attributes          `json:"attributes"`
@@ -735,6 +825,12 @@ type Setup struct {
 
 	// Goals Goals, most important first.
 	Goals []SetupGoals `json:"goals"`
+
+	// InGameCount How many Pokémon the game shows the trainer has; 0 or absent when not given, and the imported count is used as an estimate.
+	InGameCount *int `json:"inGameCount,omitempty"`
+
+	// Limit Percent of storage to stay under; absent means 80.
+	Limit *int `json:"limit,omitempty"`
 }
 
 // SetupGoals defines model for Setup.Goals.
@@ -772,6 +868,22 @@ type SpeciesRule struct {
 type SpeciesRules struct {
 	Rules []SpeciesRule `json:"rules"`
 }
+
+// StorageUse defines model for StorageUse.
+type StorageUse struct {
+	Capacity int `json:"capacity"`
+
+	// Estimated Occupied counts imported Pokémon because no in-game count was given.
+	Estimated bool `json:"estimated"`
+	Free      int  `json:"free"`
+
+	// Limit Slots the trainer wants to stay under.
+	Limit    int `json:"limit"`
+	Occupied int `json:"occupied"`
+}
+
+// TargetKind limit gets back under the storage limit; free_more frees value more slots; reach_free reaches value free slots; percent frees value percent of the Pokémon in storage.
+type TargetKind string
 
 // Team defines model for Team.
 type Team struct {
@@ -842,6 +954,14 @@ type VariantGroupRule string
 
 // ImportId defines model for ImportId.
 type ImportId = string
+
+// GetPlanParams defines parameters for GetPlan.
+type GetPlanParams struct {
+	Kind TargetKind `form:"kind" json:"kind"`
+
+	// Value Slots or percent; not used for limit.
+	Value *int `form:"value,omitempty" json:"value,omitempty"`
+}
 
 // SetAutostartJSONRequestBody defines body for SetAutostart for application/json ContentType.
 type SetAutostartJSONRequestBody = AutostartInput
@@ -941,6 +1061,9 @@ type ServerInterface interface {
 	// GetMe The profile the caller is signed in to.
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// GetPlan Suggest which Pokémon to transfer to make the room asked for.
+	// (GET /plan)
+	GetPlan(w http.ResponseWriter, r *http.Request, params GetPlanParams)
 	// ListProfiles List the profiles on this host, for the profile picker.
 	// (GET /profiles)
 	ListProfiles(w http.ResponseWriter, r *http.Request)
@@ -1315,6 +1438,52 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 	handler.ServeHTTP(w, r)
 }
 
+// GetPlan operation middleware
+func (siw *ServerInterfaceWrapper) GetPlan(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetPlanParams
+
+	// ------------- Required query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "value" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "value", r.URL.Query(), &params.Value, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "value"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "value", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPlan(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListProfiles operation middleware
 func (siw *ServerInterfaceWrapper) ListProfiles(w http.ResponseWriter, r *http.Request) {
 
@@ -1675,6 +1844,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/capacity-bands", wrapper.GetCapacityBands)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/setup", wrapper.GetSetup)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/setup", wrapper.SaveSetup)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/plan", wrapper.GetPlan)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/species-rules", wrapper.GetSpeciesRules)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/species-rules", wrapper.SaveSpeciesRules)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/category-rules", wrapper.GetCategoryRules)
@@ -2892,6 +3062,87 @@ func (response GetMedefaultJSONResponse) VisitGetMeResponse(w http.ResponseWrite
 	return err
 }
 
+type GetPlanRequestObject struct {
+	Params GetPlanParams
+}
+
+type GetPlanResponseObject interface {
+	VisitGetPlanResponse(w http.ResponseWriter) error
+}
+
+type GetPlan200JSONResponse Plan
+
+func (response GetPlan200JSONResponse) VisitGetPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPlan401JSONResponse struct{ ErrorJSONResponse }
+
+func (response GetPlan401JSONResponse) VisitGetPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPlan409JSONResponse Error
+
+func (response GetPlan409JSONResponse) VisitGetPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPlan422JSONResponse Error
+
+func (response GetPlan422JSONResponse) VisitGetPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPlandefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetPlandefaultJSONResponse) VisitGetPlanResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListProfilesRequestObject struct {
 }
 
@@ -3858,6 +4109,9 @@ type StrictServerInterface interface {
 	// GetMe The profile the caller is signed in to.
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// GetPlan Suggest which Pokémon to transfer to make the room asked for.
+	// (GET /plan)
+	GetPlan(ctx context.Context, request GetPlanRequestObject) (GetPlanResponseObject, error)
 	// ListProfiles List the profiles on this host, for the profile picker.
 	// (GET /profiles)
 	ListProfiles(ctx context.Context, request ListProfilesRequestObject) (ListProfilesResponseObject, error)
@@ -4426,6 +4680,32 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPlan operation middleware
+func (sh *strictHandler) GetPlan(w http.ResponseWriter, r *http.Request, params GetPlanParams) {
+	var request GetPlanRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPlan(ctx, request.(GetPlanRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPlan")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPlanResponseObject); ok {
+		if err := validResponse.VisitGetPlanResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
