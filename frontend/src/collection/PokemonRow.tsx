@@ -24,21 +24,21 @@ export function PokemonRow({
         <p className="truncate">
           <span className="font-semibold">{p.species}</span>
           {p.form !== "Normal" && (
-            <span className="text-slate-500"> · {p.form}</span>
+            <span className="text-muted"> · {p.form}</span>
           )}
-          <span className="text-sm text-slate-500">
+          <span className="text-sm text-muted">
             {" "}
             · {p.cp === undefined ? "CP ?" : `CP ${p.cp}`}
             {p.hp !== undefined && ` / HP ${p.hp}`}
           </span>
         </p>
-        <p className="text-sm text-slate-600 tabular-nums dark:text-slate-400">
+        <p className="text-sm text-muted tabular-nums">
           {p.iv
             ? `IV ${p.iv.attack}-${p.iv.defense}-${p.iv.stamina}`
             : "IVs unknown"}
           {p.level !== undefined && ` / LVL ${p.level.toFixed(1)}`}
         </p>
-        <p className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+        <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
           {p.attributes.shiny === "yes" && <Badge>Shiny</Badge>}
           {p.attributes.lucky === "yes" && <Badge>Lucky</Badge>}
           {p.attributes.shadow === "yes" && <Badge>Shadow</Badge>}
@@ -60,7 +60,7 @@ export function PokemonRow({
 
 function Badge({ children }: { children: string }) {
   return (
-    <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-900 dark:bg-amber-900 dark:text-amber-100">
+    <span className="rounded-full bg-warn/15 px-2 py-0.5 font-medium text-warn">
       {children}
     </span>
   );

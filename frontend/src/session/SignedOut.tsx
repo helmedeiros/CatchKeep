@@ -37,7 +37,7 @@ export function SignedOut() {
   const [resetting, setResetting] = useState(false);
 
   if (profiles.isPending || host.isPending) {
-    return <p className="text-sm text-slate-500">Loading profiles…</p>;
+    return <p className="text-sm text-muted">Loading profiles…</p>;
   }
   if (profiles.isError) {
     return <p className={alert}>Couldn't load profiles.</p>;
@@ -49,7 +49,7 @@ export function SignedOut() {
     return (
       <section className={`${card} flex flex-col gap-2`}>
         <h2 className="text-lg font-semibold">No trainers yet</h2>
-        <p className="text-sm text-slate-600 dark:text-slate-400">
+        <p className="text-sm text-muted">
           Add the first trainer on the computer running CatchKeep.
         </p>
       </section>
@@ -82,7 +82,7 @@ export function SignedOut() {
             <button
               type="button"
               onClick={() => setSelected(p)}
-              className="w-full rounded-xl bg-slate-100 px-4 py-3 text-left font-medium hover:bg-teal-50 dark:bg-slate-800 dark:hover:bg-slate-700"
+              className="w-full rounded-xl bg-soft px-4 py-3 text-left font-medium hover:bg-highlight"
             >
               {p.displayName}
             </button>
@@ -107,7 +107,7 @@ export function SignedOut() {
           </button>
         </div>
       ) : (
-        <p className="mt-3 text-sm text-slate-500">{askTheHost}</p>
+        <p className="mt-3 text-sm text-muted">{askTheHost}</p>
       )}
     </section>
   );
@@ -165,7 +165,7 @@ function ResetPinForm({
       className={`${card} flex flex-col gap-3`}
     >
       <h2 className="text-lg font-semibold">Reset a PIN</h2>
-      <p className="text-sm text-slate-600 dark:text-slate-400">
+      <p className="text-sm text-muted">
         The trainer is signed out on every device and signs in again with the
         new PIN.
       </p>
@@ -203,7 +203,7 @@ function ResetPinForm({
           onChange={(e) => setRepeat(e.target.value)}
         />
       </label>
-      <p className="text-xs text-slate-500">4 to 8 digits.</p>
+      <p className="text-xs text-muted">4 to 8 digits.</p>
       {mismatch && (
         <p role="alert" className={alert}>
           The PINs don't match.
@@ -308,7 +308,7 @@ function CreateProfileForm({
   return (
     <form onSubmit={submit} className={`${card} flex flex-col gap-3`}>
       <h2 className="text-lg font-semibold">New profile</h2>
-      <p className="text-sm text-slate-600 dark:text-slate-400">
+      <p className="text-sm text-muted">
         Each trainer gets their own collection, rules and history, protected by
         a PIN.
       </p>
@@ -338,7 +338,7 @@ function CreateProfileForm({
           onChange={(e) => setRepeat(e.target.value)}
         />
       </label>
-      <p className="text-xs text-slate-500">4 to 8 digits.</p>
+      <p className="text-xs text-muted">4 to 8 digits.</p>
       {mismatch && (
         <p role="alert" className={alert}>
           The PINs don't match.

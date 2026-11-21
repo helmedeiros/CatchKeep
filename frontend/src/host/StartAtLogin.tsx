@@ -33,18 +33,18 @@ export function StartAtLogin() {
 
   if (!admin || !state.data?.supported) return null;
   return (
-    <div className="mt-3 flex flex-col gap-1 border-t border-slate-100 pt-3 text-sm dark:border-slate-800">
+    <div className="mt-3 flex flex-col gap-1 border-t border-line pt-3 text-sm">
       <label className="flex items-center gap-2 font-medium">
         <input
           type="checkbox"
-          className="size-4 accent-teal-700"
+          className="size-4 accent-accent"
           checked={state.data.enabled}
           disabled={change.isPending}
           onChange={(e) => change.mutate(e.target.checked)}
         />
         Start CatchKeep when I log in to this computer
       </label>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-muted">
         Takes effect the next time you log in, with the same settings as now.
       </p>
     </div>

@@ -9,15 +9,13 @@ import { card } from "./ui/styles";
 
 export default function App() {
   return (
-    <div className="min-h-dvh bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="min-h-dvh bg-soft text-ink">
       <main className="mx-auto flex max-w-md flex-col gap-4 px-4 py-8 sm:max-w-3xl">
         <header className="flex items-center gap-3">
           <img src="/favicon.svg" alt="" className="size-10" />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">CatchKeep</h1>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              A Pokémon GO storage helper.
-            </p>
+            <p className="text-sm text-muted">A Pokémon GO storage helper.</p>
           </div>
         </header>
         <Session />

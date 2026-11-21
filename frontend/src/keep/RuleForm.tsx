@@ -27,16 +27,14 @@ export function RuleForm({
   return (
     <form
       aria-label={`Keep rule for ${name}`}
-      className="flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-950"
+      className="flex flex-wrap items-end gap-3 rounded-xl bg-soft p-3 text-sm"
       onSubmit={(e) => {
         e.preventDefault();
         if (valid) onSave({ minimum: favorite ? 0 : count, favorite });
       }}
     >
       <label className="flex flex-col gap-1">
-        <span className="text-slate-600 dark:text-slate-400">
-          Keep at least
-        </span>
+        <span className="text-muted">Keep at least</span>
         <input
           type="number"
           inputMode="numeric"
@@ -52,7 +50,7 @@ export function RuleForm({
           type="checkbox"
           checked={favorite}
           onChange={(e) => setFavorite(e.target.checked)}
-          className="size-4 accent-teal-700"
+          className="size-4 accent-accent"
         />
         {favoriteLabel}
       </label>
@@ -60,7 +58,7 @@ export function RuleForm({
         <button
           type="submit"
           disabled={!valid || pending}
-          className="rounded-lg bg-teal-700 px-3 py-2 font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+          className="rounded-full bg-accent px-3 py-2 font-semibold text-accent-ink hover:bg-accent/90 disabled:opacity-50"
         >
           Save rule
         </button>
@@ -75,7 +73,7 @@ export function RuleForm({
           </button>
         )}
       </div>
-      <p className="basis-full text-xs text-slate-500">{hint}</p>
+      <p className="basis-full text-xs text-muted">{hint}</p>
     </form>
   );
 }

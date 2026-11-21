@@ -25,10 +25,10 @@ export function ProtectButton({ pokemon: p }: { pokemon: Pokemon }) {
           },
         )
       }
-      className={`shrink-0 rounded-lg px-2 py-1 text-xs font-semibold ring-1 disabled:opacity-50 ${
+      className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ring-1 disabled:opacity-50 ${
         p.protected
-          ? "bg-teal-700 text-white ring-teal-700 hover:bg-teal-800"
-          : "text-slate-600 ring-slate-300 hover:bg-slate-50 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-800"
+          ? "bg-accent text-accent-ink ring-accent hover:bg-accent/90"
+          : "text-muted ring-line hover:bg-soft"
       }`}
     >
       {p.protected ? "Protected" : "Protect"}

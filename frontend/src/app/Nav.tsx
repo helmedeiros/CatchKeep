@@ -72,7 +72,7 @@ export function Nav() {
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-3 bottom-3 z-20 rounded-full bg-white/95 px-2 py-1.5 shadow-lg ring-1 ring-slate-200 backdrop-blur sm:static sm:inset-auto sm:rounded-2xl sm:px-1.5 sm:py-1.5 sm:shadow-sm dark:bg-slate-900/95 dark:ring-slate-700"
+      className="fixed inset-x-3 bottom-3 z-20 rounded-full bg-surface px-2 py-1.5 shadow-lg ring-1 ring-line backdrop-blur sm:static sm:inset-auto sm:rounded-2xl sm:px-1.5 sm:py-1.5 sm:shadow-sm"
     >
       <ul className="flex items-end justify-around sm:items-center sm:justify-start sm:gap-1">
         {PLACES.map((p) => {
@@ -85,17 +85,15 @@ export function Nav() {
                 aria-current={current ? "page" : undefined}
                 onClick={(e) => go(e, p.path)}
                 className={`flex min-w-14 flex-col items-center gap-0.5 whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-semibold sm:flex-row sm:gap-2 sm:px-3 sm:py-2 sm:text-sm ${
-                  current
-                    ? "text-teal-800 dark:text-teal-300"
-                    : "text-slate-500 hover:text-teal-800 dark:text-slate-400 dark:hover:text-teal-300"
-                } ${current ? "sm:bg-teal-50 dark:sm:bg-slate-800" : ""}`}
+                  current ? "text-accent" : "text-muted hover:text-accent"
+                } ${current ? "sm:bg-highlight" : ""}`}
               >
                 <span
                   className={`grid place-items-center rounded-full ${
                     raised
-                      ? "-mt-6 size-13 bg-teal-700 text-white shadow-md sm:mt-0 sm:size-auto sm:bg-transparent sm:text-current sm:shadow-none"
+                      ? "-mt-6 size-13 bg-accent text-accent-ink shadow-md sm:mt-0 sm:size-auto sm:bg-transparent sm:text-current sm:shadow-none"
                       : current
-                        ? "size-9 bg-teal-50 sm:size-auto sm:bg-transparent dark:bg-slate-800"
+                        ? "size-9 bg-highlight sm:size-auto sm:bg-transparent"
                         : "size-9 sm:size-auto"
                   }`}
                 >

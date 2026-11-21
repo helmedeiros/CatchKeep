@@ -14,12 +14,12 @@ export function Sprite({
 }) {
   const [failed, setFailed] = useState(false);
   const box = size === "sm" ? "size-10" : "size-14";
-  const frame = `${box} shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800`;
+  const frame = `${box} shrink-0 rounded-xl bg-soft`;
   if (dexNumber === undefined || failed) {
     return (
       <span
         aria-hidden="true"
-        className={`${frame} grid place-items-center text-lg font-semibold text-slate-400`}
+        className={`${frame} grid place-items-center text-lg font-semibold text-muted`}
       >
         {species.charAt(0)}
       </span>

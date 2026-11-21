@@ -91,7 +91,7 @@ function Place({ title, children }: { title: string; children: ReactNode }) {
 
 function ImportFirst() {
   return (
-    <p className={`${card} text-sm text-slate-600 dark:text-slate-400`}>
+    <p className={`${card} text-sm text-muted`}>
       Bring in your collection first, from Home.
     </p>
   );
@@ -125,12 +125,10 @@ function Shortcuts({ pokemon }: { pokemon: Pokemon[] }) {
               e.preventDefault();
               navigate(it.to);
             }}
-            className={`${card} flex h-full flex-col gap-1 hover:ring-2 hover:ring-teal-600`}
+            className={`${card} flex h-full flex-col gap-1 hover:ring-2 hover:ring-accent`}
           >
             <span className="font-semibold">{it.title}</span>
-            <span className="text-sm text-slate-600 dark:text-slate-400">
-              {it.text}
-            </span>
+            <span className="text-sm text-muted">{it.text}</span>
           </a>
         </li>
       ))}
