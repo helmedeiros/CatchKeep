@@ -26,6 +26,7 @@ const (
 	codeAdminOnly        = "ADMIN_ONLY"
 	codeHostNotAllowed   = "HOST_NOT_ALLOWED"
 	codeCrossSite        = "CROSS_SITE"
+	codeNoAutostart      = "AUTOSTART_UNSUPPORTED"
 
 	codeUnsupportedMediaType = "UNSUPPORTED_MEDIA_TYPE"
 )

@@ -42,7 +42,7 @@ CatchKeep runs on one computer. Phones, tablets and other computers connected to
 2. On that computer, open <http://localhost:8080>. "localhost" means "this computer", so it only works there. This is also the only place where you can add trainers and reset forgotten PINs.
 3. Under **Use CatchKeep on other devices**, the page shows the address to open everywhere else, such as `http://192.168.1.20:8080`. The numbers are the computer's address on your network, called its IP address. Type it into the browser on a phone and sign in with your PIN.
 
-Keep the computer on and awake while others use it. The connection is not encrypted (plain HTTP), so use it on a network you trust.
+Keep the computer on and awake while others use it. On a Mac, tick **Start CatchKeep when I log in to this computer** on that computer and it starts by itself from then on, with the same settings. The connection is not encrypted (plain HTTP), so use it on a network you trust.
 
 ## Coming next
 

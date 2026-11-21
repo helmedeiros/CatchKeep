@@ -172,3 +172,28 @@ func (s *server) GetMe(ctx context.Context, _ GetMeRequestObject) (GetMeResponse
 	}
 	return GetMe200JSONResponse(toProfile(me)), nil
 }
+
+func (s *server) GetAutostart(ctx context.Context, _ GetAutostartRequestObject) (GetAutostartResponseObject, error) {
+	if !isAdmin(ctx) {
+		return GetAutostart403JSONResponse{ErrorJSONResponse(adminOnly())}, nil
+	}
+	state, err := s.services.Autostart.State()
+	if err != nil {
+		return nil, err
+	}
+	return GetAutostart200JSONResponse{Supported: state.Supported, Enabled: state.Enabled}, nil
+}
+
+func (s *server) SetAutostart(ctx context.Context, req SetAutostartRequestObject) (SetAutostartResponseObject, error) {
+	if !isAdmin(ctx) {
+		return SetAutostart403JSONResponse{ErrorJSONResponse(adminOnly())}, nil
+	}
+	state, err := s.services.Autostart.Set(req.Body.Enabled)
+	switch {
+	case errors.Is(err, app.ErrAutostartUnsupported):
+		return SetAutostart409JSONResponse(errorBody(codeNoAutostart, "This computer can't start CatchKeep at login from here.")), nil
+	case err != nil:
+		return nil, err
+	}
+	return SetAutostart200JSONResponse{Supported: state.Supported, Enabled: state.Enabled}, nil
+}

@@ -52,3 +52,10 @@ type Sessions interface {
 type Tokens interface {
 	NewToken() string
 }
+
+// Autostart starts CatchKeep when the user logs in to this computer.
+type Autostart interface {
+	Enabled() (bool, error)
+	Enable() error
+	Disable() error
+}

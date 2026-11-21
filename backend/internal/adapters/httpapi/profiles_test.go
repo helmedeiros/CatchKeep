@@ -43,6 +43,7 @@ func newAPI(t *testing.T) *apiClient {
 		Keep:       app.NewKeep(apptest.NewSetups(), collection, apptest.SpeciesCategories{"Mewtwo": domain.CategoryLegendary}, teams),
 		Teams:      app.NewTeams(teams, ulidLike{}),
 		HostNames:  func() []string { return []string{hostAddress} },
+		Autostart:  app.NewAutostart(&apptest.Autostart{}),
 	})}
 }
 
@@ -247,4 +248,25 @@ func TestProfiles_TheHostResetsAPIN(t *testing.T) {
 
 	wantStatus(t, device.do(http.MethodGet, "/api/v1/me", ""), http.StatusUnauthorized)
 	wantStatus(t, device.do(http.MethodPost, "/api/v1/session", `{"profileId":"`+id+`","pin":"1357"}`), http.StatusOK)
+}
+
+func TestAutostart_OnlyTheHostTurnsItOnAndOff(t *testing.T) {
+	type state struct{ Supported, Enabled bool }
+	api := newAPI(t)
+	if got := decode[state](t, api.do(http.MethodGet, "/api/v1/autostart", "").Body.Bytes()); !got.Supported || got.Enabled {
+		t.Fatalf("state = %+v", got)
+	}
+	if got := decode[state](t, api.do(http.MethodPut, "/api/v1/autostart", `{"enabled":true}`).Body.Bytes()); !got.Enabled {
+		t.Fatalf("after turning on: %+v", got)
+	}
+	device := &apiClient{t: t, handler: api.handler}
+	device.onOtherDevice()
+	wantStatus(t, device.do(http.MethodGet, "/api/v1/autostart", ""), http.StatusForbidden)
+	wantStatus(t, device.do(http.MethodPut, "/api/v1/autostart", `{"enabled":false}`), http.StatusForbidden)
+
+	unsupported := &apiClient{t: t, handler: httpapi.NewHandler(httpapi.Services{Autostart: app.NewAutostart(nil)})}
+	if got := decode[state](t, unsupported.do(http.MethodGet, "/api/v1/autostart", "").Body.Bytes()); got.Supported {
+		t.Fatalf("state = %+v", got)
+	}
+	wantStatus(t, unsupported.do(http.MethodPut, "/api/v1/autostart", `{"enabled":true}`), http.StatusConflict)
 }
