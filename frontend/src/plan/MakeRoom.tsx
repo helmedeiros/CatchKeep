@@ -3,11 +3,19 @@ import { PokemonItem } from "../collection/PokemonItem";
 import type { Pokemon } from "../collection/useCollection";
 import { useSetup } from "../keep/useKeep";
 import { alert, card, input, secondaryButton } from "../ui/styles";
+import { FilterBar } from "../collection/FilterBar";
+import { applyFilters, NO_FILTERS } from "../collection/filters";
+import { useFilters } from "../collection/useFilters";
 import { FindInGame } from "./FindInGame";
 import { StorageBar } from "./StorageBar";
 import { type Plan, type TargetKind, usePlan } from "./usePlan";
 
 const SHOWN = 30;
+const WEAKEST_FIRST = { ...NO_FILTERS, sort: "plan" as const };
+const NO_CONTEXT = {
+  teamIds: new Set<string>(),
+  transferIds: new Set<string>(),
+};
 
 const TARGETS: Array<{ kind: TargetKind; label: string; field?: string }> = [
   { kind: "limit", label: "Get under my limit" },
@@ -91,6 +99,7 @@ export function MakeRoom({ pokemon }: { pokemon: Pokemon[] }) {
 
 function Suggestions({ plan, pokemon }: { plan: Plan; pokemon: Pokemon[] }) {
   const [showAll, setShowAll] = useState(false);
+  const { filters } = useFilters("make-room", WEAKEST_FIRST);
   const byId = useMemo(() => new Map(pokemon.map((p) => [p.id, p])), [pokemon]);
   if (plan.wanted === 0) {
     return (
@@ -101,7 +110,13 @@ function Suggestions({ plan, pokemon }: { plan: Plan; pokemon: Pokemon[] }) {
       </p>
     );
   }
-  const shown = showAll ? plan.transfers : plan.transfers.slice(0, SHOWN);
+  const items = new Map(plan.transfers.map((t) => [t.pokemonId, t]));
+  const planned = plan.transfers.flatMap((t) => {
+    const p = byId.get(t.pokemonId);
+    return p ? [p] : [];
+  });
+  const filtered = applyFilters(planned, filters, NO_CONTEXT);
+  const shown = showAll ? filtered : filtered.slice(0, SHOWN);
   return (
     <div className="flex flex-col gap-2">
       <h4 className="text-lg font-semibold">
@@ -124,32 +139,34 @@ function Suggestions({ plan, pokemon }: { plan: Plan; pokemon: Pokemon[] }) {
         Weakest first: lowest IVs, then CP, then oldest catch. Every one keeps
         your rules: better copies of each stay.
       </p>
+      <FilterBar
+        list="make-room"
+        chips={["shiny", "lucky", "shadow", "purified", "costume"]}
+        shown={filtered.length}
+        total={plan.transfers.length}
+        defaults={WEAKEST_FIRST}
+      />
       <ul
         aria-label="Suggested transfers"
         className="flex flex-col divide-y divide-line"
       >
-        {shown.map((t) => {
-          const p = byId.get(t.pokemonId);
-          return (
-            p && (
-              <li key={t.pokemonId} className="py-2">
-                <PokemonItem pokemon={p}>
-                  <span className="rounded-full bg-soft px-2 py-0.5 font-medium text-muted">
-                    {t.keptInGroup} better {p.species} kept
-                  </span>
-                </PokemonItem>
-              </li>
-            )
-          );
-        })}
+        {shown.map((p) => (
+          <li key={p.id} className="py-2">
+            <PokemonItem pokemon={p}>
+              <span className="rounded-full bg-soft px-2 py-0.5 font-medium text-muted">
+                {items.get(p.id)?.keptInGroup} better {p.species} kept
+              </span>
+            </PokemonItem>
+          </li>
+        ))}
       </ul>
-      {plan.transfers.length > SHOWN && (
+      {filtered.length > SHOWN && (
         <button
           type="button"
           className={`${secondaryButton} self-start`}
           onClick={() => setShowAll((v) => !v)}
         >
-          {showAll ? "Show fewer" : `Show all ${plan.transfers.length}`}
+          {showAll ? "Show fewer" : `Show all ${filtered.length}`}
         </button>
       )}
     </div>
