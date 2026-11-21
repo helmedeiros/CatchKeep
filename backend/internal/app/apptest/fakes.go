@@ -199,6 +199,10 @@ type CollectionStore struct {
 	batches  map[string]domain.ImportBatch
 	pokemon  map[domain.TrainerID][]domain.Pokemon
 	mappings map[string]domain.ColumnMapping
+	// gone holds transferred Pokémon; events the transfer history.
+	gone      map[domain.PokemonID]domain.Pokemon
+	events    []domain.TransferEvent
+	revisions map[domain.TrainerID]int64
 }
 
 // NewCollectionStore returns an empty store.
@@ -206,6 +210,7 @@ func NewCollectionStore() *CollectionStore {
 	return &CollectionStore{
 		batches: map[string]domain.ImportBatch{}, pokemon: map[domain.TrainerID][]domain.Pokemon{},
 		mappings: map[string]domain.ColumnMapping{},
+		gone:     map[domain.PokemonID]domain.Pokemon{}, revisions: map[domain.TrainerID]int64{},
 	}
 }
 
@@ -424,4 +429,88 @@ func (a *Autostart) Disable() error {
 	defer a.mu.Unlock()
 	a.on = false
 	return nil
+}
+
+// Revision implements ports.Revisions; it counts recorded transfers and undos.
+func (s *CollectionStore) Revision(_ context.Context, trainer domain.TrainerID) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.revisions[trainer], nil
+}
+
+// FindByRequest implements ports.Transfers.
+func (s *CollectionStore) FindByRequest(_ context.Context, trainer domain.TrainerID, requestID string) (domain.TransferEvent, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, e := range s.events {
+		if e.TrainerID == trainer && e.RequestID != "" && e.RequestID == requestID {
+			return e, true, nil
+		}
+	}
+	return domain.TransferEvent{}, false, nil
+}
+
+// Record implements ports.Transfers.
+func (s *CollectionStore) Record(_ context.Context, e domain.TransferEvent, expected int64) (domain.TransferEvent, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if expected >= 0 && expected != s.revisions[e.TrainerID] {
+		return domain.TransferEvent{}, domain.ErrStaleRevision
+	}
+	list := s.pokemon[e.TrainerID]
+	var gone []domain.PokemonID
+	for _, t := range e.Pokemon {
+		if !slices.ContainsFunc(list, func(p domain.Pokemon) bool { return p.ID == t.ID }) {
+			gone = append(gone, t.ID)
+		}
+	}
+	if len(gone) > 0 {
+		return domain.TransferEvent{}, &domain.NotActiveError{IDs: gone}
+	}
+	for _, t := range e.Pokemon {
+		i := slices.IndexFunc(list, func(p domain.Pokemon) bool { return p.ID == t.ID })
+		s.gone[t.ID] = list[i]
+		list = slices.Delete(list, i, i+1)
+	}
+	s.pokemon[e.TrainerID] = list
+	s.events = append(s.events, e)
+	s.revisions[e.TrainerID]++
+	return e, nil
+}
+
+// Undo implements ports.Transfers.
+func (s *CollectionStore) Undo(_ context.Context, trainer domain.TrainerID, eventID string, undo domain.TransferEvent) (domain.TransferEvent, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	i := slices.IndexFunc(s.events, func(e domain.TransferEvent) bool { return e.ID == eventID && e.TrainerID == trainer })
+	switch {
+	case i < 0:
+		return domain.TransferEvent{}, domain.ErrTransferNotFound
+	case s.events[i].UndoneBy != "":
+		return domain.TransferEvent{}, domain.ErrAlreadyUndone
+	}
+	for _, t := range s.events[i].Pokemon {
+		if p, ok := s.gone[t.ID]; ok {
+			s.pokemon[trainer] = append(s.pokemon[trainer], p)
+			delete(s.gone, t.ID)
+		}
+	}
+	undo.Pokemon, undo.Undoes = s.events[i].Pokemon, eventID
+	s.events[i].UndoneBy = undo.ID
+	s.events = append(s.events, undo)
+	s.revisions[trainer]++
+	return undo, nil
+}
+
+// ListTransfers implements ports.Transfers.
+func (s *CollectionStore) ListTransfers(_ context.Context, trainer domain.TrainerID, limit int) ([]domain.TransferEvent, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.TransferEvent
+	for i := len(s.events) - 1; i >= 0 && len(out) < limit; i-- {
+		if s.events[i].TrainerID == trainer {
+			out = append(out, s.events[i])
+		}
+	}
+	return out, nil
 }
