@@ -88,4 +88,33 @@ describe("making room", () => {
       "Your keep rules allow 3, so that's 2 short of your target.",
     );
   });
+
+  it("gives a search to find them in the game and warns when it would catch one to keep", async () => {
+    const { user, setup } = await ready([
+      "1,Pidgey,,16,,120,30",
+      "2,Pidgey,,16,,140,32",
+      "3,Pidgey,,16,,140,31",
+      "4,Pidgey,,16,,150,33",
+    ]);
+    await user.type(
+      within(setup).getByLabelText(/Pokémon in the game now/),
+      "10",
+    );
+    await user.click(within(setup).getByRole("button", { name: "Save" }));
+
+    const room = await screen.findByRole("region", { name: "Make room" });
+    const find = await within(room).findByRole("region", {
+      name: "Find them in the game",
+    });
+    const pidgey = within(find).getByRole("group", { name: "Pidgey" });
+    expect(pidgey).toHaveTextContent("16&cp120,cp140");
+    expect(
+      within(pidgey).getByRole("button", {
+        name: "Copy the search for Pidgey",
+      }),
+    ).toBeInTheDocument();
+    expect(pidgey).toHaveTextContent(
+      "This search also finds 1 Pidgey you keep (CP 140, HP 31).",
+    );
+  });
 });

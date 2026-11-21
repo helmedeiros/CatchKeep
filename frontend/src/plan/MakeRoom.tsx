@@ -3,6 +3,7 @@ import { PokemonItem } from "../collection/PokemonItem";
 import type { Pokemon } from "../collection/useCollection";
 import { useSetup } from "../keep/useKeep";
 import { alert, card, input, secondaryButton } from "../ui/styles";
+import { FindInGame } from "./FindInGame";
 import { type Plan, type TargetKind, usePlan } from "./usePlan";
 
 const SHOWN = 30;
@@ -145,6 +146,7 @@ function Suggestions({ plan, pokemon }: { plan: Plan; pokemon: Pokemon[] }) {
           {plan.favorites} of these are starred in the game: unstar them first.
         </p>
       )}
+      <FindInGame searches={plan.searches} byId={byId} />
       <p className="text-xs text-slate-500">
         Weakest first: lowest IVs, then CP, then oldest catch. Every one keeps
         your rules: better copies of each stay.
