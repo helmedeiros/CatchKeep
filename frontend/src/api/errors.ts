@@ -21,3 +21,12 @@ export function unwrap<T>(result: { data?: T; error?: ApiErrorBody }): T {
   }
   return result.data as T;
 }
+
+/**
+ * Retries a failed request up to three times only when the server could
+ * not be reached; an answer from the server, like "set up first", will not
+ * change by asking again.
+ */
+export function shouldRetry(failures: number, error: unknown): boolean {
+  return !(error instanceof ApiError) && failures < 3;
+}

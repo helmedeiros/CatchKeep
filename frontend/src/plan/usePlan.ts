@@ -8,9 +8,14 @@ export type Plan = components["schemas"]["Plan"];
 export type TargetKind = components["schemas"]["TargetKind"];
 
 /** The suggested cleanup for a target; refreshed with the rules. */
-export function usePlan(kind: TargetKind, value: number | undefined) {
+export function usePlan(
+  kind: TargetKind,
+  value: number | undefined,
+  enabled: boolean,
+) {
   const api = useApi();
-  const ready = kind === "limit" || (value !== undefined && value >= 1);
+  const ready =
+    enabled && (kind === "limit" || (value !== undefined && value >= 1));
   return useQuery({
     queryKey: [...rulesKey, "plan", kind, value],
     enabled: ready,

@@ -17,16 +17,19 @@ export function useTeams() {
   });
 }
 
-/** Team changes change protection, so the keep summary follows. */
+/**
+ * Team changes change protection, so the keep rules follow. The team list
+ * refreshes before the caller continues; the keep rules refresh in the
+ * background so a slow summary never holds up the editor.
+ */
 function useTeamMutation<T, R>(fn: (input: T) => Promise<R>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: fn,
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: teamsKey }),
-        queryClient.invalidateQueries({ queryKey: rulesKey }),
-      ]),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: rulesKey });
+      return queryClient.invalidateQueries({ queryKey: teamsKey });
+    },
   });
 }
 

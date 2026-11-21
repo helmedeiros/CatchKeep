@@ -35,7 +35,7 @@ export function MakeRoom({ pokemon }: { pokemon: Pokemon[] }) {
   const [kind, setKind] = useState<TargetKind>("limit");
   const [amount, setAmount] = useState("");
   const value = amount === "" ? undefined : Number(amount);
-  const plan = usePlan(kind, value);
+  const plan = usePlan(kind, value, Boolean(setup.data));
   if (!setup.data) return null;
 
   return (
