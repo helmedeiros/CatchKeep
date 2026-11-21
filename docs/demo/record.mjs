@@ -40,6 +40,15 @@ async function clickOn(page, locator) {
   await locator.click();
 }
 
+async function goTo(page, place) {
+  const link = page
+    .getByRole("navigation", { name: "Main" })
+    .getByRole("link", { name: place });
+  await clickOn(page, link);
+  await page.getByRole("heading", { level: 2 }).first().waitFor();
+  await pause(page, 600);
+}
+
 async function scrollBy(page, dy) {
   for (let i = 0; i < 10; i++) {
     await page.mouse.wheel(0, dy / 10);
@@ -103,12 +112,12 @@ const scenes = {
         page,
         preview.getByRole("button", { name: /^Add \d+ Pokémon$/ }),
       );
+      await pause(page, 1200);
+      await goTo(page, "Collection");
       await page.getByRole("list", { name: "Collection" }).waitFor();
       await pause(page, 1000);
       await scrollBy(page, 900);
-      await pause(page, 1500);
-      await scrollBy(page, 700);
-      await pause(page, 1800);
+      await pause(page, 1600);
     },
   },
   keep: {
@@ -117,6 +126,8 @@ const scenes = {
       await importSample(request);
     },
     async play(page) {
+      await pause(page, 600);
+      await goTo(page, "Rules");
       const setup = page.getByRole("region", {
         name: "Your storage and goals",
       });
@@ -144,8 +155,6 @@ const scenes = {
         .getByRole("region", { name: /^Why Pidgey keeps/ })
         .scrollIntoViewIfNeeded();
       await pause(page, 2500);
-      await scrollBy(page, 500);
-      await pause(page, 2000);
     },
   },
   protect: {
@@ -157,6 +166,8 @@ const scenes = {
       });
     },
     async play(page) {
+      await pause(page, 600);
+      await goTo(page, "Rules");
       const keep = page.getByRole("region", { name: "Your keep rules" });
       await keep.waitFor();
       const pidgey = keep.getByRole("button", { name: /^Pidgey/ });
@@ -176,6 +187,31 @@ const scenes = {
       await pause(page, 2500);
     },
   },
+  room: {
+    async seed(request) {
+      await signIn(request, "Dawn");
+      await importSample(request);
+      await request.put(`${url}api/v1/setup`, {
+        data: { capacity: 50, goals: ["collecting"], inGameCount: 45 },
+      });
+    },
+    async play(page) {
+      await pause(page, 800);
+      await goTo(page, "Make room");
+      const room = page.getByRole("region", { name: "Make room" });
+      await room.getByRole("heading", { name: /^Transfer/ }).waitFor();
+      await pause(page, 1800);
+      await clickOn(page, room.getByRole("radio", { name: /Free more slots/ }));
+      await clickOn(page, room.getByLabel("Slots to free"));
+      await page.keyboard.type("8", { delay: 200 });
+      await pause(page, 1500);
+      const find = room.getByRole("region", { name: "Find them in the game" });
+      await find.scrollIntoViewIfNeeded();
+      await pause(page, 2200);
+      await scrollBy(page, 700);
+      await pause(page, 2000);
+    },
+  },
 };
 
 function toGif(video, offsetSeconds, out) {
@@ -188,7 +224,7 @@ function toGif(video, offsetSeconds, out) {
     "-i",
     video,
     "-vf",
-    "fps=7,scale=480:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
+    "fps=6,scale=480:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=48:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
     out,
   ]);
 }
