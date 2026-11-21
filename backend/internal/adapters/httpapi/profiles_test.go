@@ -44,6 +44,7 @@ func newAPI(t *testing.T) *apiClient {
 		Teams:      app.NewTeams(teams, ulidLike{}),
 		HostNames:  func() []string { return []string{hostAddress} },
 		Autostart:  app.NewAutostart(&apptest.Autostart{}),
+		Transfers:  app.NewTransfers(collection, collection, collection, ulidLike{}, clock),
 	})}
 }
 

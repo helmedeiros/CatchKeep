@@ -577,6 +577,87 @@ paths:
           $ref: "#/components/responses/Error"
         default:
           $ref: "#/components/responses/Error"
+  /transfers:
+    post:
+      tags: [collection]
+      operationId: confirmTransfers
+      summary: Mark Pokémon as transferred in the game, all or none.
+      description: >-
+        Refused as a whole when any is already gone (409 ALREADY_TRANSFERRED,
+        listing them) or, with planRevision, when the plan is out of date
+        (409 STALE_REVISION). The same requestId counts once.
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferInput"
+      responses:
+        "201":
+          description: Recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferEvent"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+  /transfers/{eventId}/undo:
+    post:
+      tags: [collection]
+      operationId: undoTransfer
+      summary: Put the Pokémon of a transfer back in CatchKeep.
+      description: It cannot bring back a Pokémon transferred in the game.
+      security:
+        - session: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: The undo, recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferEvent"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+  /history:
+    get:
+      tags: [collection]
+      operationId: getHistory
+      summary: The latest transfers and undos, newest first.
+      security:
+        - session: []
+      responses:
+        "200":
+          description: The history.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/History"
+        "401":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
   /plan:
     get:
       tags: [keep]
@@ -1381,6 +1462,7 @@ components:
           favoritesUnknown,
           transfers,
           searches,
+          revision,
         ]
       properties:
         use:
@@ -1413,11 +1495,78 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PlanItem"
+        revision:
+          type: integer
+          format: int64
+          description: Send it back when confirming the plan, so a plan made before a change is refused.
         searches:
           type: array
           description: One Pokémon GO search per species, in plan order (V1-CLN-04).
           items:
             $ref: "#/components/schemas/SpeciesSearch"
+    TransferInput:
+      type: object
+      additionalProperties: false
+      required: [pokemonIds, requestId]
+      properties:
+        pokemonIds:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items:
+            type: string
+        requestId:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Chosen by the client; repeating it returns the same transfer.
+        planRevision:
+          type: integer
+          format: int64
+          description: The revision of the plan being confirmed, if any.
+    TransferEvent:
+      type: object
+      additionalProperties: false
+      required: [id, kind, at, pokemon]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [single, bulk, undo]
+        at:
+          type: string
+          format: date-time
+        pokemon:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransferredPokemon"
+        undoes:
+          type: string
+          description: For an undo, the transfer it reverses.
+        undoneBy:
+          type: string
+          description: For a transfer that was undone, the undo.
+    TransferredPokemon:
+      type: object
+      additionalProperties: false
+      required: [id, species]
+      properties:
+        id:
+          type: string
+        species:
+          type: string
+        cp:
+          type: integer
+    History:
+      type: object
+      additionalProperties: false
+      required: [events]
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransferEvent"
     SpeciesSearch:
       type: object
       additionalProperties: false

@@ -147,6 +147,7 @@ func newRootHandler(cfg serveConfig, store *sqlite.Store, listen net.Addr) http.
 		Addresses:  func() []string { return netaddr.URLs(listen, net.InterfaceAddrs) },
 		HostNames:  func() []string { return netaddr.HostNames(listen, net.InterfaceAddrs, hostname()) },
 		Autostart:  app.NewAutostart(loginItem(cfg)),
+		Transfers:  app.NewTransfers(sqlite.NewTransfers(store), collection, collection, ulids, clock),
 	})
 	if cfg.webDir == "" {
 		return api
