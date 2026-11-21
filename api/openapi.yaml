@@ -577,6 +577,51 @@ paths:
           $ref: "#/components/responses/Error"
         default:
           $ref: "#/components/responses/Error"
+  /plan:
+    get:
+      tags: [keep]
+      operationId: getPlan
+      summary: Suggest which Pokémon to transfer to make the room asked for.
+      description: >-
+        The possible transfers, least valuable first (lowest IV total, then
+        CP, then oldest catch), up to the target, each verified against the
+        keep rules (spec §7). Nothing changes until the trainer transfers in
+        the game.
+      security:
+        - session: []
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/TargetKind"
+        - name: value
+          in: query
+          required: false
+          description: Slots or percent; not used for limit.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20000
+      responses:
+        "200":
+          description: The suggested cleanup.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Plan"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: Storage and goals are not set up yet (SETUP_REQUIRED).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
   /species-rules:
     get:
       tags: [keep]
@@ -1303,6 +1348,103 @@ components:
           items:
             type: string
             enum: [collecting, trading, battling]
+        inGameCount:
+          type: integer
+          minimum: 0
+          maximum: 20000
+          description: >-
+            How many Pokémon the game shows the trainer has; 0 or absent when
+            not given, and the imported count is used as an estimate.
+        limit:
+          type: integer
+          minimum: 50
+          maximum: 100
+          description: Percent of storage to stay under; absent means 80.
+    TargetKind:
+      type: string
+      enum: [limit, free_more, reach_free, percent]
+      description: >-
+        limit gets back under the storage limit; free_more frees value more
+        slots; reach_free reaches value free slots; percent frees value
+        percent of the Pokémon in storage.
+    Plan:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          use,
+          kind,
+          wanted,
+          maxFeasible,
+          shortfall,
+          favorites,
+          favoritesUnknown,
+          transfers,
+        ]
+      properties:
+        use:
+          $ref: "#/components/schemas/StorageUse"
+        kind:
+          $ref: "#/components/schemas/TargetKind"
+        value:
+          type: integer
+        wanted:
+          type: integer
+          minimum: 0
+          description: How many to transfer for the target.
+        maxFeasible:
+          type: integer
+          minimum: 0
+          description: How many the keep rules allow to transfer.
+        shortfall:
+          type: integer
+          minimum: 0
+          description: How many short of the target, when the rules allow fewer.
+        favorites:
+          type: integer
+          minimum: 0
+          description: Suggestions starred in the game; unstar them first.
+        favoritesUnknown:
+          type: integer
+          minimum: 0
+          description: Suggestions whose star the export could not tell.
+        transfers:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanItem"
+    StorageUse:
+      type: object
+      additionalProperties: false
+      required: [capacity, occupied, free, estimated, limit]
+      properties:
+        capacity:
+          type: integer
+        occupied:
+          type: integer
+        free:
+          type: integer
+        estimated:
+          type: boolean
+          description: Occupied counts imported Pokémon because no in-game count was given.
+        limit:
+          type: integer
+          description: Slots the trainer wants to stay under.
+    PlanItem:
+      type: object
+      additionalProperties: false
+      required: [pokemonId, keptInGroup, rule, favorite]
+      properties:
+        pokemonId:
+          type: string
+        keptInGroup:
+          type: integer
+          minimum: 0
+          description: Copies of its variant that stay.
+        rule:
+          type: string
+          enum: [default, rare, category, species, favorite]
+        favorite:
+          $ref: "#/components/schemas/TriState"
     Teams:
       type: object
       additionalProperties: false

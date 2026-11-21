@@ -354,6 +354,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suggest which Pokémon to transfer to make the room asked for.
+         * @description The possible transfers, least valuable first (lowest IV total, then CP, then oldest catch), up to the target, each verified against the keep rules (spec §7). Nothing changes until the trainer transfers in the game.
+         */
+        get: operations["getPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/species-rules": {
         parameters: {
             query?: never;
@@ -651,6 +671,48 @@ export interface components {
             capacity: number;
             /** @description Goals, most important first. */
             goals: ("collecting" | "trading" | "battling")[];
+            /** @description How many Pokémon the game shows the trainer has; 0 or absent when not given, and the imported count is used as an estimate. */
+            inGameCount?: number;
+            /** @description Percent of storage to stay under; absent means 80. */
+            limit?: number;
+        };
+        /**
+         * @description limit gets back under the storage limit; free_more frees value more slots; reach_free reaches value free slots; percent frees value percent of the Pokémon in storage.
+         * @enum {string}
+         */
+        TargetKind: "limit" | "free_more" | "reach_free" | "percent";
+        Plan: {
+            use: components["schemas"]["StorageUse"];
+            kind: components["schemas"]["TargetKind"];
+            value?: number;
+            /** @description How many to transfer for the target. */
+            wanted: number;
+            /** @description How many the keep rules allow to transfer. */
+            maxFeasible: number;
+            /** @description How many short of the target, when the rules allow fewer. */
+            shortfall: number;
+            /** @description Suggestions starred in the game; unstar them first. */
+            favorites: number;
+            /** @description Suggestions whose star the export could not tell. */
+            favoritesUnknown: number;
+            transfers: components["schemas"]["PlanItem"][];
+        };
+        StorageUse: {
+            capacity: number;
+            occupied: number;
+            free: number;
+            /** @description Occupied counts imported Pokémon because no in-game count was given. */
+            estimated: boolean;
+            /** @description Slots the trainer wants to stay under. */
+            limit: number;
+        };
+        PlanItem: {
+            pokemonId: string;
+            /** @description Copies of its variant that stay. */
+            keptInGroup: number;
+            /** @enum {string} */
+            rule: "default" | "rare" | "category" | "species" | "favorite";
+            favorite: components["schemas"]["TriState"];
         };
         Teams: {
             teams: components["schemas"]["Team"][];
@@ -1372,6 +1434,42 @@ export interface operations {
                 };
             };
             401: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getPlan: {
+        parameters: {
+            query: {
+                kind: components["schemas"]["TargetKind"];
+                /** @description Slots or percent; not used for limit. */
+                value?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The suggested cleanup. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Plan"];
+                };
+            };
+            401: components["responses"]["Error"];
+            /** @description Storage and goals are not set up yet (SETUP_REQUIRED). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             422: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };

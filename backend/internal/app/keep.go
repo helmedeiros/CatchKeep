@@ -73,20 +73,38 @@ func (k *Keep) save(ctx context.Context, trainer domain.TrainerID, s domain.Setu
 	return nil
 }
 
+// Plan suggests what to transfer for the target (spec §7).
+func (k *Keep) Plan(ctx context.Context, trainer domain.TrainerID, target domain.Target) (domain.Plan, error) {
+	setup, pokemon, err := k.inputs(ctx, trainer)
+	if err != nil {
+		return domain.Plan{}, err
+	}
+	return domain.PlanTransfers(pokemon, domain.SummarizeKeeps(pokemon, setup, k.species.Category), setup, target)
+}
+
 // Summary applies the trainer's keep rules to their collection; team
 // members are protected.
 func (k *Keep) Summary(ctx context.Context, trainer domain.TrainerID) (domain.KeepSummary, error) {
-	setup, err := k.setups.GetSetup(ctx, trainer)
+	setup, pokemon, err := k.inputs(ctx, trainer)
 	if err != nil {
 		return domain.KeepSummary{}, err
+	}
+	return domain.SummarizeKeeps(pokemon, setup, k.species.Category), nil
+}
+
+// inputs are the trainer's setup and Pokémon, with team members protected.
+func (k *Keep) inputs(ctx context.Context, trainer domain.TrainerID) (domain.Setup, []domain.Pokemon, error) {
+	setup, err := k.setups.GetSetup(ctx, trainer)
+	if err != nil {
+		return domain.Setup{}, nil, err
 	}
 	pokemon, err := k.collection.ListPokemon(ctx, trainer)
 	if err != nil {
-		return domain.KeepSummary{}, err
+		return domain.Setup{}, nil, err
 	}
 	teams, err := k.teams.ListTeams(ctx, trainer)
 	if err != nil {
-		return domain.KeepSummary{}, err
+		return domain.Setup{}, nil, err
 	}
-	return domain.SummarizeKeeps(domain.ProtectTeamMembers(pokemon, teams), setup, k.species.Category), nil
+	return setup, domain.ProtectTeamMembers(pokemon, teams), nil
 }
