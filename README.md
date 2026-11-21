@@ -49,7 +49,7 @@ Keep the computer on and awake while others use it. On a Mac, tick **Start Catch
 
 - **A transfer checklist.** Copy a search for the game that finds exactly the suggested Pokémon, tick them off as you transfer, and undo a mistake.
 - **History and insights.** Every addition and transfer is recorded, so you can see how fast storage fills, how much an event brings in, and which species you always end up transferring.
-- **Teams built for you, later.** Today you create teams yourself. The plan is for CatchKeep to also suggest teams on its own (raid teams for each type, Go Battle League teams, Max Battles) from your best Pokémon and their moves, and to keep those safe from transfer.
+- **Teams built for you, later.** Today you create teams yourself. The plan is for CatchKeep to also suggest teams on its own (raid teams for each type, GO Battle League teams, Max Battles) from your best Pokémon and their moves, and to keep those safe from transfer.
 
 ## Status
 
