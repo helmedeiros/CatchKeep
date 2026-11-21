@@ -37,6 +37,10 @@ type Setup struct {
 	Goals      []Goal
 	Species    []SpeciesRule
 	Categories []CategoryRule
+	// InGameCount is how many Pokémon the game shows the trainer has, or 0
+	// if not given; Limit the percent of storage they want to stay under,
+	// or 0 for the default.
+	InGameCount, Limit int
 }
 
 // SpeciesRule overrides the generated minimums of one species. Minimum
@@ -60,6 +64,12 @@ type CategoryRule struct {
 func (s Setup) Validate() error {
 	if s.Capacity < 1 || s.Capacity > maxCapacity {
 		return fmt.Errorf("%w: storage must be between 1 and %d", ErrInvalidSetup, maxCapacity)
+	}
+	if s.InGameCount < 0 || s.InGameCount > maxCapacity {
+		return fmt.Errorf("%w: the number of Pokémon in the game must be between 0 and %d", ErrInvalidSetup, maxCapacity)
+	}
+	if s.Limit != 0 && (s.Limit < 50 || s.Limit > 100) {
+		return fmt.Errorf("%w: the storage limit must be between 50%% and 100%%", ErrInvalidSetup)
 	}
 	if len(s.Goals) == 0 {
 		return fmt.Errorf("%w: choose at least one goal", ErrInvalidSetup)
