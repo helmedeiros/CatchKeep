@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import App from "../App";
 import { createFakeApi } from "../test/fakeApi";
 import { renderWithApi } from "../test/render";
+import { importField, inPlace } from "../test/places";
 
 const HEADER = "Index,Name,Form,Pokemon Number,Gender,CP,HP";
 
@@ -13,7 +14,7 @@ async function ready(rows: string[]) {
   api.signIn("Ash");
   renderWithApi(<App />, api.fetch);
   await user.upload(
-    await screen.findByLabelText("Choose your Poke Genie export"),
+    await importField(user),
     new File([[HEADER, ...rows].join("\n")], "export.csv", {
       type: "text/csv",
     }),
@@ -22,15 +23,13 @@ async function ready(rows: string[]) {
   await user.click(
     within(preview).getByRole("button", { name: /^Add \d+ Pokémon$/ }),
   );
-  const confirm = await screen.findByRole("region", {
-    name: "Confirm what the export can't tell",
-  });
+  const confirm = await inPlace(user, "Confirm what the export can't tell");
   await user.click(within(confirm).getByRole("button", { name: /^Confirm/ }));
   const yes = within(confirm).queryByRole("button", {
     name: "Yes, I checked them all",
   });
   if (yes) await user.click(yes);
-  const setup = screen.getByRole("region", { name: "Your storage and goals" });
+  const setup = await inPlace(user, "Your storage and goals");
   await user.type(within(setup).getByLabelText("Storage slots"), "10");
   await user.click(within(setup).getByRole("checkbox", { name: "Collecting" }));
   return { user, setup };
@@ -54,7 +53,7 @@ describe("making room", () => {
     await user.type(within(setup).getByLabelText(/Keep storage under/), "70");
     await user.click(within(setup).getByRole("button", { name: "Save" }));
 
-    const room = await screen.findByRole("region", { name: "Make room" });
+    const room = await inPlace(user, "Make room");
     expect(room).toHaveTextContent("9 of 10 slots used");
     expect(room).toHaveTextContent("your limit is 70% (7 slots)");
     expect(
@@ -74,7 +73,7 @@ describe("making room", () => {
     const { user, setup } = await ready(pidgeys);
     await user.click(within(setup).getByRole("button", { name: "Save" }));
 
-    const room = await screen.findByRole("region", { name: "Make room" });
+    const room = await inPlace(user, "Make room");
     expect(room).toHaveTextContent("estimate");
     await user.click(
       within(room).getByRole("radio", { name: /Free more slots/ }),
@@ -102,7 +101,7 @@ describe("making room", () => {
     );
     await user.click(within(setup).getByRole("button", { name: "Save" }));
 
-    const room = await screen.findByRole("region", { name: "Make room" });
+    const room = await inPlace(user, "Make room");
     const find = await within(room).findByRole("region", {
       name: "Find them in the game",
     });

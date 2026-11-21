@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import App from "../App";
 import { createFakeApi } from "../test/fakeApi";
+import { goTo } from "../test/places";
 import { renderWithApi } from "../test/render";
 
 describe("signing in", () => {
@@ -67,6 +68,7 @@ describe("signing in", () => {
     await user.type(screen.getByLabelText("PIN for Ash"), "2468");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
+    await goTo(user, "More");
     await user.click(await screen.findByRole("button", { name: "Sign out" }));
 
     expect(

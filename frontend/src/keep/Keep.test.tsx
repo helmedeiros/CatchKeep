@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import App from "../App";
 import { createFakeApi } from "../test/fakeApi";
 import { renderWithApi } from "../test/render";
+import { importField, inPlace } from "../test/places";
 
 const HEADER = "Index,Name,Form,Pokemon Number,Gender,CP,HP";
 
@@ -13,7 +14,7 @@ async function withCollection(rows: string[]) {
   api.signIn("Ash");
   renderWithApi(<App />, api.fetch);
   await user.upload(
-    await screen.findByLabelText("Choose your Poke Genie export"),
+    await importField(user),
     new File([[HEADER, ...rows].join("\n")], "export.csv", {
       type: "text/csv",
     }),
@@ -24,7 +25,7 @@ async function withCollection(rows: string[]) {
   await user.click(
     within(preview).getByRole("button", { name: /^Add \d+ Pokémon$/ }),
   );
-  await screen.findByRole("list", { name: "Collection" });
+  await screen.findAllByText(/to your collection\.$/);
   return user;
 }
 
@@ -33,9 +34,7 @@ async function saveSetup(
   slots: string,
   goals: string[],
 ) {
-  const setup = await screen.findByRole("region", {
-    name: "Your storage and goals",
-  });
+  const setup = await inPlace(user, "Your storage and goals");
   const input = within(setup).getByLabelText("Storage slots");
   await user.clear(input);
   await user.type(input, slots);
@@ -79,16 +78,12 @@ describe("keep rules", () => {
       screen.queryByRole("region", { name: "Optional next steps" }),
     ).not.toBeInTheDocument();
 
-    const keep = await screen.findByRole("region", {
-      name: "Your keep rules",
-    });
+    let keep = await inPlace(user, "Your keep rules");
     expect(keep).toHaveTextContent("350 slots · Trading, then Collecting");
     expect(keep).toHaveTextContent(/4\s*waiting for confirmation/);
     expect(keep).toHaveTextContent(/0\s*possible transfers/);
 
-    const confirm = screen.getByRole("region", {
-      name: "Confirm what the export can't tell",
-    });
+    const confirm = await inPlace(user, "Confirm what the export can't tell");
     await user.click(
       within(confirm).getByRole("button", { name: "Confirm all 2 species" }),
     );
@@ -96,6 +91,7 @@ describe("keep rules", () => {
       within(confirm).getByRole("button", { name: "Yes, I checked them all" }),
     );
 
+    keep = await inPlace(user, "Your keep rules");
     await waitFor(() =>
       expect(keep).toHaveTextContent(/2\s*possible transfers/),
     );
@@ -138,12 +134,10 @@ describe("keep rules", () => {
     ]);
     const setup = await saveSetup(user, "350", ["Collecting"]);
     await user.click(within(setup).getByRole("button", { name: "Save" }));
-    const confirm = await screen.findByRole("region", {
-      name: "Confirm what the export can't tell",
-    });
+    const confirm = await inPlace(user, "Confirm what the export can't tell");
     await user.click(within(confirm).getByRole("button", { name: "Confirm" }));
 
-    const keep = screen.getByRole("region", { name: "Your keep rules" });
+    const keep = await inPlace(user, "Your keep rules");
     const mewtwo = await within(keep).findByRole("button", {
       name: /Mewtwo · legendary/,
     });
@@ -162,16 +156,14 @@ describe("keep rules", () => {
     const user = await withCollection(rows);
     const setup = await saveSetup(user, "350", ["Collecting"]);
     await user.click(within(setup).getByRole("button", { name: "Save" }));
-    const confirm = await screen.findByRole("region", {
-      name: "Confirm what the export can't tell",
-    });
+    const confirm = await inPlace(user, "Confirm what the export can't tell");
     await user.click(
       within(confirm).getByRole("button", { name: "Confirm all 2 species" }),
     );
     await user.click(
       within(confirm).getByRole("button", { name: "Yes, I checked them all" }),
     );
-    const keep = screen.getByRole("region", { name: "Your keep rules" });
+    const keep = await inPlace(user, "Your keep rules");
     await user.click(
       await within(keep).findByRole("button", { name: /^Pidgey/ }),
     );
@@ -213,16 +205,14 @@ describe("keep rules", () => {
     const user = await withCollection(rows);
     const setup = await saveSetup(user, "350", ["Collecting"]);
     await user.click(within(setup).getByRole("button", { name: "Save" }));
-    const confirm = await screen.findByRole("region", {
-      name: "Confirm what the export can't tell",
-    });
+    const confirm = await inPlace(user, "Confirm what the export can't tell");
     await user.click(
       within(confirm).getByRole("button", { name: "Confirm all 2 species" }),
     );
     await user.click(
       within(confirm).getByRole("button", { name: "Yes, I checked them all" }),
     );
-    const keep = screen.getByRole("region", { name: "Your keep rules" });
+    const keep = await inPlace(user, "Your keep rules");
     await user.click(
       await within(keep).findByRole("button", { name: /^Pidgey/ }),
     );
@@ -248,16 +238,14 @@ describe("keep rules", () => {
     const user = await withCollection(rows);
     const setup = await saveSetup(user, "350", ["Collecting"]);
     await user.click(within(setup).getByRole("button", { name: "Save" }));
-    const confirm = await screen.findByRole("region", {
-      name: "Confirm what the export can't tell",
-    });
+    const confirm = await inPlace(user, "Confirm what the export can't tell");
     await user.click(
       within(confirm).getByRole("button", { name: "Confirm all 2 species" }),
     );
     await user.click(
       within(confirm).getByRole("button", { name: "Yes, I checked them all" }),
     );
-    const keep = screen.getByRole("region", { name: "Your keep rules" });
+    const keep = await inPlace(user, "Your keep rules");
     await user.click(
       await within(keep).findByRole("button", { name: /^Pidgey/ }),
     );
@@ -285,16 +273,14 @@ describe("keep rules", () => {
     const user = await withCollection(rows);
     const setup = await saveSetup(user, "350", ["Collecting"]);
     await user.click(within(setup).getByRole("button", { name: "Save" }));
-    const confirm = await screen.findByRole("region", {
-      name: "Confirm what the export can't tell",
-    });
+    const confirm = await inPlace(user, "Confirm what the export can't tell");
     await user.click(
       within(confirm).getByRole("button", { name: "Confirm all 2 species" }),
     );
     await user.click(
       within(confirm).getByRole("button", { name: "Yes, I checked them all" }),
     );
-    const teams = screen.getByRole("region", { name: "Your teams" });
+    const teams = await inPlace(user, "Your teams");
     await user.type(within(teams).getByLabelText("New team name"), "Raid");
     await user.click(
       within(teams).getByRole("button", { name: "Create team" }),
@@ -311,7 +297,7 @@ describe("keep rules", () => {
     );
     await user.click(within(editor).getByRole("button", { name: "Save team" }));
 
-    const keep = screen.getByRole("region", { name: "Your keep rules" });
+    const keep = await inPlace(user, "Your keep rules");
     await waitFor(() =>
       expect(keep).toHaveTextContent(/2\s*possible transfers/),
     );
@@ -334,16 +320,14 @@ describe("keep rules", () => {
     ]);
     const setup = await saveSetup(user, "350", ["Collecting"]);
     await user.click(within(setup).getByRole("button", { name: "Save" }));
-    const confirm = await screen.findByRole("region", {
-      name: "Confirm what the export can't tell",
-    });
+    const confirm = await inPlace(user, "Confirm what the export can't tell");
     await user.click(
       within(confirm).getByRole("button", { name: "Confirm all 2 species" }),
     );
     await user.click(
       within(confirm).getByRole("button", { name: "Yes, I checked them all" }),
     );
-    const keep = screen.getByRole("region", { name: "Your keep rules" });
+    const keep = await inPlace(user, "Your keep rules");
     await user.click(
       within(keep).getByRole("button", {
         name: "Rules for legendary, mythical and Ultra Beasts",
@@ -385,13 +369,9 @@ describe("keep rules", () => {
     const setup = await saveSetup(user, "350", ["Collecting"]);
     await user.click(within(setup).getByRole("button", { name: "Save" }));
 
-    const keep = await screen.findByRole("region", {
-      name: "Your keep rules",
-    });
+    const keep = await inPlace(user, "Your keep rules");
     await user.click(within(keep).getByRole("button", { name: "Change" }));
-    const edit = await screen.findByRole("region", {
-      name: "Your storage and goals",
-    });
+    const edit = await inPlace(user, "Your storage and goals");
     expect(within(edit).getByLabelText("Storage slots")).toHaveValue(350);
     await saveSetup(user, "2700", []);
     expect(edit).toHaveTextContent(

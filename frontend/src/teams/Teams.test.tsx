@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import App from "../App";
 import { createFakeApi } from "../test/fakeApi";
 import { renderWithApi } from "../test/render";
+import { importField, inPlace } from "../test/places";
 
 const HEADER = "Index,Name,Form,Pokemon Number,Gender,CP,HP";
 
@@ -13,7 +14,7 @@ async function withCollection() {
   api.signIn("Ash");
   renderWithApi(<App />, api.fetch);
   await user.upload(
-    await screen.findByLabelText("Choose your Poke Genie export"),
+    await importField(user),
     new File(
       [[HEADER, "1,Mewtwo,,150,,4000,180", "2,Pidgey,,16,,120,30"].join("\n")],
       "export.csv",
@@ -26,7 +27,7 @@ async function withCollection() {
   );
   return {
     user,
-    teams: await screen.findByRole("region", { name: "Your teams" }),
+    teams: await inPlace(user, "Your teams"),
   };
 }
 

@@ -359,8 +359,8 @@ function Numbers({
       )}
       {s.needsConfirmation > 0 && (
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Pokémon with unconfirmed features are always kept. Confirm them above
-          to see what you can let go.
+          Pokémon with unconfirmed features are always kept. Confirm them on
+          Home to see what you can let go.
         </p>
       )}
       <SpeciesRuleList pokemon={pokemon} />
