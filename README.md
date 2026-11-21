@@ -14,6 +14,8 @@ CatchKeep takes both off your plate. It reads your Poke Genie export, keeps the 
 
 ![Protecting a weak Pidgey so it is always kept](docs/demo/protect.gif)
 
+![Making room: freeing 8 slots shows what to transfer and the searches to find them in the game](docs/demo/room.gif)
+
 ## What you can do today
 
 - **A profile per trainer.** Each trainer has a PIN-protected profile, so collections never get mixed up.
