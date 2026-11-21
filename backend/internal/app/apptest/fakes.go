@@ -396,3 +396,32 @@ func (s *Teams) DeleteTeam(_ context.Context, trainer domain.TrainerID, id domai
 	}
 	return nil
 }
+
+// Autostart is an in-memory ports.Autostart.
+type Autostart struct {
+	mu sync.Mutex
+	on bool
+}
+
+// Enabled implements ports.Autostart.
+func (a *Autostart) Enabled() (bool, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.on, nil
+}
+
+// Enable implements ports.Autostart.
+func (a *Autostart) Enable() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.on = true
+	return nil
+}
+
+// Disable implements ports.Autostart.
+func (a *Autostart) Disable() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.on = false
+	return nil
+}

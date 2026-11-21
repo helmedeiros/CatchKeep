@@ -373,6 +373,19 @@ type Attributes struct {
 	Shiny TriState `json:"shiny"`
 }
 
+// Autostart defines model for Autostart.
+type Autostart struct {
+	Enabled bool `json:"enabled"`
+
+	// Supported This computer can start CatchKeep at login (macOS).
+	Supported bool `json:"supported"`
+}
+
+// AutostartInput defines model for AutostartInput.
+type AutostartInput struct {
+	Enabled bool `json:"enabled"`
+}
+
 // CapacityBand defines model for CapacityBand.
 type CapacityBand struct {
 	// Ordinary Copies kept of each variant.
@@ -830,6 +843,9 @@ type VariantGroupRule string
 // ImportId defines model for ImportId.
 type ImportId = string
 
+// SetAutostartJSONRequestBody defines body for SetAutostart for application/json ContentType.
+type SetAutostartJSONRequestBody = AutostartInput
+
 // SaveCategoryRulesJSONRequestBody defines body for SaveCategoryRules for application/json ContentType.
 type SaveCategoryRulesJSONRequestBody = CategoryRules
 
@@ -871,6 +887,12 @@ type UpdateTeamJSONRequestBody = TeamInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// GetAutostart Whether CatchKeep starts when this computer's user logs in.
+	// (GET /autostart)
+	GetAutostart(w http.ResponseWriter, r *http.Request)
+	// SetAutostart Start CatchKeep at login, or stop doing so.
+	// (PUT /autostart)
+	SetAutostart(w http.ResponseWriter, r *http.Request)
 	// GetCapacityBands How many copies the default keep rules keep for each storage size.
 	// (GET /capacity-bands)
 	GetCapacityBands(w http.ResponseWriter, r *http.Request)
@@ -968,6 +990,34 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetAutostart operation middleware
+func (siw *ServerInterfaceWrapper) GetAutostart(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAutostart(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetAutostart operation middleware
+func (siw *ServerInterfaceWrapper) SetAutostart(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetAutostart(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetCapacityBands operation middleware
 func (siw *ServerInterfaceWrapper) GetCapacityBands(w http.ResponseWriter, r *http.Request) {
@@ -1605,6 +1655,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/health", wrapper.GetHealth)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/host", wrapper.GetHost)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/autostart", wrapper.GetAutostart)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/autostart", wrapper.SetAutostart)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/profiles", wrapper.ListProfiles)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/profiles", wrapper.CreateProfile)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/profiles/{profileId}/pin", wrapper.ResetPin)
@@ -1637,6 +1689,125 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 }
 
 type ErrorJSONResponse Error
+
+type GetAutostartRequestObject struct {
+}
+
+type GetAutostartResponseObject interface {
+	VisitGetAutostartResponse(w http.ResponseWriter) error
+}
+
+type GetAutostart200JSONResponse Autostart
+
+func (response GetAutostart200JSONResponse) VisitGetAutostartResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAutostart403JSONResponse struct{ ErrorJSONResponse }
+
+func (response GetAutostart403JSONResponse) VisitGetAutostartResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAutostartdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetAutostartdefaultJSONResponse) VisitGetAutostartResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetAutostartRequestObject struct {
+	Body *SetAutostartJSONRequestBody
+}
+
+type SetAutostartResponseObject interface {
+	VisitSetAutostartResponse(w http.ResponseWriter) error
+}
+
+type SetAutostart200JSONResponse Autostart
+
+func (response SetAutostart200JSONResponse) VisitSetAutostartResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetAutostart403JSONResponse struct{ ErrorJSONResponse }
+
+func (response SetAutostart403JSONResponse) VisitSetAutostartResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetAutostart409JSONResponse Error
+
+func (response SetAutostart409JSONResponse) VisitSetAutostartResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetAutostartdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response SetAutostartdefaultJSONResponse) VisitSetAutostartResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type GetCapacityBandsRequestObject struct {
 }
@@ -3633,6 +3804,12 @@ func (response UpdateTeamdefaultJSONResponse) VisitUpdateTeamResponse(w http.Res
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// GetAutostart Whether CatchKeep starts when this computer's user logs in.
+	// (GET /autostart)
+	GetAutostart(ctx context.Context, request GetAutostartRequestObject) (GetAutostartResponseObject, error)
+	// SetAutostart Start CatchKeep at login, or stop doing so.
+	// (PUT /autostart)
+	SetAutostart(ctx context.Context, request SetAutostartRequestObject) (SetAutostartResponseObject, error)
 	// GetCapacityBands How many copies the default keep rules keep for each storage size.
 	// (GET /capacity-bands)
 	GetCapacityBands(ctx context.Context, request GetCapacityBandsRequestObject) (GetCapacityBandsResponseObject, error)
@@ -3759,6 +3936,61 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GetAutostart operation middleware
+func (sh *strictHandler) GetAutostart(w http.ResponseWriter, r *http.Request) {
+	var request GetAutostartRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAutostart(ctx, request.(GetAutostartRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAutostart")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAutostartResponseObject); ok {
+		if err := validResponse.VisitGetAutostartResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetAutostart operation middleware
+func (sh *strictHandler) SetAutostart(w http.ResponseWriter, r *http.Request) {
+	var request SetAutostartRequestObject
+
+	var body SetAutostartJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetAutostart(ctx, request.(SetAutostartRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetAutostart")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetAutostartResponseObject); ok {
+		if err := validResponse.VisitSetAutostartResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetCapacityBands operation middleware

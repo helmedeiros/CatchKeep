@@ -107,6 +107,9 @@ export function createFakeApi(
           .map(({ id, displayName }) => ({ id, displayName })),
       );
     }
+    if (path === "/autostart") {
+      return jsonResponse(200, { supported: false, enabled: false });
+    }
     if (path === "/host") {
       return jsonResponse(200, {
         admin,

@@ -12,12 +12,14 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"time"
 
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/csvimport"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/httpapi"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/ids"
+	"github.com/helmedeiros/catchkeep/backend/internal/adapters/launchd"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/netaddr"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/pinhash"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/refdata"
@@ -25,6 +27,7 @@ import (
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/web"
 	"github.com/helmedeiros/catchkeep/backend/internal/app"
 	"github.com/helmedeiros/catchkeep/backend/internal/buildinfo"
+	"github.com/helmedeiros/catchkeep/backend/internal/ports"
 )
 
 const usage = `usage:
@@ -143,6 +146,7 @@ func newRootHandler(cfg serveConfig, store *sqlite.Store, listen net.Addr) http.
 		Teams:      app.NewTeams(teams, ulids),
 		Addresses:  func() []string { return netaddr.URLs(listen, net.InterfaceAddrs) },
 		HostNames:  func() []string { return netaddr.HostNames(listen, net.InterfaceAddrs, hostname()) },
+		Autostart:  app.NewAutostart(loginItem(cfg)),
 	})
 	if cfg.webDir == "" {
 		return api
@@ -151,6 +155,33 @@ func newRootHandler(cfg serveConfig, store *sqlite.Store, listen net.Addr) http.
 	mux.Handle("/api/", api)
 	mux.Handle("/", web.Handler(os.DirFS(cfg.webDir)))
 	return mux
+}
+
+// loginItem starts CatchKeep at login on macOS with the settings it runs
+// with now, as absolute paths since launchd starts it from "/". Elsewhere,
+// or when a path cannot be resolved, it returns nil (unsupported).
+func loginItem(cfg serveConfig) ports.Autostart {
+	home, err := os.UserHomeDir()
+	if runtime.GOOS != "darwin" || err != nil {
+		return nil
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return nil
+	}
+	db, err := filepath.Abs(cfg.dbPath)
+	if err != nil {
+		return nil
+	}
+	args := []string{exe, "serve", "-addr", cfg.addr, "-db", db}
+	if cfg.webDir != "" {
+		web, err := filepath.Abs(cfg.webDir)
+		if err != nil {
+			return nil
+		}
+		args = append(args, "-web-dir", web)
+	}
+	return launchd.New(home, args)
 }
 
 func hostname() string {

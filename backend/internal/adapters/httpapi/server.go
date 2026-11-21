@@ -21,6 +21,7 @@ type Services struct {
 	Collection *app.Collection
 	Keep       *app.Keep
 	Teams      *app.Teams
+	Autostart  *app.Autostart
 
 	// HostNames are this computer's names on the network (addresses and
 	// host names, without ports). Requests addressed to any other name are

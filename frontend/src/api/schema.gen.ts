@@ -38,6 +38,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/autostart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether CatchKeep starts when this computer's user logs in.
+         * @description Only the computer running CatchKeep may ask.
+         */
+        get: operations["getAutostart"];
+        /**
+         * Start CatchKeep at login, or stop doing so.
+         * @description Only the computer running CatchKeep may change it. It takes effect at the next login and starts CatchKeep with the settings it runs with now.
+         */
+        put: operations["setAutostart"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles": {
         parameters: {
             query?: never;
@@ -448,6 +472,14 @@ export interface components {
             displayName: components["schemas"]["DisplayName"];
             pin: components["schemas"]["Pin"];
         };
+        Autostart: {
+            /** @description This computer can start CatchKeep at login (macOS). */
+            supported: boolean;
+            enabled: boolean;
+        };
+        AutostartInput: {
+            enabled: boolean;
+        };
         HostInfo: {
             /** @description This request comes from the computer running CatchKeep, which may create profiles and reset PINs. */
             admin: boolean;
@@ -810,6 +842,63 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HostInfo"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getAutostart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The current setting. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Autostart"];
+                };
+            };
+            403: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    setAutostart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutostartInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Autostart"];
+                };
+            };
+            403: components["responses"]["Error"];
+            /** @description This computer cannot start CatchKeep at login (AUTOSTART_UNSUPPORTED). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             default: components["responses"]["Error"];
