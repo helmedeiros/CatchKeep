@@ -214,6 +214,12 @@ func TestKeep_PlanSuggestsTransfersForATarget(t *testing.T) {
 	if got.Use.Occupied != 300 || got.Use.Limit != 280 || got.Wanted != 20 || got.Shortfall != got.Wanted-len(got.Transfers) {
 		t.Fatalf("plan = %+v", got)
 	}
+	searches := decode[struct {
+		Searches []struct{ Species, Query string }
+	}](t, api.do(http.MethodGet, "/api/v1/plan?kind=limit", "").Body.Bytes()).Searches
+	if len(got.Transfers) > 0 && (len(searches) == 0 || searches[0].Query == "") {
+		t.Fatalf("searches = %+v; every species with a Pokédex number gets one", searches)
+	}
 	free := decode[plan](t, api.do(http.MethodGet, "/api/v1/plan?kind=free_more&value=1", "").Body.Bytes())
 	if free.Wanted != 1 || len(free.Transfers) != min(1, free.MaxFeasible) {
 		t.Fatalf("plan = %+v", free)

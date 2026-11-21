@@ -626,6 +626,7 @@ export function createFakeApi(
       favorites: 0,
       favoritesUnknown: transfers.length,
       transfers,
+      searches: [],
     });
   }
 

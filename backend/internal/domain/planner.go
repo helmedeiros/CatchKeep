@@ -101,6 +101,8 @@ type Plan struct {
 	// the keep rules allow; Shortfall what is still missing.
 	Wanted, MaxFeasible, Shortfall int
 	Transfers                      []PlanItem
+	// Searches find the transfers in the game, one per species.
+	Searches []SpeciesSearch
 	// Favorites are suggestions starred in the game; FavoritesUnknown
 	// those whose star the export could not tell.
 	Favorites, FavoritesUnknown int
@@ -145,6 +147,11 @@ func PlanTransfers(pokemon []Pokemon, summary KeepSummary, setup Setup, target T
 	if err := VerifyPlan(pokemon, summary, plan.Transfers); err != nil {
 		return Plan{}, err
 	}
+	ids := make([]PokemonID, len(plan.Transfers))
+	for i, it := range plan.Transfers {
+		ids[i] = it.ID
+	}
+	plan.Searches = Searches(pokemon, ids)
 	return plan, nil
 }
 

@@ -86,6 +86,9 @@ func TestPlanTransfers_LeastValuableFirstUpToTheTarget(t *testing.T) {
 	if plan.Wanted != 3 || plan.MaxFeasible != 5 || plan.Shortfall != 0 || fmt.Sprint(got) != "[R1 P1 P3]" {
 		t.Fatalf("plan = %+v, transfers %v; want the 0, 1 and 3 IV copies", plan, got)
 	}
+	if len(plan.Searches) != 2 || plan.Searches[0].Species != "Rattata" {
+		t.Fatalf("searches = %+v; one per species, in plan order", plan.Searches)
+	}
 	if plan.Favorites != 1 || plan.Transfers[0].KeptInGroup != 1 {
 		t.Fatalf("plan = %+v; the starred Rattata is counted, with 1 copy kept", plan)
 	}

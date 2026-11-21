@@ -132,6 +132,19 @@ func (s *server) GetPlan(ctx context.Context, req GetPlanRequestObject) (GetPlan
 		Shortfall: plan.Shortfall, Favorites: plan.Favorites, FavoritesUnknown: plan.FavoritesUnknown,
 		Transfers: make([]PlanItem, 0, len(plan.Transfers)),
 	}
+	out.Searches = make([]SpeciesSearch, 0, len(plan.Searches))
+	for _, sp := range plan.Searches {
+		search := SpeciesSearch{
+			Species: sp.Species, Query: sp.Query, PokemonIds: ids(sp.IDs), Collisions: ids(sp.Collisions),
+			Items: make([]ItemSearch, 0, len(sp.Items)),
+		}
+		for _, it := range sp.Items {
+			if it.Query != "" || len(it.Collisions) > 0 {
+				search.Items = append(search.Items, ItemSearch{PokemonId: string(it.ID), Query: it.Query, Collisions: ids(it.Collisions)})
+			}
+		}
+		out.Searches = append(out.Searches, search)
+	}
 	for _, it := range plan.Transfers {
 		out.Transfers = append(out.Transfers, PlanItem{
 			PokemonId: string(it.ID), KeptInGroup: it.KeptInGroup, Rule: PlanItemRule(it.Rule), Favorite: toTri(it.Favorite),
@@ -257,6 +270,14 @@ func toSpeciesRules(rules []domain.SpeciesRule) SpeciesRules {
 	out := SpeciesRules{Rules: make([]SpeciesRule, 0, len(rules))}
 	for _, r := range rules {
 		out.Rules = append(out.Rules, SpeciesRule{Species: r.Species, Minimum: r.Minimum, Favorite: r.Favorite})
+	}
+	return out
+}
+
+func ids(in []domain.PokemonID) []string {
+	out := make([]string, len(in))
+	for i, id := range in {
+		out[i] = string(id)
 	}
 	return out
 }
