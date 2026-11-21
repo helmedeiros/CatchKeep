@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Nav } from "../app/Nav";
 import { navigate, usePath } from "../app/router";
 import { CollectionView } from "../collection/CollectionView";
@@ -12,12 +12,21 @@ import { StartAtLogin } from "../host/StartAtLogin";
 import { KeepCard } from "../keep/KeepCard";
 import { MakeRoom } from "../plan/MakeRoom";
 import { NextStep } from "./NextStep";
+import { Onboarding } from "../onboarding/Onboarding";
+import { hasSeen, markSeen } from "../onboarding/seen";
 import { useSignOut } from "../session/useSession";
 import { TeamsCard } from "../teams/TeamsCard";
 import { alert, card, secondaryButton } from "../ui/styles";
 
 /** The signed-in app: five places behind the main menu. */
-export function Home({ displayName }: { displayName: string }) {
+export function Home({
+  displayName,
+  profileId,
+}: {
+  displayName: string;
+  profileId: string;
+}) {
+  const [intro, setIntro] = useState(() => !hasSeen(profileId));
   const collection = useCollection();
   const path = usePath();
   const pokemon = collection.data?.pokemon ?? [];
@@ -58,7 +67,12 @@ export function Home({ displayName }: { displayName: string }) {
         );
         break;
       case "/more":
-        place = <More hasPokemon={pokemon.length > 0} />;
+        place = (
+          <More
+            hasPokemon={pokemon.length > 0}
+            onIntro={() => setIntro(true)}
+          />
+        );
         break;
       default:
         place = (
@@ -77,6 +91,13 @@ export function Home({ displayName }: { displayName: string }) {
   return (
     <div className="flex flex-col gap-4 pb-24 sm:pb-0">
       <Nav />
+      <Onboarding
+        open={intro}
+        onClose={() => {
+          markSeen(profileId);
+          setIntro(false);
+        }}
+      />
       {collection.isError && (
         <p className={alert}>Couldn't load your collection.</p>
       )}
@@ -141,7 +162,13 @@ function Shortcuts({ pokemon }: { pokemon: Pokemon[] }) {
   );
 }
 
-function More({ hasPokemon }: { hasPokemon: boolean }) {
+function More({
+  hasPokemon,
+  onIntro,
+}: {
+  hasPokemon: boolean;
+  onIntro: () => void;
+}) {
   const signOut = useSignOut();
   return (
     <Place title="More">
@@ -151,6 +178,13 @@ function More({ hasPokemon }: { hasPokemon: boolean }) {
         <OtherDevices />
         <StartAtLogin />
       </section>
+      <button
+        type="button"
+        onClick={onIntro}
+        className={`${secondaryButton} self-start`}
+      >
+        Show the introduction again
+      </button>
       <button
         type="button"
         onClick={() => signOut.mutate()}

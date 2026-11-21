@@ -9,5 +9,6 @@ afterEach(() => {
 
 beforeEach(() => {
   window.history.replaceState({}, "", "/");
+  window.localStorage.clear();
   resetAllFilters();
 });
