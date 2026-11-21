@@ -19,6 +19,10 @@ describe("OtherDevices", () => {
       name: "Use CatchKeep on other devices",
     });
     expect(region).toHaveTextContent("http://192.168.1.20:8080");
+    expect(
+      screen.getByRole("img", { name: "QR code for http://192.168.1.20:8080" }),
+    ).toBeInTheDocument();
+    expect(region).toHaveTextContent(/point the camera/i);
     expect(region).toHaveTextContent(/same network/);
     expect(
       screen.getByRole("button", { name: "Copy http://192.168.1.20:8080" }),

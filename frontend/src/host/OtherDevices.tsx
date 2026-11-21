@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import { useHost } from "../session/useSession";
 import { secondaryButton } from "../ui/styles";
+import { QrCode } from "./QrCode";
 
 /**
  * On the computer running CatchKeep, the web address phones, tablets and
@@ -30,22 +31,26 @@ export function OtherDevices() {
         <>
           <p className="text-muted">
             On a phone, tablet or another computer connected to the same network
-            (the same Wi-Fi), open this address in the web browser:
+            (the same Wi-Fi), point the camera at the code, or open the address
+            in the web browser:
           </p>
           <ul className="flex flex-col gap-2">
             {addresses.map((a) => (
-              <li key={a} className="flex items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded-full bg-soft px-3 py-2 font-mono text-base">
-                  {a}
-                </code>
-                <button
-                  type="button"
-                  aria-label={`Copy ${a}`}
-                  className={secondaryButton}
-                  onClick={() => void copy(a)}
-                >
-                  Copy
-                </button>
+              <li key={a} className="flex flex-col items-start gap-2">
+                <QrCode text={a} />
+                <div className="flex w-full items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate rounded-full bg-soft px-3 py-2 font-mono text-base">
+                    {a}
+                  </code>
+                  <button
+                    type="button"
+                    aria-label={`Copy ${a}`}
+                    className={secondaryButton}
+                    onClick={() => void copy(a)}
+                  >
+                    Copy
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
