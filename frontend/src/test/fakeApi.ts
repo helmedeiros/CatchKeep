@@ -576,6 +576,26 @@ export function createFakeApi(
     });
   }
 
+  /** One search per species by Pokédex number and CP, like the server. */
+  function searchesFor(ids: string[]): Schemas["SpeciesSearch"][] {
+    const planned = collection.filter((p) => ids.includes(p.id));
+    const species = [...new Set(planned.map((p) => p.species))];
+    return species.map((name) => {
+      const mine = planned.filter((p) => p.species === name);
+      const cps = [...new Set(mine.map((p) => p.cp))].sort((a, b) => a - b);
+      const collisions = collection.filter(
+        (p) => p.species === name && !ids.includes(p.id) && cps.includes(p.cp),
+      );
+      return {
+        species: name,
+        query: `${mine[0]?.dexNumber}&${cps.map((cp) => `cp${cp}`).join(",")}`,
+        pokemonIds: mine.map((p) => p.id),
+        collisions: collisions.map((p) => p.id),
+        items: [],
+      };
+    });
+  }
+
   /** Least valuable first here means lowest CP. */
   function plan(s: Schemas["Setup"], q: URLSearchParams) {
     const kind = (q.get("kind") ?? "limit") as Schemas["TargetKind"];
@@ -626,7 +646,7 @@ export function createFakeApi(
       favorites: 0,
       favoritesUnknown: transfers.length,
       transfers,
-      searches: [],
+      searches: searchesFor(transfers.map((t) => t.pokemonId)),
     });
   }
 
