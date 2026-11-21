@@ -354,6 +354,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Pokémon as transferred in the game, all or none.
+         * @description Refused as a whole when any is already gone (409 ALREADY_TRANSFERRED, listing them) or, with planRevision, when the plan is out of date (409 STALE_REVISION). The same requestId counts once.
+         */
+        post: operations["confirmTransfers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transfers/{eventId}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Put the Pokémon of a transfer back in CatchKeep.
+         * @description It cannot bring back a Pokémon transferred in the game.
+         */
+        post: operations["undoTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The latest transfers and undos, newest first. */
+        get: operations["getHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/plan": {
         parameters: {
             query?: never;
@@ -696,8 +753,43 @@ export interface components {
             /** @description Suggestions whose star the export could not tell. */
             favoritesUnknown: number;
             transfers: components["schemas"]["PlanItem"][];
+            /**
+             * Format: int64
+             * @description Send it back when confirming the plan, so a plan made before a change is refused.
+             */
+            revision: number;
             /** @description One Pokémon GO search per species, in plan order (V1-CLN-04). */
             searches: components["schemas"]["SpeciesSearch"][];
+        };
+        TransferInput: {
+            pokemonIds: string[];
+            /** @description Chosen by the client; repeating it returns the same transfer. */
+            requestId: string;
+            /**
+             * Format: int64
+             * @description The revision of the plan being confirmed, if any.
+             */
+            planRevision?: number;
+        };
+        TransferEvent: {
+            id: string;
+            /** @enum {string} */
+            kind: "single" | "bulk" | "undo";
+            /** Format: date-time */
+            at: string;
+            pokemon: components["schemas"]["TransferredPokemon"][];
+            /** @description For an undo, the transfer it reverses. */
+            undoes?: string;
+            /** @description For a transfer that was undone, the undo. */
+            undoneBy?: string;
+        };
+        TransferredPokemon: {
+            id: string;
+            species: string;
+            cp?: number;
+        };
+        History: {
+            events: components["schemas"]["TransferEvent"][];
         };
         SpeciesSearch: {
             species: string;
@@ -1457,6 +1549,83 @@ export interface operations {
             };
             401: components["responses"]["Error"];
             422: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    confirmTransfers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferInput"];
+            };
+        };
+        responses: {
+            /** @description Recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferEvent"];
+                };
+            };
+            401: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    undoTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The undo, recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferEvent"];
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            422: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The history. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["History"];
+                };
+            };
+            401: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };
     };

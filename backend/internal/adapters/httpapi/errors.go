@@ -28,6 +28,10 @@ const (
 	codeCrossSite        = "CROSS_SITE"
 	codeNoAutostart      = "AUTOSTART_UNSUPPORTED"
 
+	codeAlreadyTransferred = "ALREADY_TRANSFERRED"
+	codeStaleRevision      = "STALE_REVISION"
+	codeAlreadyUndone      = "ALREADY_UNDONE"
+
 	codeUnsupportedMediaType = "UNSUPPORTED_MEDIA_TYPE"
 )
 

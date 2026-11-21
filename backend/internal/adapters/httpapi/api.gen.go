@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -336,6 +337,27 @@ func (e TargetKind) Valid() bool {
 	}
 }
 
+// Defines values for TransferEventKind.
+const (
+	Bulk   TransferEventKind = "bulk"
+	Single TransferEventKind = "single"
+	Undo   TransferEventKind = "undo"
+)
+
+// Valid indicates whether the value is a known member of the TransferEventKind enum.
+func (e TransferEventKind) Valid() bool {
+	switch e {
+	case Bulk:
+		return true
+	case Single:
+		return true
+	case Undo:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TriState.
 const (
 	No      TriState = "no"
@@ -545,6 +567,11 @@ type Health struct {
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// History defines model for History.
+type History struct {
+	Events []TransferEvent `json:"events"`
+}
+
 // HostInfo defines model for HostInfo.
 type HostInfo struct {
 	// Addresses Web addresses other devices on the network can open to reach CatchKeep. Only told to the computer running it; empty when CatchKeep only listens on that computer.
@@ -732,6 +759,9 @@ type Plan struct {
 
 	// MaxFeasible How many the keep rules allow to transfer.
 	MaxFeasible int `json:"maxFeasible"`
+
+	// Revision Send it back when confirming the plan, so a plan made before a change is refused.
+	Revision int64 `json:"revision"`
 
 	// Searches One Pokémon GO search per species, in plan order (V1-CLN-04).
 	Searches []SpeciesSearch `json:"searches"`
@@ -936,6 +966,40 @@ type Teams struct {
 	Teams []Team `json:"teams"`
 }
 
+// TransferEvent defines model for TransferEvent.
+type TransferEvent struct {
+	At      time.Time            `json:"at"`
+	Id      string               `json:"id"`
+	Kind    TransferEventKind    `json:"kind"`
+	Pokemon []TransferredPokemon `json:"pokemon"`
+
+	// Undoes For an undo, the transfer it reverses.
+	Undoes *string `json:"undoes,omitempty"`
+
+	// UndoneBy For a transfer that was undone, the undo.
+	UndoneBy *string `json:"undoneBy,omitempty"`
+}
+
+// TransferEventKind defines model for TransferEvent.Kind.
+type TransferEventKind string
+
+// TransferInput defines model for TransferInput.
+type TransferInput struct {
+	// PlanRevision The revision of the plan being confirmed, if any.
+	PlanRevision *int64   `json:"planRevision,omitempty"`
+	PokemonIds   []string `json:"pokemonIds"`
+
+	// RequestId Chosen by the client; repeating it returns the same transfer.
+	RequestId string `json:"requestId"`
+}
+
+// TransferredPokemon defines model for TransferredPokemon.
+type TransferredPokemon struct {
+	Cp      *int   `json:"cp,omitempty"`
+	Id      string `json:"id"`
+	Species string `json:"species"`
+}
+
 // TriState Whether a feature is known to be present, known to be absent, or not established by any source yet. Unknown is never treated as absent.
 type TriState string
 
@@ -1034,6 +1098,9 @@ type CreateTeamJSONRequestBody = TeamInput
 // UpdateTeamJSONRequestBody defines body for UpdateTeam for application/json ContentType.
 type UpdateTeamJSONRequestBody = TeamInput
 
+// ConfirmTransfersJSONRequestBody defines body for ConfirmTransfers for application/json ContentType.
+type ConfirmTransfersJSONRequestBody = TransferInput
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// GetAutostart Whether CatchKeep starts when this computer's user logs in.
@@ -1066,6 +1133,9 @@ type ServerInterface interface {
 	// GetHealth Report whether the API is up.
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
+	// GetHistory The latest transfers and undos, newest first.
+	// (GET /history)
+	GetHistory(w http.ResponseWriter, r *http.Request)
 	// GetHost Whether this device is the host admin (the computer running CatchKeep).
 	// (GET /host)
 	GetHost(w http.ResponseWriter, r *http.Request)
@@ -1132,6 +1202,12 @@ type ServerInterface interface {
 	// UpdateTeam Rename a team and replace its members.
 	// (PUT /teams/{teamId})
 	UpdateTeam(w http.ResponseWriter, r *http.Request, teamId string)
+	// ConfirmTransfers Mark Pokémon as transferred in the game, all or none.
+	// (POST /transfers)
+	ConfirmTransfers(w http.ResponseWriter, r *http.Request)
+	// UndoTransfer Put the Pokémon of a transfer back in CatchKeep.
+	// (POST /transfers/{eventId}/undo)
+	UndoTransfer(w http.ResponseWriter, r *http.Request, eventId string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -1298,6 +1374,20 @@ func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealth(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetHistory operation middleware
+func (siw *ServerInterfaceWrapper) GetHistory(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetHistory(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1731,6 +1821,46 @@ func (siw *ServerInterfaceWrapper) UpdateTeam(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ConfirmTransfers operation middleware
+func (siw *ServerInterfaceWrapper) ConfirmTransfers(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfirmTransfers(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UndoTransfer operation middleware
+func (siw *ServerInterfaceWrapper) UndoTransfer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "eventId" -------------
+	var eventId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "eventId", r.PathValue("eventId"), &eventId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eventId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UndoTransfer(w, r, eventId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -1873,6 +2003,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/capacity-bands", wrapper.GetCapacityBands)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/setup", wrapper.GetSetup)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/setup", wrapper.SaveSetup)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/transfers", wrapper.ConfirmTransfers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/transfers/{eventId}/undo", wrapper.UndoTransfer)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/history", wrapper.GetHistory)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/plan", wrapper.GetPlan)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/species-rules", wrapper.GetSpeciesRules)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/species-rules", wrapper.SaveSpeciesRules)
@@ -2503,6 +2636,58 @@ type GetHealthdefaultJSONResponse struct {
 }
 
 func (response GetHealthdefaultJSONResponse) VisitGetHealthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetHistoryRequestObject struct {
+}
+
+type GetHistoryResponseObject interface {
+	VisitGetHistoryResponse(w http.ResponseWriter) error
+}
+
+type GetHistory200JSONResponse History
+
+func (response GetHistory200JSONResponse) VisitGetHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetHistory401JSONResponse struct{ ErrorJSONResponse }
+
+func (response GetHistory401JSONResponse) VisitGetHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetHistorydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetHistorydefaultJSONResponse) VisitGetHistoryResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -4082,6 +4267,182 @@ func (response UpdateTeamdefaultJSONResponse) VisitUpdateTeamResponse(w http.Res
 	return err
 }
 
+type ConfirmTransfersRequestObject struct {
+	Body *ConfirmTransfersJSONRequestBody
+}
+
+type ConfirmTransfersResponseObject interface {
+	VisitConfirmTransfersResponse(w http.ResponseWriter) error
+}
+
+type ConfirmTransfers201JSONResponse TransferEvent
+
+func (response ConfirmTransfers201JSONResponse) VisitConfirmTransfersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmTransfers401JSONResponse struct{ ErrorJSONResponse }
+
+func (response ConfirmTransfers401JSONResponse) VisitConfirmTransfersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmTransfers409JSONResponse Error
+
+func (response ConfirmTransfers409JSONResponse) VisitConfirmTransfersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmTransfers422JSONResponse Error
+
+func (response ConfirmTransfers422JSONResponse) VisitConfirmTransfersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmTransfersdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ConfirmTransfersdefaultJSONResponse) VisitConfirmTransfersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UndoTransferRequestObject struct {
+	EventId string `json:"eventId"`
+}
+
+type UndoTransferResponseObject interface {
+	VisitUndoTransferResponse(w http.ResponseWriter) error
+}
+
+type UndoTransfer201JSONResponse TransferEvent
+
+func (response UndoTransfer201JSONResponse) VisitUndoTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UndoTransfer401JSONResponse struct{ ErrorJSONResponse }
+
+func (response UndoTransfer401JSONResponse) VisitUndoTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UndoTransfer404JSONResponse Error
+
+func (response UndoTransfer404JSONResponse) VisitUndoTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UndoTransfer409JSONResponse Error
+
+func (response UndoTransfer409JSONResponse) VisitUndoTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UndoTransfer422JSONResponse Error
+
+func (response UndoTransfer422JSONResponse) VisitUndoTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UndoTransferdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UndoTransferdefaultJSONResponse) VisitUndoTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// GetAutostart Whether CatchKeep starts when this computer's user logs in.
@@ -4114,6 +4475,9 @@ type StrictServerInterface interface {
 	// GetHealth Report whether the API is up.
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
+	// GetHistory The latest transfers and undos, newest first.
+	// (GET /history)
+	GetHistory(ctx context.Context, request GetHistoryRequestObject) (GetHistoryResponseObject, error)
 	// GetHost Whether this device is the host admin (the computer running CatchKeep).
 	// (GET /host)
 	GetHost(ctx context.Context, request GetHostRequestObject) (GetHostResponseObject, error)
@@ -4180,6 +4544,12 @@ type StrictServerInterface interface {
 	// UpdateTeam Rename a team and replace its members.
 	// (PUT /teams/{teamId})
 	UpdateTeam(ctx context.Context, request UpdateTeamRequestObject) (UpdateTeamResponseObject, error)
+	// ConfirmTransfers Mark Pokémon as transferred in the game, all or none.
+	// (POST /transfers)
+	ConfirmTransfers(ctx context.Context, request ConfirmTransfersRequestObject) (ConfirmTransfersResponseObject, error)
+	// UndoTransfer Put the Pokémon of a transfer back in CatchKeep.
+	// (POST /transfers/{eventId}/undo)
+	UndoTransfer(ctx context.Context, request UndoTransferRequestObject) (UndoTransferResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -4493,6 +4863,30 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetHealthResponseObject); ok {
 		if err := validResponse.VisitGetHealthResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetHistory operation middleware
+func (sh *strictHandler) GetHistory(w http.ResponseWriter, r *http.Request) {
+	var request GetHistoryRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetHistory(ctx, request.(GetHistoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetHistory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetHistoryResponseObject); ok {
+		if err := validResponse.VisitGetHistoryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -5102,6 +5496,63 @@ func (sh *strictHandler) UpdateTeam(w http.ResponseWriter, r *http.Request, team
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateTeamResponseObject); ok {
 		if err := validResponse.VisitUpdateTeamResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ConfirmTransfers operation middleware
+func (sh *strictHandler) ConfirmTransfers(w http.ResponseWriter, r *http.Request) {
+	var request ConfirmTransfersRequestObject
+
+	var body ConfirmTransfersJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ConfirmTransfers(ctx, request.(ConfirmTransfersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConfirmTransfers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConfirmTransfersResponseObject); ok {
+		if err := validResponse.VisitConfirmTransfersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UndoTransfer operation middleware
+func (sh *strictHandler) UndoTransfer(w http.ResponseWriter, r *http.Request, eventId string) {
+	var request UndoTransferRequestObject
+
+	request.EventId = eventId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UndoTransfer(ctx, request.(UndoTransferRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UndoTransfer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UndoTransferResponseObject); ok {
+		if err := validResponse.VisitUndoTransferResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

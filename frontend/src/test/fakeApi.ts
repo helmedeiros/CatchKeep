@@ -78,6 +78,7 @@ export function createFakeApi(
   let signedIn: Profile | null = null;
   let failures = 0;
   let next = 0;
+  let revision = 0;
   let setup: Schemas["Setup"] | null = null;
   let speciesRules: Schemas["SpeciesRule"][] = [];
   let categoryRules: Schemas["CategoryRule"][] = [];
@@ -647,6 +648,7 @@ export function createFakeApi(
       favoritesUnknown: transfers.length,
       transfers,
       searches: searchesFor(transfers.map((t) => t.pokemonId)),
+      revision,
     });
   }
 

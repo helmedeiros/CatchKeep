@@ -114,6 +114,10 @@ func (s *server) GetPlan(ctx context.Context, req GetPlanRequestObject) (GetPlan
 		return nil, err
 	}
 	target := domain.Target{Kind: domain.TargetKind(req.Params.Kind), Value: deref(req.Params.Value)}
+	revision, err := s.services.Transfers.Revision(ctx, trainer)
+	if err != nil {
+		return nil, err
+	}
 	plan, err := s.services.Keep.Plan(ctx, trainer, target)
 	switch {
 	case errors.Is(err, domain.ErrSetupNotFound):
@@ -129,7 +133,7 @@ func (s *server) GetPlan(ctx context.Context, req GetPlanRequestObject) (GetPlan
 			Estimated: plan.Use.Estimated, Limit: plan.Use.Limit,
 		},
 		Kind: req.Params.Kind, Value: req.Params.Value, Wanted: plan.Wanted, MaxFeasible: plan.MaxFeasible,
-		Shortfall: plan.Shortfall, Favorites: plan.Favorites, FavoritesUnknown: plan.FavoritesUnknown,
+		Shortfall: plan.Shortfall, Favorites: plan.Favorites, FavoritesUnknown: plan.FavoritesUnknown, Revision: revision,
 		Transfers: make([]PlanItem, 0, len(plan.Transfers)),
 	}
 	out.Searches = make([]SpeciesSearch, 0, len(plan.Searches))

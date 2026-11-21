@@ -227,3 +227,47 @@ func TestKeep_PlanSuggestsTransfersForATarget(t *testing.T) {
 	wantStatus(t, api.do(http.MethodGet, "/api/v1/plan?kind=free_more", ""), http.StatusUnprocessableEntity)
 	wantStatus(t, api.do(http.MethodGet, "/api/v1/plan?kind=percent&value=500", ""), http.StatusUnprocessableEntity)
 }
+
+func TestTransfers_ConfirmUndoAndHistory(t *testing.T) {
+	wantStatus(t, newAPI(t).do(http.MethodGet, "/api/v1/history", ""), http.StatusUnauthorized)
+	api := signedIn(t, "Ash")
+	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
+	type pokemon struct{ ID string }
+	list := decode[struct{ Pokemon []pokemon }](t, api.do(http.MethodGet, "/api/v1/collection", "").Body.Bytes()).Pokemon
+	id := list[0].ID
+	type event struct {
+		ID, Kind, Undoes, UndoneBy string
+		Pokemon                    []struct{ ID, Species string }
+	}
+
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/transfers", `{"pokemonIds":["`+id+`"],"requestId":"r1","planRevision":999}`), http.StatusConflict)
+	rec := api.do(http.MethodPost, "/api/v1/transfers", `{"pokemonIds":["`+id+`"],"requestId":"r1"}`)
+	wantStatus(t, rec, http.StatusCreated)
+	e := decode[event](t, rec.Body.Bytes())
+	if e.Kind != "single" || len(e.Pokemon) != 1 || e.Pokemon[0].ID != id {
+		t.Fatalf("event = %+v", e)
+	}
+	if again := decode[event](t, api.do(http.MethodPost, "/api/v1/transfers", `{"pokemonIds":["`+id+`"],"requestId":"r1"}`).Body.Bytes()); again.ID != e.ID {
+		t.Fatalf("repeat = %+v", again)
+	}
+	rec = api.do(http.MethodPost, "/api/v1/transfers", `{"pokemonIds":["`+id+`"],"requestId":"r2"}`)
+	wantStatus(t, rec, http.StatusConflict)
+	if code := errorCode(t, rec); code != "ALREADY_TRANSFERRED" {
+		t.Fatalf("code = %q", code)
+	}
+	if left := decode[struct{ Pokemon []pokemon }](t, api.do(http.MethodGet, "/api/v1/collection", "").Body.Bytes()).Pokemon; len(left) != len(list)-1 {
+		t.Fatalf("collection = %d, want %d", len(left), len(list)-1)
+	}
+
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/transfers/nope/undo", ""), http.StatusNotFound)
+	undo := decode[event](t, api.do(http.MethodPost, "/api/v1/transfers/"+e.ID+"/undo", "").Body.Bytes())
+	if undo.Kind != "undo" || undo.Undoes != e.ID {
+		t.Fatalf("undo = %+v", undo)
+	}
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/transfers/"+e.ID+"/undo", ""), http.StatusConflict)
+	history := decode[struct{ Events []event }](t, api.do(http.MethodGet, "/api/v1/history", "").Body.Bytes()).Events
+	if len(history) != 2 || history[0].Kind != "undo" || history[1].UndoneBy != undo.ID {
+		t.Fatalf("history = %+v", history)
+	}
+}
