@@ -372,3 +372,12 @@ func nullableTime(t time.Time) any {
 	}
 	return formatTime(t)
 }
+
+// Revision implements ports.Revisions.
+func (c *Collection) Revision(ctx context.Context, trainer domain.TrainerID) (int64, error) {
+	var rev int64
+	if err := c.db.QueryRowContext(ctx, `SELECT revision FROM trainers WHERE id = ?`, string(trainer)).Scan(&rev); err != nil {
+		return 0, fmt.Errorf("read revision: %w", err)
+	}
+	return rev, nil
+}
