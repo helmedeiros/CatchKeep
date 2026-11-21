@@ -70,7 +70,7 @@ export function TeamsCard({ pokemon }: { pokemon: Pokemon[] }) {
         </ul>
       )}
       <form
-        className="flex gap-2"
+        className="flex flex-col gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           create.mutate(
@@ -90,7 +90,7 @@ export function TeamsCard({ pokemon }: { pokemon: Pokemon[] }) {
         </label>
         <input
           id="new-team"
-          className={`${input} min-w-0 flex-1`}
+          className={input}
           placeholder="New team, e.g. Raid Kyurem"
           maxLength={40}
           value={name}
