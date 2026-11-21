@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import App from "../App";
@@ -111,10 +111,12 @@ describe("confirming what the export can't tell", () => {
         "Confirmed 2 Pokémon: no shiny, costume, background, Dynamax or Gigantamax.",
       ),
     ).toBeInTheDocument();
-    expect(
-      await within(panel).findByText(
-        "Nothing left to confirm for these features.",
-      ),
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("region", {
+          name: "Confirm what the export can't tell",
+        }),
+      ).not.toBeInTheDocument(),
+    );
   });
 });

@@ -6,14 +6,16 @@ export const button = cva(
   {
     variants: {
       intent: {
-        primary:
-          "w-full bg-accent px-5 py-2.5 text-accent-ink hover:bg-accent/90",
+        primary: "bg-accent px-5 py-2.5 text-accent-ink hover:bg-accent/90",
         secondary: "px-3 py-2 text-sm text-accent hover:bg-highlight",
         outline:
           "px-3 py-1.5 text-sm text-accent ring-1 ring-line hover:bg-highlight",
       },
+      /** A primary button fills its row unless it fits its content. */
+      fit: { true: "", false: "" },
     },
-    defaultVariants: { intent: "primary" },
+    compoundVariants: [{ intent: "primary", fit: false, class: "w-full" }],
+    defaultVariants: { intent: "primary", fit: false },
   },
 );
 
