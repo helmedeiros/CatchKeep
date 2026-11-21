@@ -28,6 +28,7 @@ CatchKeep takes both off your plate. It reads your Poke Genie export, keeps the 
 - **Your own rules.** Keep at least N of a species, or mark it a favorite to keep every copy. Set one rule for all legendary, mythical or Ultra Beast species at once; a species with its own rule follows that instead.
 - **A rule inspector.** For each species: the default your storage sets, your own rules, protection, and the minimum that won.
 - **Protection and teams.** Protect any single Pokémon and it is always kept, even over a stronger copy. Group Pokémon into named teams (a raid team, your buddies) and every member is always kept.
+- **Make room.** Tell CatchKeep how many Pokémon the game shows you have and the share of storage you want to stay under (80% to start). It shows how full you are and suggests exactly what to transfer to get under your limit, free more slots before an event like Community Day, or free a share of storage: weakest first, always keeping your rules, and saying how many better copies stay.
 
 ## Run it on your network
 
@@ -46,8 +47,7 @@ Keep the computer on and awake while others use it. On a Mac, tick **Start Catch
 
 ## Coming next
 
-- **A headroom goal.** "Stay under 80% of storage" and "free 400 slots before Community Day", with a warning when you drift past it.
-- **A cleanup plan.** How many to transfer to reach your goal, which ones, and in-game search strings to find them, with a checklist and undo.
+- **A transfer checklist.** Copy a search for the game that finds exactly the suggested Pokémon, tick them off as you transfer, and undo a mistake.
 - **History and insights.** Every addition and transfer is recorded, so you can see how fast storage fills, how much an event brings in, and which species you always end up transferring.
 
 ## Status

@@ -118,14 +118,29 @@ function SetupForm({
   const bands = useCapacityBands();
   const [slots, setSlots] = useState(initial ? String(initial.capacity) : "");
   const [goals, setGoals] = useState<Goal[]>(initial?.goals ?? []);
+  const [inGame, setInGame] = useState(
+    initial?.inGameCount ? String(initial.inGameCount) : "",
+  );
+  const [limitText, setLimitText] = useState(String(initial?.limit ?? 80));
   const capacity = Number(slots);
+  const inGameCount = Number(inGame);
+  const limit = Number(limitText);
   const capacityOk =
     Number.isInteger(capacity) && capacity >= 1 && capacity <= 20000;
   const problem = !capacityOk
     ? "Enter how many Pokémon your storage holds (1 to 20,000)."
     : goals.length === 0
       ? "Choose at least one goal."
-      : null;
+      : inGame !== "" &&
+          !(
+            Number.isInteger(inGameCount) &&
+            inGameCount >= 0 &&
+            inGameCount <= 20000
+          )
+        ? "The number of Pokémon in the game must be 0 to 20,000."
+        : !(Number.isInteger(limit) && limit >= 50 && limit <= 100)
+          ? "The storage limit must be 50% to 100%."
+          : null;
 
   const move = (from: number, to: number) =>
     setGoals((cur) => {
@@ -215,6 +230,37 @@ function SetupForm({
           {defaultsText(bands.data, capacity, goals.includes("trading"))}
         </p>
       )}
+      <label className="flex flex-col gap-1 text-sm">
+        Pokémon in the game now (optional)
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={20000}
+          className={input}
+          value={inGame}
+          onChange={(e) => setInGame(e.target.value)}
+        />
+        <span className="text-xs text-slate-500">
+          The game shows it at the top of your Pokémon list, like 2500/4000.
+          Without it, CatchKeep counts what you imported.
+        </span>
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Keep storage under (%)
+        <input
+          type="number"
+          inputMode="numeric"
+          min={50}
+          max={100}
+          className={input}
+          value={limitText}
+          onChange={(e) => setLimitText(e.target.value)}
+        />
+        <span className="text-xs text-slate-500">
+          Room left for new catches, like a Community Day. 80% is a good start.
+        </span>
+      </label>
       {problem && slots !== "" && (
         <p className="text-sm text-slate-500">{problem}</p>
       )}
@@ -227,7 +273,17 @@ function SetupForm({
         type="button"
         className={primaryButton}
         disabled={problem !== null || save.isPending}
-        onClick={() => save.mutate({ capacity, goals }, { onSuccess: onDone })}
+        onClick={() =>
+          save.mutate(
+            {
+              capacity,
+              goals,
+              limit,
+              ...(inGame !== "" && inGameCount > 0 && { inGameCount }),
+            },
+            { onSuccess: onDone },
+          )
+        }
       >
         Save
       </button>
