@@ -37,6 +37,16 @@ const usage = `usage:
 
 const shutdownTimeout = 10 * time.Second
 
+// Connection limits: a 10 MB export over slow Wi-Fi fits the read timeout,
+// and slow or stuck connections are dropped instead of piling up.
+const (
+	readHeaderTimeout = 5 * time.Second
+	readTimeout       = 3 * time.Minute
+	writeTimeout      = 3 * time.Minute
+	idleTimeout       = 2 * time.Minute
+	maxHeaderBytes    = 64 << 10
+)
+
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	code := run(ctx, os.Args[1:], os.Stdout, os.Stderr)
@@ -100,11 +110,7 @@ func serve(ctx context.Context, cfg serveConfig, ready func(addr string)) error 
 		return fmt.Errorf("listen: %w", err)
 	}
 
-	srv := &http.Server{
-		Handler:           newRootHandler(cfg, store, ln.Addr()),
-		ReadHeaderTimeout: 5 * time.Second,
-		BaseContext:       func(net.Listener) context.Context { return ctx },
-	}
+	srv := newServer(ctx, newRootHandler(cfg, store, ln.Addr()))
 
 	errs := make(chan error, 1)
 	go func() { errs <- srv.Serve(ln) }()
@@ -125,6 +131,19 @@ func serve(ctx context.Context, cfg serveConfig, ready func(addr string)) error 
 		return fmt.Errorf("serve: %w", err)
 	}
 	return nil
+}
+
+// newServer serves h with the connection limits; requests inherit ctx.
+func newServer(ctx context.Context, h http.Handler) *http.Server {
+	return &http.Server{
+		Handler:           h,
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+		MaxHeaderBytes:    maxHeaderBytes,
+		BaseContext:       func(net.Listener) context.Context { return ctx },
+	}
 }
 
 // newRootHandler routes /api/ to the API and everything else to the frontend
