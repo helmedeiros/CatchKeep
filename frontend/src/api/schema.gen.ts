@@ -660,6 +660,8 @@ export interface components {
             columns: components["schemas"]["ImportColumn"][];
             /** @description How an unrecognized file's columns are mapped, or a suggestion from their names while it still needs mapping. */
             mapping: components["schemas"]["ColumnMapEntry"][];
+            /** @description Pokémon in the collection that nothing in the file can be. After a full export they were probably transferred; a file with only some Pokémon leaves the rest out. Listed while staged and in the answer to the commit, so they can be marked as transferred; empty otherwise. */
+            missing: string[];
         };
         ImportColumn: {
             name: string;

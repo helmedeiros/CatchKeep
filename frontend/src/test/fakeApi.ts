@@ -788,6 +788,7 @@ export function createFakeApi(
             .slice(0, 3) ?? [],
       })),
       mapping: table ? (imp?.mapping ?? suggest(table.header)) : [],
+      missing: [],
     };
   }
 

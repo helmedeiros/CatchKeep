@@ -254,6 +254,10 @@ func toPreview(p app.ImportPreview) ImportPreview {
 		NeedsMapping:  p.NeedsMapping,
 		Columns:       make([]ImportColumn, 0, len(p.Columns)),
 		Mapping:       make([]ColumnMapEntry, 0, len(p.Mapping)),
+		Missing:       make([]string, 0, len(p.Missing)),
+	}
+	for _, id := range p.Missing {
+		out.Missing = append(out.Missing, string(id))
 	}
 	for _, c := range p.Columns {
 		samples := c.Samples

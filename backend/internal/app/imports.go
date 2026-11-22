@@ -40,6 +40,9 @@ type ImportPreview struct {
 	NeedsMapping bool
 	Columns      []ColumnPreview
 	Mapping      domain.ColumnMapping
+	// Missing are collected Pokémon nothing in the file can be; set while
+	// staged and in the answer to the commit.
+	Missing []domain.PokemonID
 }
 
 // ColumnPreview is one column of an unrecognized file with a few values.
@@ -222,7 +225,9 @@ func (u *Imports) Commit(ctx context.Context, trainer domain.TrainerID, id strin
 	if err := u.batches.Commit(ctx, batch, add, review.Update); err != nil {
 		return ImportPreview{}, fmt.Errorf("commit import: %w", err)
 	}
-	return previewOf(batch), nil
+	p := previewOf(batch)
+	p.Missing = review.Missing
+	return p, nil
 }
 
 func (u *Imports) review(ctx context.Context, b domain.ImportBatch) (domain.ImportReview, error) {
@@ -251,7 +256,7 @@ func withCounts(b domain.ImportBatch, r domain.ImportReview) domain.ImportBatch 
 
 func stagedPreview(b domain.ImportBatch, r domain.ImportReview) ImportPreview {
 	p := previewOf(withCounts(b, r))
-	p.Matches = r.Matches
+	p.Matches, p.Missing = r.Matches, r.Missing
 	return p
 }
 

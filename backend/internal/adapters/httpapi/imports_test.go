@@ -288,3 +288,26 @@ func TestImport_MapsTheColumnsOfAnUnfamiliarFile(t *testing.T) {
 		t.Fatalf("next preview = %+v; the saved mapping applies", next)
 	}
 }
+
+func TestImport_ListsCollectedPokemonMissingFromTheFile(t *testing.T) {
+	api := signedIn(t, "Ash")
+	first := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
+	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+first.ID+"/commit", ""), http.StatusOK)
+	var without []string
+	for _, line := range strings.Split(fixture(t), "\n") {
+		if !strings.Contains(line, "Mewtwo") {
+			without = append(without, line)
+		}
+	}
+
+	type missing struct{ Missing []string }
+	staged := api.doWithType(http.MethodPost, "/api/v1/imports", strings.Join(without, "\n"), "text/csv")
+	wantStatus(t, staged, http.StatusCreated)
+	got := decode[missing](t, staged.Body.Bytes())
+	coll := decode[struct {
+		Pokemon []struct{ ID, Species string }
+	}](t, api.do(http.MethodGet, "/api/v1/collection", "").Body.Bytes())
+	if len(got.Missing) != 1 || coll.Pokemon[0].Species != "Mewtwo" || got.Missing[0] != coll.Pokemon[0].ID {
+		t.Fatalf("missing = %v, want the Mewtwo of %+v", got.Missing, coll.Pokemon)
+	}
+}

@@ -1190,6 +1190,7 @@ components:
           needsMapping,
           columns,
           mapping,
+          missing,
         ]
       properties:
         id:
@@ -1255,6 +1256,16 @@ components:
             from their names while it still needs mapping.
           items:
             $ref: "#/components/schemas/ColumnMapEntry"
+        missing:
+          type: array
+          description: >-
+            Pokémon in the collection that nothing in the file can be. After
+            a full export they were probably transferred; a file with only
+            some Pokémon leaves the rest out. Listed while staged and in the
+            answer to the commit, so they can be marked as transferred; empty
+            otherwise.
+          items:
+            type: string
     ImportColumn:
       type: object
       additionalProperties: false

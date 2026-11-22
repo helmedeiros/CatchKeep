@@ -607,6 +607,9 @@ type ImportPreview struct {
 	// Mapping How an unrecognized file's columns are mapped, or a suggestion from their names while it still needs mapping.
 	Mapping []ColumnMapEntry `json:"mapping"`
 
+	// Missing Pokémon in the collection that nothing in the file can be. After a full export they were probably transferred; a file with only some Pokémon leaves the rest out. Listed while staged and in the answer to the commit, so they can be marked as transferred; empty otherwise.
+	Missing []string `json:"missing"`
+
 	// NeedsMapping The file is not a recognized export and its columns are not mapped yet; nothing is read and it cannot be committed until they are.
 	NeedsMapping bool `json:"needsMapping"`
 

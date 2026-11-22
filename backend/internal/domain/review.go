@@ -52,6 +52,10 @@ type ImportReview struct {
 	Matches []PossibleMatch
 	// Repeats are rows answered as the same as an earlier row; they are dropped.
 	Repeats int
+	// Missing are collected Pokémon that no row of the file can be: no
+	// unanswered row lists them and no answer named them. After a full
+	// export they were probably transferred; a partial one leaves them out.
+	Missing []PokemonID
 }
 
 // Pending counts possible matches still waiting for an answer.
@@ -132,6 +136,27 @@ func ReviewImport(existing []Pokemon, rows []ImportRow, answers map[int]Resoluti
 			}
 		}
 		out.Matches = append(out.Matches, m)
+	}
+	out.Missing = missing(existing, out.Matches)
+	return out
+}
+
+func missing(existing []Pokemon, matches []PossibleMatch) []PokemonID {
+	present := make(map[string]bool)
+	for _, m := range matches {
+		if m.Resolution != nil {
+			present[m.Resolution.SameAs] = true
+			continue
+		}
+		for _, c := range m.Candidates {
+			present[c.Ref] = true
+		}
+	}
+	var out []PokemonID
+	for _, p := range existing {
+		if !present[string(p.ID)] {
+			out = append(out, p.ID)
+		}
 	}
 	return out
 }

@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/helmedeiros/catchkeep/backend/internal/domain"
@@ -137,5 +138,28 @@ func TestReviewImport_GenderlessPokemonCanStillBeAnExactMatch(t *testing.T) {
 	}
 	if r := domain.ReviewImport([]domain.Pokemon{mon("P1", gendered...)}, []domain.ImportRow{row(2, genderless...)}, nil); r.Matches[0].Exact {
 		t.Fatal("gender known on one side only marked exact")
+	}
+}
+
+func TestReviewImport_ListsCollectedPokemonNothingInTheFileCouldBe(t *testing.T) {
+	existing := []domain.Pokemon{
+		mon("P1", withCP("100")...),
+		mon("P2", "species", "Rattata", "cp", "20"),
+		mon("P3", "species", "Zubat", "cp", "30"),
+	}
+	rows := []domain.ImportRow{row(2, withCP("150")...), row(3, "species", "Rattata", "cp", "25"), row(4, "species", "Oddish", "cp", "40")}
+
+	r := domain.ReviewImport(existing, rows, map[int]domain.Resolution{3: {Line: 3}})
+
+	if len(r.Matches) != 2 {
+		t.Fatalf("Matches = %+v, want lines 2 and 3", r.Matches)
+	}
+	if want := []domain.PokemonID{"P2", "P3"}; !slices.Equal(r.Missing, want) {
+		t.Fatalf("Missing = %v, want %v: P1 may be line 2 (unanswered), line 3 was answered different from P2", r.Missing, want)
+	}
+
+	r = domain.ReviewImport(existing, rows, map[int]domain.Resolution{2: {Line: 2, SameAs: "P1"}})
+	if want := []domain.PokemonID{"P3"}; !slices.Equal(r.Missing, want) {
+		t.Fatalf("Missing = %v, want %v", r.Missing, want)
 	}
 }
