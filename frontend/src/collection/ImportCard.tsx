@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { alert, card, primaryButton, secondaryButton } from "../ui/styles";
 import { ColumnMapper } from "./ColumnMapper";
 import { DuplicateReview } from "./DuplicateReview";
+import { MissingFromImport } from "./MissingFromImport";
 import {
   type ImportPreview,
   type MatchAnswer,
@@ -19,6 +20,7 @@ export function ImportCard({ hasPokemon }: { hasPokemon: boolean }) {
   const map = useMapColumns();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [remapping, setRemapping] = useState(false);
+  const [missing, setMissing] = useState<string[]>([]);
 
   const choose = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -31,9 +33,14 @@ export function ImportCard({ hasPokemon }: { hasPokemon: boolean }) {
     commit.mutate(p.id, {
       onSuccess: (done) => {
         setPreview(null);
+        setMissing(done.missing);
         toast.success(doneMessage(done));
       },
     });
+
+  if (missing.length > 0) {
+    return <MissingFromImport ids={missing} onDone={() => setMissing([])} />;
+  }
 
   if (preview && (preview.needsMapping || remapping)) {
     return (
@@ -116,6 +123,7 @@ export function ImportCard({ hasPokemon }: { hasPokemon: boolean }) {
 }
 
 function doneMessage({ newCount, updatedCount }: ImportPreview) {
+  if (newCount + updatedCount === 0) return "Nothing new in this file.";
   if (updatedCount === 0)
     return `Added ${newCount} Pokémon to your collection.`;
   if (newCount === 0) return `Updated ${updatedCount} Pokémon.`;
@@ -123,6 +131,7 @@ function doneMessage({ newCount, updatedCount }: ImportPreview) {
 }
 
 function commitLabel({ newCount, updatedCount }: ImportPreview) {
+  if (newCount + updatedCount === 0) return "Continue";
   if (updatedCount === 0) return `Add ${newCount} Pokémon`;
   if (newCount === 0) return `Update ${updatedCount} Pokémon`;
   return `Add ${newCount} and update ${updatedCount} Pokémon`;
@@ -149,7 +158,9 @@ function Preview({
   const pending = preview.possibleMatches.filter((m) => m.answer === "pending");
   const exact = pending.filter((m) => m.exact && m.candidates.length === 1);
   const current = reviewing ? pending[0] : undefined;
-  const nothingToDo = preview.newCount + preview.updatedCount === 0;
+  const nothingToDo =
+    preview.newCount + preview.updatedCount === 0 &&
+    preview.missing.length === 0;
 
   return (
     <section
@@ -172,6 +183,16 @@ function Preview({
             <strong>{preview.possibleMatchCount}</strong> may already be in your
             collection. They are held back until you say whether they're the
             same Pokémon, so nothing is counted twice.
+          </li>
+        )}
+        {preview.missing.length > 0 && (
+          <li>
+            <strong>{preview.missing.length}</strong>{" "}
+            {preview.missing.length === 1
+              ? "Pokémon in CatchKeep isn't in this file."
+              : "Pokémon in CatchKeep aren't in this file."}{" "}
+            After this, you can mark{" "}
+            {preview.missing.length === 1 ? "it" : "them"} as transferred.
           </li>
         )}
       </ul>
