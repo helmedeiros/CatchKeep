@@ -59,6 +59,9 @@ export function useConfirmTransfers() {
       });
       return refresh();
     },
-    onError: () => refresh(),
+    onError: (e, input) => {
+      if (input.planRevision === undefined) toast.error(e.message);
+      return refresh();
+    },
   });
 }

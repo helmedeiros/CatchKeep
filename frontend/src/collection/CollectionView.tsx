@@ -6,6 +6,7 @@ import { card } from "../ui/styles";
 import { FilterBar } from "./FilterBar";
 import { applyFilters } from "./filters";
 import { PokemonItem } from "./PokemonItem";
+import { TransferButton } from "./TransferButton";
 import { useFilters } from "./useFilters";
 import type { Pokemon } from "./useCollection";
 
@@ -58,7 +59,9 @@ export function CollectionView({ pokemon }: { pokemon: Pokemon[] }) {
           initialItemCount={Math.min(INITIAL_ROWS, shown.length)}
           components={{ List, Item }}
           computeItemKey={(_, p) => p.id}
-          itemContent={(_, p) => <PokemonItem pokemon={p} />}
+          itemContent={(_, p) => (
+            <PokemonItem pokemon={p} actions={<TransferButton pokemon={p} />} />
+          )}
         />
       )}
     </section>
