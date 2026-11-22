@@ -92,6 +92,9 @@ export function createFakeApi(
   let categoryRules: Schemas["CategoryRule"][] = [];
   let teams: Schemas["Team"][] = [];
   const collection: Stored[] = [];
+  /** Transferred Pokémon, kept so an undo can bring them back. */
+  const transferred = new Map<string, Stored>();
+  const events: Array<Schemas["TransferEvent"] & { requestId?: string }> = [];
   const imports = new Map<string, FakeImport>();
   const mappings = new Map<string, Schemas["ColumnMapEntry"][]>();
   const err = (status: number, code: string, message: string) =>
@@ -406,6 +409,78 @@ export function createFakeApi(
         pokemon: sorted.map((p) => toPokemon(p.id, p)),
       });
     }
+    if (path === "/transfers" && req.method === "POST") {
+      if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
+      const input = body as Schemas["TransferInput"];
+      const earlier = events.find((e) => e.requestId === input.requestId);
+      if (earlier) return jsonResponse(201, publicEvent(earlier));
+      if (input.planRevision !== undefined && input.planRevision !== revision) {
+        return err(
+          409,
+          "STALE_REVISION",
+          "Your collection changed since this plan was made; look at the new plan first.",
+        );
+      }
+      const gone = input.pokemonIds.filter(
+        (id) => !collection.some((p) => p.id === id),
+      );
+      if (gone.length > 0) {
+        return jsonResponse(409, {
+          error: {
+            code: "ALREADY_TRANSFERRED",
+            message:
+              "Some of these are no longer in your collection; nothing was marked.",
+            correlationId: "test",
+            details: { pokemonIds: gone },
+          },
+        });
+      }
+      const moved = input.pokemonIds.map((id) => {
+        const i = collection.findIndex((p) => p.id === id);
+        const [p] = collection.splice(i, 1) as [Stored];
+        transferred.set(id, p);
+        return { id, species: p.species, cp: p.cp };
+      });
+      countInGame(-moved.length);
+      const event = {
+        id: `E${++next}`,
+        kind: moved.length === 1 ? ("single" as const) : ("bulk" as const),
+        at: "2026-11-22T10:00:00Z",
+        pokemon: moved,
+        requestId: input.requestId,
+      };
+      events.unshift(event);
+      return jsonResponse(201, publicEvent(event));
+    }
+    const undo = /^\/transfers\/([^/]+)\/undo$/.exec(path);
+    if (undo && req.method === "POST") {
+      if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
+      const original = events.find((e) => e.id === undo[1]);
+      if (!original) return err(404, "NOT_FOUND", "No such transfer.");
+      if (original.undoneBy) {
+        return err(409, "ALREADY_UNDONE", "This transfer was already undone.");
+      }
+      for (const { id } of original.pokemon) {
+        const p = transferred.get(id);
+        if (p) collection.push(p);
+        transferred.delete(id);
+      }
+      countInGame(original.pokemon.length);
+      const event = {
+        id: `E${++next}`,
+        kind: "undo" as const,
+        at: "2026-11-22T10:01:00Z",
+        pokemon: original.pokemon,
+        undoes: original.id,
+      };
+      original.undoneBy = event.id;
+      events.unshift(event);
+      return jsonResponse(201, event);
+    }
+    if (path === "/history") {
+      if (!signedIn) return err(401, "UNAUTHENTICATED", "Not signed in.");
+      return jsonResponse(200, { events: events.map(publicEvent) });
+    }
     if (path === "/me") {
       return signedIn
         ? jsonResponse(200, {
@@ -416,6 +491,25 @@ export function createFakeApi(
     }
     return err(404, "NOT_FOUND", `no fake for ${req.method} ${path}`);
   };
+
+  /** Every transfer and undo changes the plan, like on the server. */
+  function countInGame(delta: number) {
+    revision += 1;
+    if (setup?.inGameCount) {
+      setup = {
+        ...setup,
+        inGameCount: Math.max(0, setup.inGameCount + delta),
+      };
+    }
+  }
+
+  function publicEvent(
+    e: Schemas["TransferEvent"] & { requestId?: string },
+  ): Schemas["TransferEvent"] {
+    const copy = { ...e };
+    delete copy.requestId;
+    return copy;
+  }
 
   function review(imp: FakeImport) {
     const add: Row[] = [];
@@ -709,6 +803,10 @@ export function createFakeApi(
       profiles.push(p);
       introduced(p.id);
       signedIn = p;
+    },
+    /** Something changed the plan elsewhere, like on another device. */
+    changePlan() {
+      revision += 1;
     },
     addProfile(displayName: string, pin: string) {
       next += 1;

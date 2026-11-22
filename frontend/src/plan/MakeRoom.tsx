@@ -1,14 +1,24 @@
 import { useMemo, useState } from "react";
+import { ApiError } from "../api/errors";
 import { PokemonItem } from "../collection/PokemonItem";
 import type { Pokemon } from "../collection/useCollection";
 import { useSetup } from "../keep/useKeep";
-import { alert, card, input, secondaryButton } from "../ui/styles";
+import {
+  alert,
+  button,
+  card,
+  input,
+  outlineButton,
+  secondaryButton,
+} from "../ui/styles";
 import { FilterBar } from "../collection/FilterBar";
 import { applyFilters, NO_FILTERS } from "../collection/filters";
 import { useFilters } from "../collection/useFilters";
 import { FindInGame } from "./FindInGame";
 import { StorageBar } from "./StorageBar";
+import { useTicks } from "./ticks";
 import { type Plan, type TargetKind, usePlan } from "./usePlan";
+import { useConfirmTransfers } from "./useTransfers";
 
 const SHOWN = 30;
 const WEAKEST_FIRST = { ...NO_FILTERS, sort: "plan" as const };
@@ -92,13 +102,39 @@ export function MakeRoom({ pokemon }: { pokemon: Pokemon[] }) {
           {plan.error.message}
         </p>
       )}
-      {plan.data && <Suggestions plan={plan.data} pokemon={pokemon} />}
+      {plan.data && (
+        <Suggestions
+          plan={plan.data}
+          pokemon={pokemon}
+          refreshing={plan.isFetching}
+        />
+      )}
     </section>
   );
 }
 
-function Suggestions({ plan, pokemon }: { plan: Plan; pokemon: Pokemon[] }) {
+/** Why a confirmation was refused, in words for the trainer. */
+function refusal(error: Error | null): string | undefined {
+  if (!(error instanceof ApiError)) return error?.message;
+  if (error.code === "STALE_REVISION")
+    return "Your collection changed since this list was made, so it was refreshed. Check your ticks, then mark them again.";
+  if (error.code === "ALREADY_TRANSFERRED")
+    return "Some of these were already marked as transferred, maybe on another device. The list was refreshed.";
+  return error.message;
+}
+
+function Suggestions({
+  plan,
+  pokemon,
+  refreshing,
+}: {
+  plan: Plan;
+  pokemon: Pokemon[];
+  refreshing: boolean;
+}) {
   const [showAll, setShowAll] = useState(false);
+  const { ticked, set: tick } = useTicks();
+  const confirm = useConfirmTransfers();
   const { filters } = useFilters("make-room", WEAKEST_FIRST);
   const byId = useMemo(() => new Map(pokemon.map((p) => [p.id, p])), [pokemon]);
   if (plan.wanted === 0) {
@@ -117,6 +153,10 @@ function Suggestions({ plan, pokemon }: { plan: Plan; pokemon: Pokemon[] }) {
   });
   const filtered = applyFilters(planned, filters, NO_CONTEXT);
   const shown = showAll ? filtered : filtered.slice(0, SHOWN);
+  const done = planned.filter((p) => ticked.has(p.id)).map((p) => p.id);
+  const why = refusal(confirm.error);
+  const allTicked =
+    filtered.length > 0 && filtered.every((p) => ticked.has(p.id));
   return (
     <div className="flex flex-col gap-2">
       <h4 className="text-lg font-semibold">
@@ -146,13 +186,31 @@ function Suggestions({ plan, pokemon }: { plan: Plan; pokemon: Pokemon[] }) {
         total={plan.transfers.length}
         defaults={WEAKEST_FIRST}
       />
+      <p className="text-sm text-muted">
+        Tick each one as you transfer it in the game, then mark them here so
+        CatchKeep stops counting them.
+      </p>
       <ul
         aria-label="Suggested transfers"
         className="flex flex-col divide-y divide-line"
       >
         {shown.map((p) => (
           <li key={p.id} className="py-2">
-            <PokemonItem pokemon={p}>
+            <PokemonItem
+              pokemon={p}
+              actions={
+                <label className="flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-semibold ring-1 ring-line has-checked:bg-highlight">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-accent"
+                    aria-label={`Transferred ${p.species} CP ${p.cp ?? "?"}`}
+                    checked={ticked.has(p.id)}
+                    onChange={(e) => tick([p.id], e.target.checked)}
+                  />
+                  Transferred
+                </label>
+              }
+            >
               <span className="rounded-full bg-soft px-2 py-0.5 font-medium text-muted">
                 {items.get(p.id)?.keptInGroup} better {p.species} kept
               </span>
@@ -169,6 +227,40 @@ function Suggestions({ plan, pokemon }: { plan: Plan; pokemon: Pokemon[] }) {
           {showAll ? "Show fewer" : `Show all ${filtered.length}`}
         </button>
       )}
+      {why && (
+        <p role="alert" className={alert}>
+          {why}
+        </p>
+      )}
+      <div className="sticky bottom-24 flex flex-wrap items-center gap-2 rounded-2xl bg-surface/95 p-2 ring-1 ring-line backdrop-blur sm:bottom-4">
+        <button
+          type="button"
+          className={outlineButton}
+          onClick={() =>
+            tick(
+              filtered.map((p) => p.id),
+              !allTicked,
+            )
+          }
+        >
+          {allTicked ? "Untick all" : `Tick all ${filtered.length}`}
+        </button>
+        {done.length > 0 && (
+          <button
+            type="button"
+            className={button({ intent: "primary", fit: true })}
+            disabled={confirm.isPending || refreshing}
+            onClick={() =>
+              confirm.mutate(
+                { pokemonIds: done, planRevision: plan.revision },
+                { onSuccess: () => tick(done, false) },
+              )
+            }
+          >
+            Mark {done.length} as transferred
+          </button>
+        )}
+      </div>
     </div>
   );
 }
