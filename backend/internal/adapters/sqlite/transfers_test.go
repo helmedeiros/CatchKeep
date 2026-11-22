@@ -93,3 +93,41 @@ func TestTransfers_RecordUndoAndHistory(t *testing.T) {
 		t.Fatalf("misty sees %+v", theirs)
 	}
 }
+
+func TestTransfers_KeepTheInGameCountCurrent(t *testing.T) {
+	store, _ := openTemp(t)
+	withTrainers(t, store, "ash", "misty")
+	withPokemon(t, store, "ash", "P1", "P2", "P3")
+	setups := sqlite.NewSetups(store)
+	transfers := sqlite.NewTransfers(store)
+	ctx := t.Context()
+	if err := setups.SaveSetup(ctx, "ash", domain.Setup{Capacity: 4000, Goals: []domain.Goal{domain.GoalCollecting}, InGameCount: 3300}); err != nil {
+		t.Fatal(err)
+	}
+	if err := setups.SaveSetup(ctx, "misty", domain.Setup{Capacity: 400, Goals: []domain.Goal{domain.GoalCollecting}}); err != nil {
+		t.Fatal(err)
+	}
+	inGame := func(trainer domain.TrainerID) int {
+		s, err := setups.GetSetup(ctx, trainer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s.InGameCount
+	}
+
+	if _, err := transfers.Record(ctx, event("E1", "r1", "P1", "P2"), -1); err != nil {
+		t.Fatal(err)
+	}
+	if n := inGame("ash"); n != 3298 {
+		t.Fatalf("after transferring 2: in-game count = %d, want 3298", n)
+	}
+	if _, err := transfers.Undo(ctx, "ash", "E1", domain.TransferEvent{ID: "U1", TrainerID: "ash", Kind: domain.TransferUndo, At: at}); err != nil {
+		t.Fatal(err)
+	}
+	if n := inGame("ash"); n != 3300 {
+		t.Fatalf("after the undo: in-game count = %d, want 3300", n)
+	}
+	if n := inGame("misty"); n != 0 {
+		t.Fatalf("misty's unknown count became %d", n)
+	}
+}
