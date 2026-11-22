@@ -1,4 +1,4 @@
-.PHONY: check generate generate-check fmt-check vet lint test build
+.PHONY: check generate generate-check fmt-check vet lint test vuln build
 
 GO ?= go
 
@@ -24,6 +24,11 @@ lint:
 
 test:
 	$(GO) test -race -shuffle=on -count=1 ./...
+
+# Known vulnerabilities in the code paths CatchKeep uses; needs the internet,
+# so CI runs it rather than the commit hooks.
+vuln:
+	$(GO) tool govulncheck ./...
 
 build:
 	$(GO) build -trimpath -o bin/catchkeep ./cmd/catchkeep
