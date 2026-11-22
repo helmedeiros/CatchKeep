@@ -406,3 +406,25 @@ func TestMark_SetsOnePokemonsFeaturesAndOnlyForItsTrainer(t *testing.T) {
 		t.Fatalf("not a feature: err = %v", err)
 	}
 }
+
+func TestImports_ListCollectedPokemonMissingFromTheFile(t *testing.T) {
+	f := newImportsFixture()
+	first, _ := f.imports.Stage(t.Context(), ash, strings.NewReader("Pidgey,1,2,3,100\nZubat,7,8,9,50\n"))
+	if _, err := f.imports.Commit(t.Context(), ash, first.ID); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := f.collection.List(t.Context(), ash)
+	zubat := list[1].ID
+
+	again, _ := f.imports.Stage(t.Context(), ash, strings.NewReader("Pidgey,1,2,3,150\nRattata,4,5,6,200\n"))
+	if len(again.Missing) != 1 || again.Missing[0] != zubat {
+		t.Fatalf("staged missing = %v, want the Zubat %s", again.Missing, zubat)
+	}
+	committed, err := f.imports.Commit(t.Context(), ash, again.ID)
+	if err != nil || len(committed.Missing) != 1 || committed.Missing[0] != zubat {
+		t.Fatalf("committed missing = %v, %v; the trainer is offered to mark them after adding", committed.Missing, err)
+	}
+	if later, _ := f.imports.Get(t.Context(), ash, again.ID); len(later.Missing) != 0 {
+		t.Fatalf("a committed import read later lists %v; the offer is made once", later.Missing)
+	}
+}
