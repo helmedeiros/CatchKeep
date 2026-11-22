@@ -31,7 +31,12 @@ interface FakeImport {
   mapping?: Schemas["ColumnMapEntry"][];
   status: "staged" | "committed";
   answers: Map<number, Schemas["MatchAnswer"]>;
-  done?: { newCount: number; updatedCount: number; pending: number };
+  done?: {
+    newCount: number;
+    updatedCount: number;
+    pending: number;
+    missing: string[];
+  };
 }
 
 const toPokemon = (id: string, p: Row): Schemas["Pokemon"] => {
@@ -261,6 +266,7 @@ export function createFakeApi(
         );
       }
       const r = review(imp);
+      const missing = r.missing;
       for (const row of r.add) {
         next += 1;
         collection.push({ id: `P${next}`, ...row });
@@ -271,8 +277,11 @@ export function createFakeApi(
         newCount: r.add.length,
         updatedCount: r.update.length,
         pending: r.pending,
+        missing,
       };
-      return jsonResponse(200, preview(commit[1] ?? ""));
+      const done = preview(commit[1] ?? "");
+      imp.done.missing = [];
+      return jsonResponse(200, done);
     }
     const answer = path.match(/^\/imports\/([^/]+)\/answers$/);
     if (answer && req.method === "POST") {
@@ -539,7 +548,19 @@ export function createFakeApi(
       });
     });
     const pending = matches.filter((m) => m.answer === "pending").length;
-    return { add, update, matches, pending };
+    const present = new Set(
+      matches.flatMap((m) =>
+        m.answer === "pending"
+          ? m.candidates.map((c) => c.pokemon.id)
+          : m.answer === "same" && m.sameAs
+            ? [m.sameAs]
+            : [],
+      ),
+    );
+    const missing = collection
+      .map((p) => p.id)
+      .filter((id) => !present.has(id));
+    return { add, update, matches, pending, missing };
   }
 
   /**
@@ -788,7 +809,7 @@ export function createFakeApi(
             .slice(0, 3) ?? [],
       })),
       mapping: table ? (imp?.mapping ?? suggest(table.header)) : [],
-      missing: [],
+      missing: imp?.done?.missing ?? r?.missing ?? [],
     };
   }
 
