@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -196,5 +197,34 @@ func TestServe_CreatesAProfileAndSignsInAgainstTheRealDatabase(t *testing.T) {
 	signIn := post("/session", `{"profileId":"`+ash.ID+`","pin":"2468"}`)
 	if signIn.status != http.StatusOK || len(signIn.cookies) == 0 {
 		t.Fatalf("sign in: %d, cookies %v", signIn.status, signIn.cookies)
+	}
+}
+
+func TestNewServer_LimitsSlowConnectionsAndLargeHeaders(t *testing.T) {
+	srv := newServer(t.Context(), http.NotFoundHandler())
+	for name, d := range map[string]time.Duration{
+		"read header": srv.ReadHeaderTimeout, "read": srv.ReadTimeout, "write": srv.WriteTimeout, "idle": srv.IdleTimeout,
+	} {
+		if d <= 0 {
+			t.Errorf("%s timeout not set", name)
+		}
+	}
+	if srv.ReadTimeout < 2*time.Minute {
+		t.Errorf("read timeout %v is too short for a 10 MB export on slow Wi-Fi", srv.ReadTimeout)
+	}
+
+	ts := httptest.NewUnstartedServer(srv.Handler)
+	ts.Config.MaxHeaderBytes = srv.MaxHeaderBytes
+	ts.Start()
+	defer ts.Close()
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, ts.URL, nil)
+	req.Header.Set("X-Big", strings.Repeat("a", 128<<10))
+	res, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusRequestHeaderFieldsTooLarge {
+		t.Fatalf("128 KB of headers: status %d, want 431", res.StatusCode)
 	}
 }
