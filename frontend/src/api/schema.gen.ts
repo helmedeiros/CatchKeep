@@ -365,7 +365,7 @@ export interface paths {
         put?: never;
         /**
          * Mark Pokémon as transferred in the game, all or none.
-         * @description Refused as a whole when any is already gone (409 ALREADY_TRANSFERRED, listing them) or, with planRevision, when the plan is out of date (409 STALE_REVISION). The same requestId counts once.
+         * @description Refused as a whole when any is already gone (409 ALREADY_TRANSFERRED, listing them) or, with planRevision, when the plan is out of date (409 STALE_REVISION). The same requestId counts once. It lowers the Pokémon-in-the-game count from the setup by as many, if one was given; an undo raises it back.
          */
         post: operations["confirmTransfers"];
         delete?: never;

@@ -54,6 +54,9 @@ func (r *Transfers) Record(ctx context.Context, e domain.TransferEvent, expected
 		if len(gone) > 0 {
 			return &domain.NotActiveError{IDs: gone}
 		}
+		if err := countInGame(ctx, tx, e.TrainerID, -len(e.Pokemon)); err != nil {
+			return err
+		}
 		return insertEvent(ctx, tx, e)
 	})
 	if err != nil {
@@ -81,6 +84,9 @@ func (r *Transfers) Undo(ctx context.Context, trainer domain.TrainerID, eventID 
 				string(p.ID), string(trainer)); err != nil {
 				return fmt.Errorf("restore: %w", err)
 			}
+		}
+		if err := countInGame(ctx, tx, trainer, len(original.Pokemon)); err != nil {
+			return err
 		}
 		undo.Pokemon, undo.Undoes = original.Pokemon, original.ID
 		if err := insertEvent(ctx, tx, undo); err != nil {
@@ -122,6 +128,17 @@ func (r *Transfers) FindByRequest(ctx context.Context, trainer domain.TrainerID,
 		return domain.TransferEvent{}, false, nil
 	}
 	return e, err == nil, err
+}
+
+// countInGame keeps the trainer's in-game count in step with what they
+// transferred, so the next plan starts from the storage left. An unknown
+// count (0) stays unknown.
+func countInGame(ctx context.Context, tx *sql.Tx, trainer domain.TrainerID, delta int) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE trainer_setups SET in_game_count = MAX(0, in_game_count + ?) WHERE trainer_id = ? AND in_game_count > 0`,
+		delta, string(trainer)); err != nil {
+		return fmt.Errorf("update in-game count: %w", err)
+	}
+	return nil
 }
 
 const selectEvent = `SELECT id, trainer_id, kind, pokemon, COALESCE(request_id, ''), COALESCE(undoes, ''), COALESCE(undone_by, ''), created_at FROM transfer_events`
