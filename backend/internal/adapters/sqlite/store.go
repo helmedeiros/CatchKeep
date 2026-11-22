@@ -7,9 +7,11 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 
@@ -27,7 +29,11 @@ type Store struct {
 
 // Open opens (creating if needed) the database at path, enables WAL, foreign
 // keys and a busy timeout on every connection, and applies pending migrations.
+// The files are readable only by their owner.
 func Open(ctx context.Context, path string) (*Store, error) {
+	if err := private(path); err != nil {
+		return nil, err
+	}
 	q := url.Values{}
 	for _, p := range []string{"journal_mode(WAL)", "foreign_keys(1)", "busy_timeout(5000)", "synchronous(NORMAL)"} {
 		q.Add("_pragma", p)
@@ -42,6 +48,23 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, err
 	}
 	return store, nil
+}
+
+// private creates the database file readable only by its owner, or makes an
+// existing one so, with any journal files. SQLite gives the journal files
+// it creates the database file's permissions.
+func private(path string) error {
+	f, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0o600) //nolint:gosec // the configured database path
+	if err != nil {
+		return fmt.Errorf("create %s: %w", path, err)
+	}
+	_ = f.Close()
+	for _, name := range []string{path, path + "-wal", path + "-shm"} {
+		if err := os.Chmod(name, 0o600); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("make %s private: %w", name, err)
+		}
+	}
+	return nil
 }
 
 func (s *Store) migrate(ctx context.Context) error {

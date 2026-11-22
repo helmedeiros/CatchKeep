@@ -1,6 +1,7 @@
 package sqlite_test
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -69,5 +70,32 @@ func TestPing_ReportsHealthyDatabase(t *testing.T) {
 
 	if err := store.Ping(t.Context()); err != nil {
 		t.Fatalf("Ping: %v", err)
+	}
+}
+
+func TestOpen_KeepsTheDatabaseFilesToTheirOwner(t *testing.T) {
+	dir := t.TempDir()
+	older := filepath.Join(dir, "older.db")
+	if err := os.WriteFile(older, nil, 0o644); err != nil { //nolint:gosec // an install from before files were private
+		t.Fatal(err)
+	}
+	for _, path := range []string{filepath.Join(dir, "new.db"), older} {
+		store, err := sqlite.Open(t.Context(), path)
+		if err != nil {
+			t.Fatalf("Open %s: %v", path, err)
+		}
+		if _, err := store.DB().ExecContext(t.Context(), `CREATE TABLE IF NOT EXISTS probe (x)`); err != nil {
+			t.Fatal(err)
+		}
+		for _, f := range []string{path, path + "-wal", path + "-shm"} {
+			info, err := os.Stat(f)
+			if err != nil {
+				t.Fatalf("stat %s: %v", f, err)
+			}
+			if mode := info.Mode().Perm(); mode != 0o600 {
+				t.Errorf("%s mode = %o, want 600", filepath.Base(f), mode)
+			}
+		}
+		_ = store.Close()
 	}
 }
