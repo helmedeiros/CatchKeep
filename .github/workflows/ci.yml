@@ -53,6 +53,8 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run check
+      - name: Known vulnerabilities in dependencies
+        run: npm audit --omit=dev --audit-level=high
       - name: Lint commit messages
         if: github.event_name == 'pull_request'
         run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
@@ -86,6 +88,8 @@ jobs:
       - name: go.mod and go.sum are tidy
         run: go mod tidy -diff
       - run: make check
+      - name: Known vulnerabilities in dependencies and the Go standard library
+        run: make vuln
       - run: make build
 
   frontend:
@@ -106,6 +110,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci --ignore-scripts
       - run: npm run check
+      - name: Known vulnerabilities in dependencies
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run build
 
   smoke:
