@@ -1,3 +1,4 @@
+import { RecentTransfers } from "../history/RecentTransfers";
 import { type ReactNode, useState } from "react";
 import { Nav } from "../app/Nav";
 import { navigate, usePath } from "../app/router";
@@ -173,6 +174,7 @@ function More({
   return (
     <Place title="More">
       {hasPokemon && <ImportCard hasPokemon />}
+      {hasPokemon && <RecentTransfers />}
       <section aria-label="This computer" className={card}>
         <HostStatus />
         <OtherDevices />

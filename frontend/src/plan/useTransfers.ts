@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { unwrap } from "../api/errors";
 import { useApi } from "../api/useApi";
@@ -17,20 +17,21 @@ function requestId(): string {
 
 const pokemon = (n: number) => `${n} Pokémon`;
 
-/**
- * Marks Pokémon as transferred in the game, all or none, and offers to undo
- * it. With a plan revision the server refuses when the plan is out of date.
- */
-export function useConfirmTransfers() {
-  const api = useApi();
+function useRefresh() {
   const queryClient = useQueryClient();
-  const refresh = () =>
+  return () =>
     Promise.all(
       changedKeys.map((queryKey) =>
         queryClient.invalidateQueries({ queryKey }),
       ),
     );
-  const undo = useMutation({
+}
+
+/** Puts the Pokémon of a transfer back in CatchKeep. */
+export function useUndoTransfer() {
+  const api = useApi();
+  const refresh = useRefresh();
+  return useMutation({
     mutationFn: async (eventId: string) =>
       unwrap(
         await api.POST("/transfers/{eventId}/undo", {
@@ -43,6 +44,16 @@ export function useConfirmTransfers() {
     },
     onError: (e) => toast.error(e.message),
   });
+}
+
+/**
+ * Marks Pokémon as transferred in the game, all or none, and offers to undo
+ * it. With a plan revision the server refuses when the plan is out of date.
+ */
+export function useConfirmTransfers() {
+  const api = useApi();
+  const refresh = useRefresh();
+  const undo = useUndoTransfer();
   return useMutation({
     mutationFn: async (input: {
       pokemonIds: string[];
@@ -63,5 +74,14 @@ export function useConfirmTransfers() {
       if (input.planRevision === undefined) toast.error(e.message);
       return refresh();
     },
+  });
+}
+
+/** The latest transfers and undos, newest first. */
+export function useHistory() {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["history"],
+    queryFn: async () => unwrap(await api.GET("/history")).events,
   });
 }
