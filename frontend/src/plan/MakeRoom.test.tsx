@@ -32,7 +32,7 @@ async function ready(rows: string[]) {
   const setup = await inPlace(user, "Your storage and goals");
   await user.type(within(setup).getByLabelText("Storage slots"), "10");
   await user.click(within(setup).getByRole("checkbox", { name: "Collecting" }));
-  return { user, setup };
+  return { user, setup, api };
 }
 
 const pidgeys = [
@@ -115,5 +115,98 @@ describe("making room", () => {
     expect(pidgey).toHaveTextContent(
       "This search also finds 1 Pidgey you keep (CP 140, HP 31).",
     );
+  });
+
+  it("ticks off transfers and marks them in CatchKeep, with an undo", async () => {
+    const { user, setup } = await ready(pidgeys);
+    await user.type(
+      within(setup).getByLabelText(/Pokémon in the game now/),
+      "9",
+    );
+    await user.clear(within(setup).getByLabelText(/Keep storage under/));
+    await user.type(within(setup).getByLabelText(/Keep storage under/), "70");
+    await user.click(within(setup).getByRole("button", { name: "Save" }));
+
+    const room = await inPlace(user, "Make room");
+    await within(room).findByRole("heading", { name: "Transfer 2 Pokémon" });
+    expect(
+      within(room).queryByRole("button", { name: /^Mark .* as transferred$/ }),
+    ).not.toBeInTheDocument();
+    await user.click(
+      within(room).getByRole("checkbox", { name: "Transferred Pidgey CP 90" }),
+    );
+    await user.click(
+      within(room).getByRole("button", { name: "Mark 1 as transferred" }),
+    );
+
+    expect(
+      await screen.findByText("Marked 1 Pokémon as transferred."),
+    ).toBeInTheDocument();
+    expect(
+      await within(room).findByRole("heading", { name: "Transfer 1 Pokémon" }),
+    ).toBeInTheDocument();
+    expect(room).toHaveTextContent("8 of 10 slots used");
+
+    await user.click(screen.getByRole("button", { name: "Undo" }));
+    expect(
+      await screen.findByText("Put 1 Pokémon back in CatchKeep."),
+    ).toBeInTheDocument();
+    expect(
+      await within(room).findByRole("heading", { name: "Transfer 2 Pokémon" }),
+    ).toBeInTheDocument();
+    expect(
+      within(room).getByRole("checkbox", { name: "Transferred Pidgey CP 90" }),
+    ).not.toBeChecked();
+  });
+
+  it("ticks every suggestion at once", async () => {
+    const { user, setup } = await ready(pidgeys);
+    await user.click(within(setup).getByRole("button", { name: "Save" }));
+    const room = await inPlace(user, "Make room");
+    await user.click(
+      within(room).getByRole("radio", { name: /Free more slots/ }),
+    );
+    await user.type(within(room).getByLabelText("Slots to free"), "2");
+    await within(room).findByRole("heading", { name: "Transfer 2 Pokémon" });
+
+    await user.click(within(room).getByRole("button", { name: "Tick all 2" }));
+    await user.click(
+      within(room).getByRole("button", { name: "Mark 2 as transferred" }),
+    );
+    expect(
+      await screen.findByText("Marked 2 Pokémon as transferred."),
+    ).toBeInTheDocument();
+  });
+
+  it("asks to check again when the plan changed while ticking", async () => {
+    const { user, setup, api } = await ready(pidgeys);
+    await user.click(within(setup).getByRole("button", { name: "Save" }));
+    const room = await inPlace(user, "Make room");
+    await user.click(
+      within(room).getByRole("radio", { name: /Free more slots/ }),
+    );
+    await user.type(within(room).getByLabelText("Slots to free"), "2");
+    await within(room).findByRole("heading", { name: "Transfer 2 Pokémon" });
+    await user.click(
+      within(room).getByRole("checkbox", { name: "Transferred Pidgey CP 90" }),
+    );
+
+    api.changePlan();
+    await user.click(
+      within(room).getByRole("button", { name: "Mark 1 as transferred" }),
+    );
+    expect(await within(room).findByRole("alert")).toHaveTextContent(
+      "Your collection changed since this list was made",
+    );
+    expect(
+      within(room).getByRole("checkbox", { name: "Transferred Pidgey CP 90" }),
+    ).toBeChecked();
+    await user.click(
+      within(room).getByRole("button", { name: "Mark 1 as transferred" }),
+    );
+    expect(
+      await screen.findByText("Marked 1 Pokémon as transferred."),
+    ).toBeInTheDocument();
+    expect(within(room).queryByRole("alert")).not.toBeInTheDocument();
   });
 });

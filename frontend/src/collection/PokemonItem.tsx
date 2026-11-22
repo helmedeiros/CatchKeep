@@ -8,16 +8,20 @@ import type { Pokemon } from "./useCollection";
 export function PokemonItem({
   pokemon: p,
   children,
+  actions,
 }: {
   pokemon: Pokemon;
   children?: ReactNode;
+  /** More actions, before protection. */
+  actions?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const label = `${p.species} CP ${p.cp ?? "?"}`;
   return (
     <div className="flex flex-col gap-1.5">
       <PokemonRow pokemon={p}>{children}</PokemonRow>
-      <div className="flex items-center gap-2 pl-17">
+      <div className="flex flex-wrap items-center gap-2 pl-17">
+        {actions}
         <ProtectButton pokemon={p} />
         <button
           type="button"
