@@ -37,7 +37,7 @@ func TestGuard_RefusesRequestsAddressedToOtherNames(t *testing.T) {
 }
 
 func TestGuard_ADNSRebindingPageCannotResetAPIN(t *testing.T) {
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	id := decode[[]struct{ ID string }](t, api.do(http.MethodGet, "/api/v1/profiles", "").Body.Bytes())[0].ID
 	rec := raw(t, api, http.MethodPut, "/api/v1/profiles/"+id+"/pin", `{"pin":"0000"}`, func(r *http.Request) { r.Host = "attacker.example:8080" })
 	wantStatus(t, rec, http.StatusMisdirectedRequest)
@@ -78,7 +78,7 @@ func TestGuard_RefusesCrossSiteChanges(t *testing.T) {
 }
 
 func TestGuard_AllowsBodylessChangesAndCSVImportsFromTheApp(t *testing.T) {
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	rec := api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv")
 	wantStatus(t, rec, http.StatusCreated)
 	id := decode[preview](t, rec.Body.Bytes()).ID

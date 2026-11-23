@@ -6,7 +6,7 @@ import (
 )
 
 func TestKeep_SetupThenSummary(t *testing.T) {
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
 	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
 
@@ -48,7 +48,7 @@ func TestKeep_RejectsInvalidSetupAndAnonymousRequests(t *testing.T) {
 	wantStatus(t, newAPI(t).do(http.MethodGet, "/api/v1/keep-summary", ""), http.StatusUnauthorized)
 	wantStatus(t, newAPI(t).do(http.MethodPut, "/api/v1/setup", `{"capacity":350,"goals":["collecting"]}`), http.StatusUnauthorized)
 
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	for name, body := range map[string]string{
 		"no goals":      `{"capacity":350,"goals":[]}`,
 		"repeated goal": `{"capacity":350,"goals":["trading","trading"]}`,
@@ -64,7 +64,7 @@ func TestKeep_RejectsInvalidSetupAndAnonymousRequests(t *testing.T) {
 }
 
 func TestKeep_SpeciesRules(t *testing.T) {
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	rules := `{"rules":[{"species":"Mewtwo","minimum":1,"favorite":false}]}`
 	wantStatus(t, api.do(http.MethodGet, "/api/v1/species-rules", ""), http.StatusConflict)
 	wantStatus(t, api.do(http.MethodPut, "/api/v1/species-rules", rules), http.StatusConflict)
@@ -100,7 +100,7 @@ func TestKeep_SpeciesRules(t *testing.T) {
 
 func TestKeep_ProtectingAPokemon(t *testing.T) {
 	wantStatus(t, newAPI(t).do(http.MethodPut, "/api/v1/collection/X/protection", `{"protected":true}`), http.StatusUnauthorized)
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
 	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
 	wantStatus(t, api.do(http.MethodPut, "/api/v1/setup", `{"capacity":350,"goals":["collecting"]}`), http.StatusOK)
@@ -129,7 +129,7 @@ func TestKeep_CapacityBands(t *testing.T) {
 
 	got := decode[struct {
 		Bands []struct{ UpTo, Ordinary, Rare int }
-	}](t, signedIn(t, "Ash").do(http.MethodGet, "/api/v1/capacity-bands", "").Body.Bytes())
+	}](t, signedIn(t).do(http.MethodGet, "/api/v1/capacity-bands", "").Body.Bytes())
 	if len(got.Bands) != 5 || got.Bands[0].UpTo != 500 || got.Bands[0].Ordinary != 1 || got.Bands[0].Rare != 2 {
 		t.Fatalf("bands = %+v", got.Bands)
 	}
@@ -137,7 +137,7 @@ func TestKeep_CapacityBands(t *testing.T) {
 
 func TestKeep_CategoryRules(t *testing.T) {
 	wantStatus(t, newAPI(t).do(http.MethodGet, "/api/v1/category-rules", ""), http.StatusUnauthorized)
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	rules := `{"rules":[{"category":"legendary","minimum":1,"favorite":false}]}`
 	wantStatus(t, api.do(http.MethodGet, "/api/v1/category-rules", ""), http.StatusConflict)
 	wantStatus(t, api.do(http.MethodPut, "/api/v1/category-rules", rules), http.StatusConflict)
@@ -170,7 +170,7 @@ func TestKeep_CategoryRules(t *testing.T) {
 
 func TestCollection_MarksOnePokemonsFeatures(t *testing.T) {
 	wantStatus(t, newAPI(t).do(http.MethodPut, "/api/v1/collection/X/features", `{"shiny":true}`), http.StatusUnauthorized)
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
 	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
 	type pokemon struct {
@@ -191,7 +191,7 @@ func TestCollection_MarksOnePokemonsFeatures(t *testing.T) {
 
 func TestKeep_PlanSuggestsTransfersForATarget(t *testing.T) {
 	wantStatus(t, newAPI(t).do(http.MethodGet, "/api/v1/plan?kind=limit", ""), http.StatusUnauthorized)
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	wantStatus(t, api.do(http.MethodGet, "/api/v1/plan?kind=limit", ""), http.StatusConflict)
 
 	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
@@ -230,7 +230,7 @@ func TestKeep_PlanSuggestsTransfersForATarget(t *testing.T) {
 
 func TestTransfers_ConfirmUndoAndHistory(t *testing.T) {
 	wantStatus(t, newAPI(t).do(http.MethodGet, "/api/v1/history", ""), http.StatusUnauthorized)
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
 	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
 	type pokemon struct{ ID string }

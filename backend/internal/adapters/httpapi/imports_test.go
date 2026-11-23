@@ -9,14 +9,10 @@ import (
 	"testing"
 )
 
-func signedIn(t *testing.T, name string) *apiClient {
+// signedIn is a new server with Ash signed in.
+func signedIn(t *testing.T) *apiClient {
 	t.Helper()
-	api := newAPI(t)
-	created := api.do(http.MethodPost, "/api/v1/profiles", `{"displayName":"`+name+`","pin":"2468"}`)
-	var p struct{ ID string }
-	_ = json.Unmarshal(created.Body.Bytes(), &p)
-	wantStatus(t, api.do(http.MethodPost, "/api/v1/session", `{"profileId":"`+p.ID+`","pin":"2468"}`), http.StatusOK)
-	return api
+	return newAPI(t).signedInToo("Ash")
 }
 
 func fixture(t *testing.T) string {
@@ -59,7 +55,7 @@ func decode[T any](t *testing.T, body []byte) T {
 }
 
 func TestImport_StagePreviewCommitAndBrowse(t *testing.T) {
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 
 	staged := api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv")
 	wantStatus(t, staged, http.StatusCreated)
@@ -99,7 +95,7 @@ func TestImport_StagePreviewCommitAndBrowse(t *testing.T) {
 }
 
 func TestImport_ReimportHoldsBackPossibleDuplicates(t *testing.T) {
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	first := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
 	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+first.ID+"/commit", ""), http.StatusOK)
 
@@ -117,14 +113,14 @@ func TestImport_RequiresSignInAndStaysWithinTheProfile(t *testing.T) {
 	wantStatus(t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv"), http.StatusUnauthorized)
 	wantStatus(t, api.do(http.MethodGet, "/api/v1/collection", ""), http.StatusUnauthorized)
 
-	ash := signedIn(t, "Ash")
+	ash := signedIn(t)
 	p := decode[preview](t, ash.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
-	misty := signedIn(t, "Misty")
+	misty := ash.signedInToo("Misty")
 	wantStatus(t, misty.do(http.MethodGet, "/api/v1/imports/"+p.ID, ""), http.StatusNotFound)
 }
 
 func TestImport_RejectsUnrecognizedAndOversizedFiles(t *testing.T) {
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 
 	rec := api.doWithType(http.MethodPost, "/api/v1/imports", "just some notes\nnothing tabular\n", "text/csv")
 	wantStatus(t, rec, http.StatusUnprocessableEntity)
@@ -137,7 +133,7 @@ func TestImport_RejectsUnrecognizedAndOversizedFiles(t *testing.T) {
 }
 
 func TestImport_AnswersDecideWhetherHeldBackRowsUpdateOrAdd(t *testing.T) {
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	first := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
 	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+first.ID+"/commit", ""), http.StatusOK)
 	again := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
@@ -168,7 +164,7 @@ func TestImport_AnswersDecideWhetherHeldBackRowsUpdateOrAdd(t *testing.T) {
 }
 
 func TestImport_InvalidAnswersAreRejected(t *testing.T) {
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	first := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
 	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+first.ID+"/commit", ""), http.StatusOK)
 	again := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
@@ -189,7 +185,7 @@ func TestImport_InvalidAnswersAreRejected(t *testing.T) {
 }
 
 func TestCollection_ConfirmAbsentForOneSpecies(t *testing.T) {
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
 	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
 
@@ -219,7 +215,7 @@ func TestCollection_ConfirmAbsentForOneSpecies(t *testing.T) {
 func TestCollection_ConfirmAbsentRejectsInvalidRequests(t *testing.T) {
 	wantStatus(t, newAPI(t).do(http.MethodPost, "/api/v1/collection/confirmations", `{"species":"Pidgey","form":"Normal","features":["shiny"]}`), http.StatusUnauthorized)
 
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	for name, body := range map[string]string{
 		"no features":     `{"species":"Pidgey","form":"Normal","features":[]}`,
 		"unknown feature": `{"species":"Pidgey","form":"Normal","features":["cp"]}`,
@@ -235,7 +231,7 @@ func TestCollection_ConfirmAbsentRejectsInvalidRequests(t *testing.T) {
 }
 
 func TestCollection_ConfirmAbsentForTheWholeCollection(t *testing.T) {
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
 	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
 
@@ -247,7 +243,7 @@ func TestCollection_ConfirmAbsentForTheWholeCollection(t *testing.T) {
 }
 
 func TestImport_MapsTheColumnsOfAnUnfamiliarFile(t *testing.T) {
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	type mapped struct {
 		ID           string
 		Source       string
@@ -290,7 +286,7 @@ func TestImport_MapsTheColumnsOfAnUnfamiliarFile(t *testing.T) {
 }
 
 func TestImport_ListsCollectedPokemonMissingFromTheFile(t *testing.T) {
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	first := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
 	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+first.ID+"/commit", ""), http.StatusOK)
 	var without []string

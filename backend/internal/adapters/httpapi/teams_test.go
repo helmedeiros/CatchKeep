@@ -7,7 +7,7 @@ import (
 
 func TestTeams_CreateUpdateListAndDelete(t *testing.T) {
 	wantStatus(t, newAPI(t).do(http.MethodGet, "/api/v1/teams", ""), http.StatusUnauthorized)
-	api := signedIn(t, "Ash")
+	api := signedIn(t)
 	p := decode[preview](t, api.doWithType(http.MethodPost, "/api/v1/imports", fixture(t), "text/csv").Body.Bytes())
 	wantStatus(t, api.do(http.MethodPost, "/api/v1/imports/"+p.ID+"/commit", ""), http.StatusOK)
 	list := decode[struct{ Pokemon []struct{ ID string } }](t, api.do(http.MethodGet, "/api/v1/collection", "").Body.Bytes())
