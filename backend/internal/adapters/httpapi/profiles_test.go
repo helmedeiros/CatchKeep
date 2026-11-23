@@ -237,7 +237,7 @@ func TestProfiles_OnlyTheHostCreatesThem(t *testing.T) {
 }
 
 func TestProfiles_TheHostResetsAPIN(t *testing.T) {
-	device := signedIn(t, "Ash")
+	device := signedIn(t)
 	id := decode[[]struct{ ID string }](t, device.do(http.MethodGet, "/api/v1/profiles", "").Body.Bytes())[0].ID
 	device.onOtherDevice()
 	wantStatus(t, device.do(http.MethodPut, "/api/v1/profiles/"+id+"/pin", `{"pin":"1357"}`), http.StatusForbidden)
