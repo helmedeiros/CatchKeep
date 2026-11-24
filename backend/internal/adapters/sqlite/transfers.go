@@ -92,7 +92,7 @@ func (r *Transfers) Undo(ctx context.Context, trainer domain.TrainerID, eventID 
 		if err := insertEvent(ctx, tx, undo); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE transfer_events SET undone_by = ? WHERE id = ?`, undo.ID, original.ID); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE history_events SET undone_by = ? WHERE id = ?`, undo.ID, original.ID); err != nil {
 			return fmt.Errorf("mark undone: %w", err)
 		}
 		return nil
@@ -141,7 +141,7 @@ func countInGame(ctx context.Context, tx *sql.Tx, trainer domain.TrainerID, delt
 	return nil
 }
 
-const selectEvent = `SELECT id, trainer_id, kind, pokemon, COALESCE(request_id, ''), COALESCE(undoes, ''), COALESCE(undone_by, ''), created_at FROM transfer_events`
+const selectEvent = `SELECT id, trainer_id, kind, pokemon, COALESCE(request_id, ''), COALESCE(undoes, ''), COALESCE(undone_by, ''), created_at FROM history_events`
 
 type transferred struct {
 	ID      string `json:"id"`
@@ -160,7 +160,7 @@ func insertEvent(ctx context.Context, tx *sql.Tx, e domain.TransferEvent) error 
 		return fmt.Errorf("encode transfer: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO transfer_events (id, trainer_id, kind, pokemon, request_id, undoes, created_at) VALUES (?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?)`,
+		INSERT INTO history_events (id, trainer_id, kind, pokemon, request_id, undoes, created_at) VALUES (?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?)`,
 		e.ID, string(e.TrainerID), string(e.Kind), string(pokemon), e.RequestID, e.Undoes, formatTime(e.At)); err != nil {
 		return fmt.Errorf("insert transfer: %w", err)
 	}
