@@ -200,7 +200,7 @@ func encodeResolutions(b domain.ImportBatch) (string, error) {
 
 // Commit implements ports.ImportBatches in a single transaction. Updates
 // only touch the batch trainer's active Pokémon.
-func (c *Collection) Commit(ctx context.Context, b domain.ImportBatch, add []domain.Pokemon, update []domain.PokemonUpdate) (err error) {
+func (c *Collection) Commit(ctx context.Context, b domain.ImportBatch, add []domain.Pokemon, update []domain.PokemonUpdate, e domain.ImportEvent) (err error) {
 	tx, err := c.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
@@ -239,6 +239,9 @@ func (c *Collection) Commit(ctx context.Context, b domain.ImportBatch, add []dom
 		}
 	}
 	if err = addObservations(ctx, tx, insertObs, b.TrainerID, update, recordedAt); err != nil {
+		return err
+	}
+	if err = insertImportEvent(ctx, tx, e); err != nil {
 		return err
 	}
 	if err = bumpRevision(ctx, tx, b.TrainerID); err != nil {

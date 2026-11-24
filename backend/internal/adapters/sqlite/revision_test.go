@@ -42,7 +42,7 @@ func TestRevision_EveryMutationThatCanChangeRecommendationsBumpsIt(t *testing.T)
 		mutate func() error
 	}{
 		{"commit an import", func() error {
-			return coll.Commit(ctx, b, []domain.Pokemon{{ID: "P1", TrainerID: "ash", Observations: obs}}, nil)
+			return coll.Commit(ctx, b, []domain.Pokemon{{ID: "P1", TrainerID: "ash", Observations: obs}}, nil, imported(b))
 		}},
 		{"add observations", func() error {
 			return coll.AddObservations(ctx, "ash", []domain.PokemonUpdate{{PokemonID: "P1", Observations: obs}})

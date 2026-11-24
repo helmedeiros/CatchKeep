@@ -38,8 +38,9 @@ type ImportBatches interface {
 	// signature, or nil.
 	SavedMapping(ctx context.Context, trainer domain.TrainerID, signature string) (domain.ColumnMapping, error)
 	// Commit atomically stores the batch (now committed), adds the new
-	// Pokémon and adds observations to the trainer's existing ones.
-	Commit(ctx context.Context, b domain.ImportBatch, add []domain.Pokemon, update []domain.PokemonUpdate) error
+	// Pokémon, adds observations to the trainer's existing ones and records
+	// e in the history log.
+	Commit(ctx context.Context, b domain.ImportBatch, add []domain.Pokemon, update []domain.PokemonUpdate, e domain.ImportEvent) error
 	// DeleteStagedBefore removes every trainer's unfinished imports started
 	// before cutoff, and returns how many.
 	DeleteStagedBefore(ctx context.Context, cutoff time.Time) (int, error)

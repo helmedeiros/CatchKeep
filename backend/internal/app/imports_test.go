@@ -447,3 +447,17 @@ func TestStage_KeepsOnlyTheLatestUnfinishedImports(t *testing.T) {
 		t.Fatalf("second import: %v, want kept", err)
 	}
 }
+
+func TestCommit_RecordsTheImportInTheHistory(t *testing.T) {
+	f := newImportsFixture()
+	preview, _ := f.imports.Stage(t.Context(), ash, strings.NewReader("Pidgey,1,2,3,100\nRattata,4,5,6,200\n"))
+
+	if _, err := f.imports.Commit(t.Context(), ash, preview.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	events := f.store.ImportEvents(ash)
+	if len(events) != 1 || events[0].BatchID != preview.ID || len(events[0].Added) != 2 || events[0].At.IsZero() {
+		t.Fatalf("history = %+v, want one import adding 2", events)
+	}
+}
