@@ -184,6 +184,20 @@ func (s *SessionStore) DeleteForTrainer(_ context.Context, trainer domain.Traine
 	return nil
 }
 
+// DeleteIdleSince implements ports.Sessions.
+func (s *SessionStore) DeleteIdleSince(_ context.Context, cutoff time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for hash, session := range s.byHash {
+		if session.LastSeenAt.Before(cutoff) {
+			delete(s.byHash, hash)
+			n++
+		}
+	}
+	return n, nil
+}
+
 // SequentialTokens is a deterministic ports.Tokens.
 type SequentialTokens struct{ SequentialIDs }
 
@@ -219,6 +233,42 @@ func (s *CollectionStore) Save(_ context.Context, b domain.ImportBatch) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.batches[b.ID] = b
+	return nil
+}
+
+// DeleteStagedBefore implements ports.ImportBatches.
+func (s *CollectionStore) DeleteStagedBefore(_ context.Context, cutoff time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for id, b := range s.batches {
+		if b.Status == domain.ImportStaged && b.CreatedAt.Before(cutoff) {
+			delete(s.batches, id)
+			n++
+		}
+	}
+	return n, nil
+}
+
+// TrimStaged implements ports.ImportBatches.
+func (s *CollectionStore) TrimStaged(_ context.Context, trainer domain.TrainerID, keep int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var staged []domain.ImportBatch
+	for _, b := range s.batches {
+		if b.TrainerID == trainer && b.Status == domain.ImportStaged {
+			staged = append(staged, b)
+		}
+	}
+	slices.SortFunc(staged, func(a, b domain.ImportBatch) int {
+		if c := b.CreatedAt.Compare(a.CreatedAt); c != 0 {
+			return c
+		}
+		return strings.Compare(b.ID, a.ID)
+	})
+	for _, b := range staged[min(keep, len(staged)):] {
+		delete(s.batches, b.ID)
+	}
 	return nil
 }
 

@@ -46,6 +46,9 @@ type Sessions interface {
 	Delete(ctx context.Context, tokenHash string) error
 	// DeleteForTrainer ends every session of the trainer.
 	DeleteForTrainer(ctx context.Context, trainer domain.TrainerID) error
+	// DeleteIdleSince removes sessions last used before cutoff, and returns
+	// how many.
+	DeleteIdleSince(ctx context.Context, cutoff time.Time) (int, error)
 }
 
 // Tokens generates unguessable session tokens.

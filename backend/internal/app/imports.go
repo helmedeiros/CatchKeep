@@ -86,8 +86,8 @@ func (u *Imports) Stage(ctx context.Context, trainer domain.TrainerID, r io.Read
 		return ImportPreview{}, err
 	}
 	if batch.NeedsMapping() {
-		if err := u.batches.Save(ctx, batch); err != nil {
-			return ImportPreview{}, fmt.Errorf("save import: %w", err)
+		if err := u.stage(ctx, batch); err != nil {
+			return ImportPreview{}, err
 		}
 		return previewOf(batch), nil
 	}
@@ -95,10 +95,19 @@ func (u *Imports) Stage(ctx context.Context, trainer domain.TrainerID, r io.Read
 	if err != nil {
 		return ImportPreview{}, err
 	}
-	if err := u.batches.Save(ctx, withCounts(batch, review)); err != nil {
-		return ImportPreview{}, fmt.Errorf("save import: %w", err)
+	if err := u.stage(ctx, withCounts(batch, review)); err != nil {
+		return ImportPreview{}, err
 	}
 	return stagedPreview(batch, review), nil
+}
+
+// stage stores a new unfinished import and drops the trainer's oldest
+// beyond the most kept.
+func (u *Imports) stage(ctx context.Context, b domain.ImportBatch) error {
+	if err := u.batches.Save(ctx, b); err != nil {
+		return fmt.Errorf("save import: %w", err)
+	}
+	return u.batches.TrimStaged(ctx, b.TrainerID, domain.MaxStagedImports)
 }
 
 func (u *Imports) stageTable(ctx context.Context, batch *domain.ImportBatch, data []byte) error {

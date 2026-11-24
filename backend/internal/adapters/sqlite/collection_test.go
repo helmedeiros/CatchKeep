@@ -297,3 +297,68 @@ func TestImportBatches_KeepTheTableAndRememberMappingsPerTrainer(t *testing.T) {
 		t.Fatalf("a newer mapping replaces the saved one: %v", m)
 	}
 }
+
+func batchAt(id string, trainer domain.TrainerID, status domain.ImportStatus, created time.Time) domain.ImportBatch {
+	b := stagedBatch()
+	b.ID, b.TrainerID, b.Status, b.CreatedAt = id, trainer, status, created
+	return b
+}
+
+func saveBatches(t *testing.T, coll *sqlite.Collection, batches ...domain.ImportBatch) {
+	t.Helper()
+	for _, b := range batches {
+		if err := coll.Save(t.Context(), b); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestImportBatches_DeleteStagedBeforeLeavesCommittedAndRecentOnes(t *testing.T) {
+	store, _ := openTemp(t)
+	withTrainers(t, store, "ash")
+	coll := sqlite.NewCollection(store)
+	saveBatches(t, coll,
+		batchAt("old", "ash", domain.ImportStaged, at),
+		batchAt("done", "ash", domain.ImportCommitted, at),
+		batchAt("recent", "ash", domain.ImportStaged, at.Add(24*time.Hour+time.Millisecond)))
+
+	n, err := coll.DeleteStagedBefore(t.Context(), at.Add(24*time.Hour))
+	if err != nil || n != 1 {
+		t.Fatalf("DeleteStagedBefore = %d, %v; want 1", n, err)
+	}
+	if _, err := coll.Get(t.Context(), "ash", "old"); !errors.Is(err, domain.ErrImportNotFound) {
+		t.Fatalf("old staged import: err = %v, want removed", err)
+	}
+	for _, id := range []string{"done", "recent"} {
+		if _, err := coll.Get(t.Context(), "ash", id); err != nil {
+			t.Fatalf("%s: %v, want kept", id, err)
+		}
+	}
+}
+
+func TestImportBatches_TrimStagedKeepsTheTrainersNewest(t *testing.T) {
+	store, _ := openTemp(t)
+	withTrainers(t, store, "ash", "misty")
+	coll := sqlite.NewCollection(store)
+	saveBatches(t, coll,
+		batchAt("first", "ash", domain.ImportStaged, at.Add(500*time.Millisecond)),
+		batchAt("second", "ash", domain.ImportStaged, at.Add(time.Second)),
+		batchAt("third", "ash", domain.ImportStaged, at.Add(2*time.Second)),
+		batchAt("done", "ash", domain.ImportCommitted, at),
+		batchAt("hers", "misty", domain.ImportStaged, at))
+
+	if err := coll.TrimStaged(t.Context(), "ash", 2); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := coll.Get(t.Context(), "ash", "first"); !errors.Is(err, domain.ErrImportNotFound) {
+		t.Fatalf("oldest staged import: err = %v, want removed", err)
+	}
+	for _, b := range []struct {
+		trainer domain.TrainerID
+		id      string
+	}{{"ash", "second"}, {"ash", "third"}, {"ash", "done"}, {"misty", "hers"}} {
+		if _, err := coll.Get(t.Context(), b.trainer, b.id); err != nil {
+			t.Fatalf("%s: %v, want kept", b.id, err)
+		}
+	}
+}

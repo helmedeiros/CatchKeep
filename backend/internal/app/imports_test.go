@@ -428,3 +428,22 @@ func TestImports_ListCollectedPokemonMissingFromTheFile(t *testing.T) {
 		t.Fatalf("a committed import read later lists %v; the offer is made once", later.Missing)
 	}
 }
+
+func TestStage_KeepsOnlyTheLatestUnfinishedImports(t *testing.T) {
+	f := newImportsFixture()
+	var ids []string
+	for range domain.MaxStagedImports + 1 {
+		p, err := f.imports.Stage(t.Context(), ash, strings.NewReader("Pidgey,1,2,3,100\n"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, p.ID)
+	}
+
+	if _, err := f.imports.Get(t.Context(), ash, ids[0]); !errors.Is(err, domain.ErrImportNotFound) {
+		t.Fatalf("oldest unfinished import: err = %v, want removed", err)
+	}
+	if _, err := f.imports.Get(t.Context(), ash, ids[1]); err != nil {
+		t.Fatalf("second import: %v, want kept", err)
+	}
+}

@@ -7,12 +7,14 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 
@@ -110,6 +112,13 @@ func serve(ctx context.Context, cfg serveConfig, ready func(addr string)) error 
 		return fmt.Errorf("listen: %w", err)
 	}
 
+	tidyCtx, stopTidy := context.WithCancel(ctx)
+	var tidy sync.WaitGroup
+	tidy.Go(func() {
+		keepTidy(tidyCtx, app.NewHousekeeping(sqlite.NewCollection(store), sqlite.NewSessions(store), ids.SystemClock{}))
+	})
+	defer func() { stopTidy(); tidy.Wait() }()
+
 	srv := newServer(ctx, newRootHandler(cfg, store, ln.Addr()))
 
 	errs := make(chan error, 1)
@@ -131,6 +140,28 @@ func serve(ctx context.Context, cfg serveConfig, ready func(addr string)) error 
 		return fmt.Errorf("serve: %w", err)
 	}
 	return nil
+}
+
+// sweepEvery is how often old imports and idle sessions are cleared out.
+const sweepEvery = 24 * time.Hour
+
+// keepTidy sweeps at start-up and then daily until ctx is canceled.
+func keepTidy(ctx context.Context, h *app.Housekeeping) {
+	ticker := time.NewTicker(sweepEvery)
+	defer ticker.Stop()
+	for {
+		swept, err := h.Sweep(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "clean-up failed", "error", err)
+		} else if swept != (app.Swept{}) {
+			slog.InfoContext(ctx, "cleaned up", "imports", swept.Imports, "sessions", swept.Sessions)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 // newServer serves h with the connection limits; requests inherit ctx.

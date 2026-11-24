@@ -87,3 +87,14 @@ func (r *Sessions) Delete(ctx context.Context, tokenHash string) error {
 	}
 	return nil
 }
+
+// DeleteIdleSince removes sessions last used before cutoff, and returns
+// how many.
+func (r *Sessions) DeleteIdleSince(ctx context.Context, cutoff time.Time) (int, error) {
+	res, err := r.db.ExecContext(ctx, `DELETE FROM sessions WHERE julianday(last_seen_at) < julianday(?)`, formatTime(cutoff))
+	if err != nil {
+		return 0, fmt.Errorf("delete idle sessions: %w", err)
+	}
+	n, err := res.RowsAffected()
+	return int(n), err
+}

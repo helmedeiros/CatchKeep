@@ -381,3 +381,28 @@ func (c *Collection) Revision(ctx context.Context, trainer domain.TrainerID) (in
 	}
 	return rev, nil
 }
+
+// DeleteStagedBefore removes every trainer's unfinished imports started
+// before cutoff, and returns how many.
+func (c *Collection) DeleteStagedBefore(ctx context.Context, cutoff time.Time) (int, error) {
+	res, err := c.db.ExecContext(ctx,
+		`DELETE FROM import_batches WHERE status = 'staged' AND julianday(created_at) < julianday(?)`, formatTime(cutoff))
+	if err != nil {
+		return 0, fmt.Errorf("delete old imports: %w", err)
+	}
+	n, err := res.RowsAffected()
+	return int(n), err
+}
+
+// TrimStaged keeps only the trainer's keep newest unfinished imports.
+func (c *Collection) TrimStaged(ctx context.Context, trainer domain.TrainerID, keep int) error {
+	_, err := c.db.ExecContext(ctx, `
+		DELETE FROM import_batches WHERE trainer_id = ? AND status = 'staged' AND id NOT IN (
+			SELECT id FROM import_batches WHERE trainer_id = ? AND status = 'staged'
+			ORDER BY julianday(created_at) DESC, id DESC LIMIT ?)`,
+		string(trainer), string(trainer), keep)
+	if err != nil {
+		return fmt.Errorf("trim imports: %w", err)
+	}
+	return nil
+}
