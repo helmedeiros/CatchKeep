@@ -95,9 +95,7 @@ func NewTransfer(id string, trainer TrainerID, pokemon []Pokemon, ids []PokemonI
 			gone = append(gone, pid)
 			continue
 		}
-		cur := p.Current()
-		cp, hasCP := cur.Int(FieldCP)
-		e.Pokemon = append(e.Pokemon, Transferred{ID: pid, Species: cur.String(FieldSpecies), CP: cp, HasCP: hasCP})
+		e.Pokemon = append(e.Pokemon, described(pid, p.Current()))
 	}
 	if len(gone) > 0 {
 		return TransferEvent{}, &NotActiveError{IDs: gone}

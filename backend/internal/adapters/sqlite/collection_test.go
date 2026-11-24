@@ -2,6 +2,7 @@ package sqlite_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +19,11 @@ func withTrainers(t *testing.T, store *sqlite.Store, ids ...domain.TrainerID) {
 			t.Fatal(err)
 		}
 	}
+}
+
+// imported is an empty history entry for committing b.
+func imported(b domain.ImportBatch) domain.ImportEvent {
+	return domain.ImportEvent{ID: "I-" + b.ID, TrainerID: b.TrainerID, BatchID: b.ID, At: at}
 }
 
 func stagedBatch() domain.ImportBatch {
@@ -68,7 +74,7 @@ func TestImportBatches_CommitAddsPokemonWithObservations(t *testing.T) {
 	b.Status, b.CommittedAt = domain.ImportCommitted, at.Add(time.Minute)
 	pidgey := domain.Pokemon{ID: "P1", TrainerID: "ash", Observations: b.Parsed.Rows[0].Observations}
 
-	if err := coll.Commit(t.Context(), b, []domain.Pokemon{pidgey}, nil); err != nil {
+	if err := coll.Commit(t.Context(), b, []domain.Pokemon{pidgey}, nil, imported(b)); err != nil {
 		t.Fatalf("Commit: %v", err)
 	}
 
@@ -98,7 +104,7 @@ func TestImportBatches_CommitIsAllOrNothing(t *testing.T) {
 	b.Status = domain.ImportCommitted
 	dup := domain.Pokemon{ID: "P1", TrainerID: "ash"}
 
-	if err := coll.Commit(t.Context(), b, []domain.Pokemon{dup, dup}, nil); err == nil {
+	if err := coll.Commit(t.Context(), b, []domain.Pokemon{dup, dup}, nil, imported(b)); err == nil {
 		t.Fatal("Commit with duplicate ids succeeded")
 	}
 
@@ -140,7 +146,7 @@ func TestImportBatches_CommitAddsObservationsToExistingPokemon(t *testing.T) {
 	}
 	first.Status, first.CommittedAt = domain.ImportCommitted, at
 	pidgey := domain.Pokemon{ID: "P1", TrainerID: "ash", Observations: first.Parsed.Rows[0].Observations}
-	if err := coll.Commit(t.Context(), first, []domain.Pokemon{pidgey}, nil); err != nil {
+	if err := coll.Commit(t.Context(), first, []domain.Pokemon{pidgey}, nil, imported(first)); err != nil {
 		t.Fatal(err)
 	}
 	second := stagedBatch()
@@ -151,7 +157,7 @@ func TestImportBatches_CommitAddsObservationsToExistingPokemon(t *testing.T) {
 	second.Status, second.CommittedAt, second.UpdatedCount = domain.ImportCommitted, at.Add(time.Hour), 1
 	later := []domain.Observation{{Field: domain.FieldCP, Value: "150", Source: domain.SourceCSV, SourceRef: "poke-genie line 2", ObservedAt: at.Add(time.Hour)}}
 
-	if err := coll.Commit(t.Context(), second, nil, []domain.PokemonUpdate{{PokemonID: "P1", Observations: later}}); err != nil {
+	if err := coll.Commit(t.Context(), second, nil, []domain.PokemonUpdate{{PokemonID: "P1", Observations: later}}, imported(second)); err != nil {
 		t.Fatalf("Commit: %v", err)
 	}
 
@@ -173,7 +179,7 @@ func TestImportBatches_CommitRefusesToUpdateAnotherTrainersPokemon(t *testing.T)
 		t.Fatal(err)
 	}
 	mine.Status = domain.ImportCommitted
-	if err := coll.Commit(t.Context(), mine, []domain.Pokemon{{ID: "P1", TrainerID: "ash"}}, nil); err != nil {
+	if err := coll.Commit(t.Context(), mine, []domain.Pokemon{{ID: "P1", TrainerID: "ash"}}, nil, imported(mine)); err != nil {
 		t.Fatal(err)
 	}
 	theirs := stagedBatch()
@@ -184,7 +190,7 @@ func TestImportBatches_CommitRefusesToUpdateAnotherTrainersPokemon(t *testing.T)
 	theirs.Status = domain.ImportCommitted
 
 	update := []domain.PokemonUpdate{{PokemonID: "P1", Observations: []domain.Observation{{Field: domain.FieldCP, Value: "1", Source: domain.SourceCSV, ObservedAt: at}}}}
-	if err := coll.Commit(t.Context(), theirs, nil, update); err == nil {
+	if err := coll.Commit(t.Context(), theirs, nil, update, imported(theirs)); err == nil {
 		t.Fatal("updated another trainer's Pokémon")
 	}
 
@@ -202,7 +208,7 @@ func TestCollection_AddObservationsIsAllOrNothingAndScopedToTheTrainer(t *testin
 		t.Fatal(err)
 	}
 	b.Status = domain.ImportCommitted
-	if err := coll.Commit(t.Context(), b, []domain.Pokemon{{ID: "P1", TrainerID: "ash", Observations: b.Parsed.Rows[0].Observations}}, nil); err != nil {
+	if err := coll.Commit(t.Context(), b, []domain.Pokemon{{ID: "P1", TrainerID: "ash", Observations: b.Parsed.Rows[0].Observations}}, nil, imported(b)); err != nil {
 		t.Fatal(err)
 	}
 	notShiny := []domain.Observation{{Field: domain.FieldShiny, Value: "false", Source: domain.SourceManual, SourceRef: "bulk confirmation", ObservedAt: at}}
@@ -236,7 +242,7 @@ func TestCollection_SetProtectedIsScopedToTheTrainer(t *testing.T) {
 		t.Fatal(err)
 	}
 	b.Status = domain.ImportCommitted
-	if err := coll.Commit(t.Context(), b, []domain.Pokemon{{ID: "P1", TrainerID: "ash", Observations: b.Parsed.Rows[0].Observations}}, nil); err != nil {
+	if err := coll.Commit(t.Context(), b, []domain.Pokemon{{ID: "P1", TrainerID: "ash", Observations: b.Parsed.Rows[0].Observations}}, nil, imported(b)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -360,5 +366,33 @@ func TestImportBatches_TrimStagedKeepsTheTrainersNewest(t *testing.T) {
 		if _, err := coll.Get(t.Context(), b.trainer, b.id); err != nil {
 			t.Fatalf("%s: %v, want kept", b.id, err)
 		}
+	}
+}
+
+func TestImportBatches_CommitRecordsTheImportInTheHistory(t *testing.T) {
+	store, _ := openTemp(t)
+	withTrainers(t, store, "ash")
+	coll := sqlite.NewCollection(store)
+	b := stagedBatch()
+	saveBatches(t, coll, b)
+	e := imported(b)
+	e.Added = []domain.Transferred{{ID: "P1", Species: "Pidgey", CP: 120, HasCP: true}}
+	e.Changed = []domain.ChangedPokemon{{Transferred: domain.Transferred{ID: "P0", Species: "Zubat"}, Fields: []domain.Field{domain.FieldCP}}}
+	b.Status, b.CommittedAt = domain.ImportCommitted, at
+
+	if err := coll.Commit(t.Context(), b, []domain.Pokemon{{ID: "P1", TrainerID: "ash"}}, nil, e); err != nil {
+		t.Fatal(err)
+	}
+
+	var kind, pokemon, detail string
+	if err := store.DB().QueryRowContext(t.Context(), `SELECT kind, pokemon, detail FROM history_events WHERE id = ?`, e.ID).Scan(&kind, &pokemon, &detail); err != nil {
+		t.Fatal(err)
+	}
+	if kind != "import" || !strings.Contains(pokemon, `"Pidgey"`) || !strings.Contains(detail, `"batchId":"B1"`) || !strings.Contains(detail, `"fields":["cp"]`) {
+		t.Fatalf("history row = %s %s %s", kind, pokemon, detail)
+	}
+	transfers, err := sqlite.NewTransfers(store).ListTransfers(t.Context(), "ash", 10)
+	if err != nil || len(transfers) != 0 {
+		t.Fatalf("transfers = %+v, %v; an import is not a transfer", transfers, err)
 	}
 }

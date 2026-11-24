@@ -221,17 +221,19 @@ func (u *Imports) Commit(ctx context.Context, trainer domain.TrainerID, id strin
 	if err := ready(batch); err != nil {
 		return ImportPreview{}, err
 	}
-	review, err := u.review(ctx, batch)
+	existing, err := u.collection.ListPokemon(ctx, trainer)
 	if err != nil {
 		return ImportPreview{}, err
 	}
+	review := domain.ReviewImport(existing, batch.Parsed.Rows, batch.Resolutions)
 	add := make([]domain.Pokemon, 0, len(review.Add))
 	for _, row := range review.Add {
 		add = append(add, domain.Pokemon{ID: domain.PokemonID(u.ids.NewID()), TrainerID: trainer, Observations: row.Observations})
 	}
 	batch = withCounts(batch, review)
 	batch.Status, batch.CommittedAt = domain.ImportCommitted, u.clock.Now()
-	if err := u.batches.Commit(ctx, batch, add, review.Update); err != nil {
+	event := domain.NewImportEvent(u.ids.NewID(), trainer, batch.ID, existing, add, review.Update, batch.CommittedAt)
+	if err := u.batches.Commit(ctx, batch, add, review.Update, event); err != nil {
 		return ImportPreview{}, fmt.Errorf("commit import: %w", err)
 	}
 	p := previewOf(batch)

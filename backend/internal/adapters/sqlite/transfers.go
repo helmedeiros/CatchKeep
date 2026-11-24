@@ -68,7 +68,7 @@ func (r *Transfers) Record(ctx context.Context, e domain.TransferEvent, expected
 // Undo implements ports.Transfers.
 func (r *Transfers) Undo(ctx context.Context, trainer domain.TrainerID, eventID string, undo domain.TransferEvent) (domain.TransferEvent, error) {
 	err := inTx(ctx, r.db, trainer, func(tx *sql.Tx) error {
-		original, err := scanEvent(tx.QueryRowContext(ctx, selectEvent+` WHERE id = ? AND trainer_id = ?`, eventID, string(trainer)))
+		original, err := scanEvent(tx.QueryRowContext(ctx, selectEvent+` WHERE id = ? AND trainer_id = ?`+transferKinds, eventID, string(trainer)))
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
 			return domain.ErrTransferNotFound
@@ -105,7 +105,7 @@ func (r *Transfers) Undo(ctx context.Context, trainer domain.TrainerID, eventID 
 
 // ListTransfers implements ports.Transfers.
 func (r *Transfers) ListTransfers(ctx context.Context, trainer domain.TrainerID, limit int) ([]domain.TransferEvent, error) {
-	rows, err := r.db.QueryContext(ctx, selectEvent+` WHERE trainer_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?`, string(trainer), limit)
+	rows, err := r.db.QueryContext(ctx, selectEvent+` WHERE trainer_id = ?`+transferKinds+` ORDER BY created_at DESC, rowid DESC LIMIT ?`, string(trainer), limit)
 	if err != nil {
 		return nil, fmt.Errorf("list transfers: %w", err)
 	}
@@ -143,6 +143,9 @@ func countInGame(ctx context.Context, tx *sql.Tx, trainer domain.TrainerID, delt
 
 const selectEvent = `SELECT id, trainer_id, kind, pokemon, COALESCE(request_id, ''), COALESCE(undoes, ''), COALESCE(undone_by, ''), created_at FROM history_events`
 
+// transferKinds keeps the other kinds of history out of transfer lists.
+const transferKinds = ` AND kind IN ('single', 'bulk', 'undo')`
+
 type transferred struct {
 	ID      string `json:"id"`
 	Species string `json:"species"`
@@ -150,12 +153,16 @@ type transferred struct {
 	HasCP   bool   `json:"hasCp,omitempty"`
 }
 
-func insertEvent(ctx context.Context, tx *sql.Tx, e domain.TransferEvent) error {
-	list := make([]transferred, len(e.Pokemon))
-	for i, p := range e.Pokemon {
-		list[i] = transferred{ID: string(p.ID), Species: p.Species, CP: p.CP, HasCP: p.HasCP}
+func toTransferred(list []domain.Transferred) []transferred {
+	out := make([]transferred, len(list))
+	for i, p := range list {
+		out[i] = transferred{ID: string(p.ID), Species: p.Species, CP: p.CP, HasCP: p.HasCP}
 	}
-	pokemon, err := json.Marshal(list)
+	return out
+}
+
+func insertEvent(ctx context.Context, tx *sql.Tx, e domain.TransferEvent) error {
+	pokemon, err := json.Marshal(toTransferred(e.Pokemon))
 	if err != nil {
 		return fmt.Errorf("encode transfer: %w", err)
 	}
@@ -189,4 +196,34 @@ func scanEvent(s scanner) (domain.TransferEvent, error) {
 	}
 	e.TrainerID, e.Kind, e.At = domain.TrainerID(trainer), domain.TransferKind(kind), at
 	return e, nil
+}
+
+type importDetail struct {
+	BatchID string    `json:"batchId"`
+	Changed []changed `json:"changed"`
+}
+
+type changed struct {
+	transferred
+	Fields []domain.Field `json:"fields"`
+}
+
+func insertImportEvent(ctx context.Context, tx *sql.Tx, e domain.ImportEvent) error {
+	added, err := json.Marshal(toTransferred(e.Added))
+	if err != nil {
+		return fmt.Errorf("encode import history: %w", err)
+	}
+	d := importDetail{BatchID: e.BatchID, Changed: []changed{}}
+	for _, c := range e.Changed {
+		d.Changed = append(d.Changed, changed{transferred: toTransferred([]domain.Transferred{c.Transferred})[0], Fields: c.Fields})
+	}
+	detail, err := json.Marshal(d)
+	if err != nil {
+		return fmt.Errorf("encode import history: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO history_events (id, trainer_id, kind, pokemon, detail, created_at) VALUES (?, ?, 'import', ?, ?, ?)`,
+		e.ID, string(e.TrainerID), string(added), string(detail), formatTime(e.At)); err != nil {
+		return fmt.Errorf("insert import history: %w", err)
+	}
+	return nil
 }

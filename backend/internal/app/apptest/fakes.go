@@ -216,6 +216,7 @@ type CollectionStore struct {
 	// gone holds transferred Pokémon; events the transfer history.
 	gone      map[domain.PokemonID]domain.Pokemon
 	events    []domain.TransferEvent
+	imports   []domain.ImportEvent
 	revisions map[domain.TrainerID]int64
 }
 
@@ -310,7 +311,7 @@ func (s *CollectionStore) SavedMapping(_ context.Context, trainer domain.Trainer
 }
 
 // Commit implements ports.ImportBatches.
-func (s *CollectionStore) Commit(_ context.Context, b domain.ImportBatch, add []domain.Pokemon, update []domain.PokemonUpdate) error {
+func (s *CollectionStore) Commit(_ context.Context, b domain.ImportBatch, add []domain.Pokemon, update []domain.PokemonUpdate, e domain.ImportEvent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.addObservations(b.TrainerID, update); err != nil {
@@ -318,7 +319,21 @@ func (s *CollectionStore) Commit(_ context.Context, b domain.ImportBatch, add []
 	}
 	s.batches[b.ID] = b
 	s.pokemon[b.TrainerID] = append(s.pokemon[b.TrainerID], add...)
+	s.imports = append(s.imports, e)
 	return nil
+}
+
+// ImportEvents returns the import history recorded for trainer.
+func (s *CollectionStore) ImportEvents(trainer domain.TrainerID) []domain.ImportEvent {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.ImportEvent
+	for _, e := range s.imports {
+		if e.TrainerID == trainer {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 // AddObservations implements ports.CollectionWriter.

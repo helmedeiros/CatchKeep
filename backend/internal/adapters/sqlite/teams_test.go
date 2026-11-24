@@ -19,7 +19,7 @@ func TestTeams_SaveListReplaceAndDelete(t *testing.T) {
 	}
 	b.Status = domain.ImportCommitted
 	obs := b.Parsed.Rows[0].Observations
-	if err := coll.Commit(t.Context(), b, []domain.Pokemon{{ID: "P1", TrainerID: "ash", Observations: obs}, {ID: "P2", TrainerID: "ash", Observations: obs}}, nil); err != nil {
+	if err := coll.Commit(t.Context(), b, []domain.Pokemon{{ID: "P1", TrainerID: "ash", Observations: obs}, {ID: "P2", TrainerID: "ash", Observations: obs}}, nil, imported(b)); err != nil {
 		t.Fatal(err)
 	}
 	teams := sqlite.NewTeams(store)

@@ -23,7 +23,7 @@ func withPokemon(t *testing.T, store *sqlite.Store, trainer domain.TrainerID, id
 	for _, id := range ids {
 		add = append(add, domain.Pokemon{ID: id, TrainerID: trainer, Observations: b.Parsed.Rows[0].Observations})
 	}
-	if err := coll.Commit(t.Context(), b, add, nil); err != nil {
+	if err := coll.Commit(t.Context(), b, add, nil, imported(b)); err != nil {
 		t.Fatal(err)
 	}
 }
