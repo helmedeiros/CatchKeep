@@ -1,7 +1,9 @@
 package sqlite_test
 
 import (
+	"database/sql"
 	"errors"
+	"path/filepath"
 	"testing"
 
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/sqlite"
@@ -129,5 +131,44 @@ func TestTransfers_KeepTheInGameCountCurrent(t *testing.T) {
 	}
 	if n := inGame("misty"); n != 0 {
 		t.Fatalf("misty's unknown count became %d", n)
+	}
+}
+
+func TestTransfers_SurviveTheMoveToTheHistoryLog(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "catchkeep.db")
+	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sqlite.MigrateTo(t.Context(), db, 14); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`INSERT INTO trainers (id, display_name, pin_hash, created_at) VALUES ('ash', 'Ash', 'h', '2026-11-01T10:00:00Z')`,
+		`INSERT INTO transfer_events (id, trainer_id, kind, pokemon, request_id, undone_by, created_at)
+			VALUES ('E1', 'ash', 'bulk', '[{"id":"P1","species":"Pidgey","cp":120,"hasCp":true}]', 'r1', 'E2', '2026-11-01T10:00:00Z')`,
+		`INSERT INTO transfer_events (id, trainer_id, kind, pokemon, undoes, created_at)
+			VALUES ('E2', 'ash', 'undo', '[{"id":"P1","species":"Pidgey","cp":120,"hasCp":true}]', 'E1', '2026-11-01T11:00:00Z')`,
+	} {
+		if _, err := db.ExecContext(t.Context(), q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = db.Close()
+
+	store, err := sqlite.Open(t.Context(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	events, err := sqlite.NewTransfers(store).ListTransfers(t.Context(), "ash", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 2 || events[0].Undoes != "E1" || events[1].UndoneBy != "E2" || events[1].Pokemon[0].Species != "Pidgey" {
+		t.Fatalf("events = %+v", events)
+	}
+	if _, ok, _ := sqlite.NewTransfers(store).FindByRequest(t.Context(), "ash", "r1"); !ok {
+		t.Fatal("the request id no longer finds its transfer")
 	}
 }
