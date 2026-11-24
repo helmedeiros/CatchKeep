@@ -31,6 +31,8 @@ CatchKeep takes both off your plate. It reads your Poke Genie export, keeps the 
 - **A rule inspector.** For each species: the default your storage sets, your own rules, protection, and the minimum that won.
 - **Protection and teams.** Protect any single Pokémon and it is always kept, even over a stronger copy. Group Pokémon into named teams (a raid team, your buddies) and every member is always kept.
 - **Make room.** Tell CatchKeep how many Pokémon the game shows you have and the share of storage you want to stay under (80% to start). It shows how full you are and suggests exactly what to transfer to get under your limit, free more slots before an event like Community Day, or free a share of storage: weakest first, always keeping your rules, and saying how many better copies stay.
+- **A transfer checklist.** Copy a search for the game that finds exactly the suggested Pokémon, tick them off as you transfer, and mark them as transferred in one go. Made a mistake? Undo puts them back. Recent transfers stay listed, and any Pokémon can also be marked transferred on its own.
+- **Spot what you already transferred.** When a new export no longer has some of your Pokémon, CatchKeep lists them so you can mark them as transferred, or keep them if the export was only partial.
 
 ## Run it on your network
 
@@ -47,9 +49,18 @@ CatchKeep runs on one computer. Phones, tablets and other computers connected to
 
 Keep the computer on and awake while others use it. On a Mac, tick **Start CatchKeep when I log in to this computer** on that computer and it starts by itself from then on, with the same settings. The connection is not encrypted (plain HTTP), so use it on a network you trust.
 
+### Keeping it safe
+
+- **Anyone on the network can see the trainer names** on the sign-in page. Collections stay behind each trainer's PIN.
+- **Use a network you trust.** The connection is not encrypted, so someone else on the same network could in principle read what is sent. A home or office Wi-Fi with a password is fine; public Wi-Fi is not.
+- **Only the computer running CatchKeep can add trainers and reset forgotten PINs.** Other devices can only sign in.
+- **Wrong PINs are limited.** After 5 wrong PINs a profile waits a minute, longer each time. A device that keeps guessing across profiles is paused for 15 minutes.
+- **Sign-ins last 30 days** without use, then you enter your PIN again. Unfinished imports are cleared after a week.
+- **Your data stays on that computer**, in a file only your account on it can read. Nothing is sent anywhere else.
+
 ## Coming next
 
-- **A transfer checklist.** Copy a search for the game that finds exactly the suggested Pokémon, tick them off as you transfer, and undo a mistake.
+- **Backups.** Save everything to a file and restore it, plus automatic daily copies on the computer running CatchKeep.
 - **History and insights.** Every addition and transfer is recorded, so you can see how fast storage fills, how much an event brings in, and which species you always end up transferring.
 - **Teams built for you, later.** Today you create teams yourself. The plan is for CatchKeep to also suggest teams on its own (raid teams for each type, GO Battle League teams, Max Battles) from your best Pokémon and their moves, and to keep those safe from transfer.
 
