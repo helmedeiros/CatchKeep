@@ -41,6 +41,13 @@ var (
 // ImportStatus is the lifecycle state of an import.
 type ImportStatus string
 
+// Unfinished imports hold a whole file, so they do not pile up: each trainer
+// keeps the latest few, for a week.
+const (
+	StagedImportLifetime = 7 * 24 * time.Hour
+	MaxStagedImports     = 5
+)
+
 // Import states.
 const (
 	ImportStaged    ImportStatus = "staged"

@@ -83,3 +83,28 @@ func TestSessions_DeleteForTrainerAndSetPINHash(t *testing.T) {
 		t.Fatalf("unknown trainer: err = %v", err)
 	}
 }
+
+func TestSessions_DeleteIdleSince(t *testing.T) {
+	store, _ := openTemp(t)
+	if err := sqlite.NewTrainers(store).Create(t.Context(), domain.Trainer{ID: "T1", DisplayName: "Ash", PINHash: "h"}); err != nil {
+		t.Fatal(err)
+	}
+	sessions := sqlite.NewSessions(store)
+	at := time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)
+	for hash, seen := range map[string]time.Time{"idle": at, "used": at.Add(time.Hour + time.Millisecond)} {
+		if err := sessions.Create(t.Context(), domain.Session{TokenHash: hash, TrainerID: "T1", CreatedAt: at, LastSeenAt: seen}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	n, err := sessions.DeleteIdleSince(t.Context(), at.Add(time.Hour))
+	if err != nil || n != 1 {
+		t.Fatalf("DeleteIdleSince = %d, %v; want 1", n, err)
+	}
+	if _, err := sessions.Get(t.Context(), "idle"); !errors.Is(err, domain.ErrNoSession) {
+		t.Fatalf("idle session: err = %v, want removed", err)
+	}
+	if _, err := sessions.Get(t.Context(), "used"); err != nil {
+		t.Fatalf("used session: %v, want kept", err)
+	}
+}

@@ -40,6 +40,11 @@ type ImportBatches interface {
 	// Commit atomically stores the batch (now committed), adds the new
 	// Pokémon and adds observations to the trainer's existing ones.
 	Commit(ctx context.Context, b domain.ImportBatch, add []domain.Pokemon, update []domain.PokemonUpdate) error
+	// DeleteStagedBefore removes every trainer's unfinished imports started
+	// before cutoff, and returns how many.
+	DeleteStagedBefore(ctx context.Context, cutoff time.Time) (int, error)
+	// TrimStaged keeps only the trainer's keep newest unfinished imports.
+	TrimStaged(ctx context.Context, trainer domain.TrainerID, keep int) error
 }
 
 // CollectionWriter changes a trainer's Pokémon.
