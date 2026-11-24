@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -194,6 +195,19 @@ func TestSignIn_RepeatedWrongPINsAreRateLimited(t *testing.T) {
 	if got := errorCode(t, rec); got != "RATE_LIMITED" {
 		t.Fatalf("code = %q, want RATE_LIMITED", got)
 	}
+}
+
+func TestSignIn_ADeviceGuessingAcrossProfilesIsPaused(t *testing.T) {
+	host := newAPI(t)
+	created := host.do(http.MethodPost, "/api/v1/profiles", `{"displayName":"Ash","pin":"2468"}`)
+	ash := decode[struct{ ID string }](t, created.Body.Bytes())
+	guesser := (&apiClient{t: t, handler: host.handler}).onOtherDevice()
+	for i := range 10 {
+		guesser.do(http.MethodPost, "/api/v1/session", fmt.Sprintf(`{"profileId":"guess-%d","pin":"1111"}`, i))
+	}
+
+	wantStatus(t, guesser.do(http.MethodPost, "/api/v1/session", `{"profileId":"`+ash.ID+`","pin":"2468"}`), http.StatusTooManyRequests)
+	wantStatus(t, host.do(http.MethodPost, "/api/v1/session", `{"profileId":"`+ash.ID+`","pin":"2468"}`), http.StatusOK)
 }
 
 // onOtherDevice makes the client call from another device on the network.

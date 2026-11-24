@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/helmedeiros/catchkeep/backend/internal/domain"
 	"github.com/helmedeiros/catchkeep/backend/internal/ports"
@@ -22,7 +23,11 @@ type Sessions struct {
 
 	mu       sync.Mutex
 	attempts map[domain.TrainerID]*domain.PINAttempts
+	devices  map[string]*domain.DeviceAttempts
 }
+
+// maxDevices bounds the devices remembered; idle ones are dropped first.
+const maxDevices = 1024
 
 // NewSessions wires the sign-in use cases. PIN attempt history is kept in
 // memory, so a host restart clears lockouts.
@@ -30,24 +35,23 @@ func NewSessions(trainers ports.Trainers, sessions ports.Sessions, hasher ports.
 	return &Sessions{
 		trainers: trainers, sessions: sessions, hasher: hasher, tokens: tokens, clock: clock,
 		attempts: map[domain.TrainerID]*domain.PINAttempts{},
+		devices:  map[string]*domain.DeviceAttempts{},
 	}
 }
 
 // SignIn checks the PIN for the profile and, if right, starts a session and
 // returns its token. A wrong PIN and an unknown profile both return
-// domain.ErrWrongPIN; repeated failures return *domain.LockedOutError.
-func (s *Sessions) SignIn(ctx context.Context, id domain.TrainerID, pin string) (string, ProfileSummary, error) {
+// domain.ErrWrongPIN; repeated failures for the profile, or from the device
+// on any profiles, return *domain.LockedOutError.
+func (s *Sessions) SignIn(ctx context.Context, device string, id domain.TrainerID, pin string) (string, ProfileSummary, error) {
 	now := s.clock.Now()
-	s.mu.Lock()
-	attempts := s.attemptsFor(id)
-	if err := attempts.Check(now); err != nil {
-		s.mu.Unlock()
+	if err := s.check(device, id, now); err != nil {
 		return "", ProfileSummary{}, err
 	}
-	s.mu.Unlock()
 
 	trainer, err := s.trainers.Get(ctx, id)
 	if errors.Is(err, domain.ErrTrainerNotFound) {
+		s.fail(device, "", now)
 		return "", ProfileSummary{}, domain.ErrWrongPIN
 	}
 	if err != nil {
@@ -57,14 +61,12 @@ func (s *Sessions) SignIn(ctx context.Context, id domain.TrainerID, pin string) 
 	if err != nil {
 		return "", ProfileSummary{}, fmt.Errorf("verify PIN: %w", err)
 	}
-
-	s.mu.Lock()
 	if !ok {
-		attempts.Fail(now)
-		s.mu.Unlock()
+		s.fail(device, id, now)
 		return "", ProfileSummary{}, domain.ErrWrongPIN
 	}
-	attempts.Succeed()
+	s.mu.Lock()
+	delete(s.attempts, id)
 	s.mu.Unlock()
 
 	token := s.tokens.NewToken()
@@ -128,13 +130,53 @@ func (s *Sessions) SignOut(ctx context.Context, token string) error {
 	return s.sessions.Delete(ctx, hashToken(token))
 }
 
-func (s *Sessions) attemptsFor(id domain.TrainerID) *domain.PINAttempts {
+// check refuses a device or profile that is paused at now.
+func (s *Sessions) check(device string, id domain.TrainerID, now time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if d, ok := s.devices[device]; ok {
+		if err := d.Check(now); err != nil {
+			return err
+		}
+	}
+	if a, ok := s.attempts[id]; ok {
+		return a.Check(now)
+	}
+	return nil
+}
+
+// fail counts a wrong PIN against the device and, when id is an existing
+// profile, against it, so made-up ids cannot grow the profile map.
+func (s *Sessions) fail(device string, id domain.TrainerID, now time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d, ok := s.devices[device]
+	if !ok {
+		s.forgetIdleDevices(now)
+		d = &domain.DeviceAttempts{}
+		s.devices[device] = d
+	}
+	d.Fail(now)
+	if id == "" {
+		return
+	}
 	a, ok := s.attempts[id]
 	if !ok {
 		a = &domain.PINAttempts{}
 		s.attempts[id] = a
 	}
-	return a
+	a.Fail(now)
+}
+
+func (s *Sessions) forgetIdleDevices(now time.Time) {
+	if len(s.devices) < maxDevices {
+		return
+	}
+	for device, d := range s.devices {
+		if d.Idle(now) {
+			delete(s.devices, device)
+		}
+	}
 }
 
 func hashToken(token string) string {

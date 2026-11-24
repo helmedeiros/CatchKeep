@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net"
 	"net/http"
 	"slices"
@@ -24,6 +25,25 @@ func readSessionCookie(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+type deviceKey struct{}
+
+// markDevice notes the address a request comes from, which sign-in limits
+// wrong PINs by. Forwarded headers are ignored: anyone could set them.
+func markDevice(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			host = r.RemoteAddr
+		}
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), deviceKey{}, host)))
+	})
+}
+
+func device(ctx context.Context) string {
+	d, _ := ctx.Value(deviceKey{}).(string)
+	return d
 }
 
 type adminKey struct{}
@@ -131,10 +151,11 @@ func (s *server) SignIn(ctx context.Context, req SignInRequestObject) (SignInRes
 	if err := domain.ValidatePIN(req.Body.Pin); err != nil {
 		return SignIn422JSONResponse(errorBody(codeValidationFailed, err.Error())), nil
 	}
-	token, me, err := s.services.Sessions.SignIn(ctx, domain.TrainerID(req.Body.ProfileId), req.Body.Pin)
+	token, me, err := s.services.Sessions.SignIn(ctx, device(ctx), domain.TrainerID(req.Body.ProfileId), req.Body.Pin)
 	var locked *domain.LockedOutError
 	switch {
 	case errors.As(err, &locked):
+		slog.WarnContext(ctx, "sign-in refused: too many wrong PINs", "device", device(ctx), "profile", req.Body.ProfileId, "until", locked.Until)
 		body := errorBody(codeRateLimited, "Too many wrong PINs. Try again later.")
 		body.Error.Details = &map[string]any{"retryAfter": locked.Until.UTC().Format(time.RFC3339)}
 		return SignIn429JSONResponse(body), nil
