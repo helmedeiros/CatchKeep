@@ -103,10 +103,10 @@ func TestTransfers_KeepTheInGameCountCurrent(t *testing.T) {
 	setups := sqlite.NewSetups(store)
 	transfers := sqlite.NewTransfers(store)
 	ctx := t.Context()
-	if err := setups.SaveSetup(ctx, "ash", domain.Setup{Capacity: 4000, Goals: []domain.Goal{domain.GoalCollecting}, InGameCount: 3300}); err != nil {
+	if err := setups.SaveSetup(ctx, "ash", domain.Setup{Capacity: 4000, Goals: []domain.Goal{domain.GoalCollecting}, InGameCount: 3300}, setupChange("ash")); err != nil {
 		t.Fatal(err)
 	}
-	if err := setups.SaveSetup(ctx, "misty", domain.Setup{Capacity: 400, Goals: []domain.Goal{domain.GoalCollecting}}); err != nil {
+	if err := setups.SaveSetup(ctx, "misty", domain.Setup{Capacity: 400, Goals: []domain.Goal{domain.GoalCollecting}}, setupChange("misty")); err != nil {
 		t.Fatal(err)
 	}
 	inGame := func(trainer domain.TrainerID) int {

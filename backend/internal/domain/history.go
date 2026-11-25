@@ -89,3 +89,9 @@ func NewChange(id string, trainer TrainerID, kind ChangeKind, pokemon []Pokemon,
 	}
 	return c
 }
+
+// SameSetup reports whether saving b over a would change nothing.
+func SameSetup(a, b Setup) bool {
+	return a.Capacity == b.Capacity && a.InGameCount == b.InGameCount && a.Limit == b.Limit &&
+		slices.Equal(a.Goals, b.Goals) && slices.Equal(a.Species, b.Species) && slices.Equal(a.Categories, b.Categories)
+}

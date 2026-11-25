@@ -2,16 +2,23 @@ package app_test
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/helmedeiros/catchkeep/backend/internal/app"
 	"github.com/helmedeiros/catchkeep/backend/internal/app/apptest"
 	"github.com/helmedeiros/catchkeep/backend/internal/domain"
 )
 
+// newKeep wires Keep with sequential ids and a fixed clock.
+func newKeep(setups *apptest.Setups, collection *apptest.CollectionStore, species apptest.SpeciesCategories, teams *apptest.Teams) *app.Keep {
+	return app.NewKeep(setups, collection, species, teams, apptest.NewSequentialIDs(), apptest.NewFixedClock(time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)))
+}
+
 func TestKeep_SummaryNeedsSetupFirst(t *testing.T) {
-	keep := app.NewKeep(apptest.NewSetups(), apptest.NewCollectionStore(), apptest.SpeciesCategories{}, apptest.NewTeams(apptest.NewCollectionStore()))
+	keep := newKeep(apptest.NewSetups(), apptest.NewCollectionStore(), apptest.SpeciesCategories{}, apptest.NewTeams(apptest.NewCollectionStore()))
 
 	if _, err := keep.Summary(t.Context(), ash); !errors.Is(err, domain.ErrSetupNotFound) {
 		t.Fatalf("err = %v, want ErrSetupNotFound", err)
@@ -27,7 +34,7 @@ func TestKeep_SavesSetupAndSummarizesTheCollection(t *testing.T) {
 	if _, err := f.imports.Commit(t.Context(), ash, preview.ID); err != nil {
 		t.Fatal(err)
 	}
-	keep := app.NewKeep(apptest.NewSetups(), f.store, apptest.SpeciesCategories{"Rattata": domain.CategoryLegendary}, apptest.NewTeams(f.store))
+	keep := newKeep(apptest.NewSetups(), f.store, apptest.SpeciesCategories{"Rattata": domain.CategoryLegendary}, apptest.NewTeams(f.store))
 
 	if err := keep.SaveSetup(t.Context(), ash, domain.Setup{Capacity: 300}); !errors.Is(err, domain.ErrInvalidSetup) {
 		t.Fatalf("invalid setup: err = %v", err)
@@ -62,7 +69,7 @@ func TestKeep_SavesSetupAndSummarizesTheCollection(t *testing.T) {
 }
 
 func TestKeep_SpeciesRulesNeedSetupAndSurviveSetupChanges(t *testing.T) {
-	keep := app.NewKeep(apptest.NewSetups(), apptest.NewCollectionStore(), apptest.SpeciesCategories{}, apptest.NewTeams(apptest.NewCollectionStore()))
+	keep := newKeep(apptest.NewSetups(), apptest.NewCollectionStore(), apptest.SpeciesCategories{}, apptest.NewTeams(apptest.NewCollectionStore()))
 	rules := []domain.SpeciesRule{{Species: "Kyurem", Minimum: 10}}
 	if err := keep.SaveSpeciesRules(t.Context(), ash, rules); !errors.Is(err, domain.ErrSetupNotFound) {
 		t.Fatalf("before setup: err = %v", err)
@@ -89,7 +96,7 @@ func TestKeep_SpeciesRulesNeedSetupAndSurviveSetupChanges(t *testing.T) {
 }
 
 func TestKeep_CategoryRulesNeedSetupAndSurviveOtherChanges(t *testing.T) {
-	keep := app.NewKeep(apptest.NewSetups(), apptest.NewCollectionStore(), apptest.SpeciesCategories{}, apptest.NewTeams(apptest.NewCollectionStore()))
+	keep := newKeep(apptest.NewSetups(), apptest.NewCollectionStore(), apptest.SpeciesCategories{}, apptest.NewTeams(apptest.NewCollectionStore()))
 	rules := []domain.CategoryRule{{Category: domain.CategoryMythical, Minimum: 4}}
 	if err := keep.SaveCategoryRules(t.Context(), ash, rules); !errors.Is(err, domain.ErrSetupNotFound) {
 		t.Fatalf("before setup: err = %v", err)
@@ -125,7 +132,7 @@ func TestKeep_ProtectedPokemonAreKept(t *testing.T) {
 	if _, err := f.collection.ConfirmAbsent(t.Context(), ash, "", "", domain.ConfirmableFields); err != nil {
 		t.Fatal(err)
 	}
-	keep := app.NewKeep(apptest.NewSetups(), f.store, apptest.SpeciesCategories{}, apptest.NewTeams(f.store))
+	keep := newKeep(apptest.NewSetups(), f.store, apptest.SpeciesCategories{}, apptest.NewTeams(f.store))
 	if err := keep.SaveSetup(t.Context(), ash, domain.Setup{Capacity: 300, Goals: []domain.Goal{domain.GoalCollecting}}); err != nil {
 		t.Fatal(err)
 	}
@@ -162,5 +169,38 @@ func TestProtect_RecordsTheChangeInTheHistory(t *testing.T) {
 	if len(changes) != 2 || changes[0].Kind != domain.ChangeProtection || changes[0].At.IsZero() ||
 		len(changes[0].Pokemon) != 1 || changes[0].Pokemon[0].Species != "Pidgey" || changes[0].ID == changes[1].ID {
 		t.Fatalf("history = %+v; protecting twice is one change, unprotecting another", changes)
+	}
+}
+
+func TestKeep_RecordsSetupAndRuleChangesInTheHistory(t *testing.T) {
+	setups := apptest.NewSetups()
+	keep := newKeep(setups, apptest.NewCollectionStore(), apptest.SpeciesCategories{}, apptest.NewTeams(apptest.NewCollectionStore()))
+	setup := domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}}
+	species := []domain.SpeciesRule{{Species: "Pidgey", Minimum: 2}}
+	categories := []domain.CategoryRule{{Category: domain.CategoryLegendary, Minimum: 1}}
+
+	for _, save := range []func() error{
+		func() error { return keep.SaveSetup(t.Context(), ash, setup) },
+		func() error { return keep.SaveSetup(t.Context(), ash, setup) },
+		func() error { return keep.SaveSpeciesRules(t.Context(), ash, species) },
+		func() error { return keep.SaveSpeciesRules(t.Context(), ash, species) },
+		func() error { return keep.SaveCategoryRules(t.Context(), ash, categories) },
+		func() error { return keep.SaveSetup(t.Context(), ash, domain.Setup{Capacity: 400, Goals: setup.Goals}) },
+	} {
+		if err := save(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var kinds []domain.ChangeKind
+	for _, c := range setups.Changes(ash) {
+		if c.At.IsZero() || c.ID == "" {
+			t.Fatalf("change = %+v", c)
+		}
+		kinds = append(kinds, c.Kind)
+	}
+	want := []domain.ChangeKind{domain.ChangeSetup, domain.ChangeRules, domain.ChangeRules, domain.ChangeSetup}
+	if !slices.Equal(kinds, want) {
+		t.Fatalf("history = %v, want %v; saving unchanged records nothing", kinds, want)
 	}
 }

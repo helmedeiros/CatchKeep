@@ -72,7 +72,7 @@ func (r *Setups) GetSetup(ctx context.Context, trainer domain.TrainerID) (domain
 }
 
 // SaveSetup implements ports.Setups.
-func (r *Setups) SaveSetup(ctx context.Context, trainer domain.TrainerID, s domain.Setup) error {
+func (r *Setups) SaveSetup(ctx context.Context, trainer domain.TrainerID, s domain.Setup, c domain.Change) error {
 	goals, err := json.Marshal(s.Goals)
 	if err != nil {
 		return fmt.Errorf("encode goals: %w", err)
@@ -102,6 +102,23 @@ func (r *Setups) SaveSetup(ctx context.Context, trainer domain.TrainerID, s doma
 			string(trainer), s.Capacity, string(goals), string(species), string(categories), s.InGameCount, s.Limit); err != nil {
 			return fmt.Errorf("save setup: %w", err)
 		}
-		return nil
+		if c.Kind == domain.ChangeRules {
+			return insertChange(ctx, tx, c, rulesDetail{Species: rules, Categories: groups})
+		}
+		return insertChange(ctx, tx, c, setupDetail{Capacity: s.Capacity, Goals: s.Goals, InGameCount: s.InGameCount, Limit: s.Limit})
 	})
+}
+
+// setupDetail is the storage and goals a setup change saved.
+type setupDetail struct {
+	Capacity    int           `json:"capacity"`
+	Goals       []domain.Goal `json:"goals"`
+	InGameCount int           `json:"inGameCount,omitempty"`
+	Limit       int           `json:"limit,omitempty"`
+}
+
+// rulesDetail is the rules a rule change saved.
+type rulesDetail struct {
+	Species    []speciesRule  `json:"species"`
+	Categories []categoryRule `json:"categories"`
 }
