@@ -373,6 +373,13 @@ func (s *CollectionStore) SetProtected(_ context.Context, trainer domain.Trainer
 	return nil
 }
 
+// record keeps a change made through another fake sharing this store.
+func (s *CollectionStore) record(c domain.Change) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.changes = append(s.changes, c)
+}
+
 // Changes returns the hand-made changes recorded for trainer.
 func (s *CollectionStore) Changes(trainer domain.TrainerID) []domain.Change {
 	s.mu.Lock()
@@ -451,7 +458,7 @@ func (s *Teams) ListTeams(_ context.Context, trainer domain.TrainerID) ([]domain
 }
 
 // SaveTeam implements ports.Teams.
-func (s *Teams) SaveTeam(ctx context.Context, trainer domain.TrainerID, t domain.Team) error {
+func (s *Teams) SaveTeam(ctx context.Context, trainer domain.TrainerID, t domain.Team, c domain.Change) error {
 	owned, _ := s.collection.ListPokemon(ctx, trainer)
 	for _, m := range t.Members {
 		if !slices.ContainsFunc(owned, func(p domain.Pokemon) bool { return p.ID == m }) {
@@ -467,11 +474,12 @@ func (s *Teams) SaveTeam(ctx context.Context, trainer domain.TrainerID, t domain
 	}
 	teams := slices.DeleteFunc(slices.Clone(s.teams[trainer]), func(x domain.Team) bool { return x.ID == t.ID })
 	s.teams[trainer] = append(teams, t)
+	s.collection.record(c)
 	return nil
 }
 
 // DeleteTeam implements ports.Teams.
-func (s *Teams) DeleteTeam(_ context.Context, trainer domain.TrainerID, id domain.TeamID) error {
+func (s *Teams) DeleteTeam(_ context.Context, trainer domain.TrainerID, id domain.TeamID, c domain.Change) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	before := len(s.teams[trainer])
@@ -479,6 +487,7 @@ func (s *Teams) DeleteTeam(_ context.Context, trainer domain.TrainerID, id domai
 	if len(s.teams[trainer]) == before {
 		return domain.ErrTeamNotFound
 	}
+	s.collection.record(c)
 	return nil
 }
 

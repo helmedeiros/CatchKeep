@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/helmedeiros/catchkeep/backend/internal/domain"
@@ -53,7 +54,7 @@ func (r *Teams) ListTeams(ctx context.Context, trainer domain.TrainerID) ([]doma
 }
 
 // SaveTeam implements ports.Teams in a single transaction.
-func (r *Teams) SaveTeam(ctx context.Context, trainer domain.TrainerID, t domain.Team) (err error) {
+func (r *Teams) SaveTeam(ctx context.Context, trainer domain.TrainerID, t domain.Team, c domain.Change) (err error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
@@ -94,6 +95,9 @@ func (r *Teams) SaveTeam(ctx context.Context, trainer domain.TrainerID, t domain
 			return fmt.Errorf("add member: %w", err)
 		}
 	}
+	if err := insertChange(ctx, tx, c, teamDetail{TeamID: string(t.ID), Name: t.Name}); err != nil {
+		return err
+	}
 	if err := bumpRevision(ctx, tx, trainer); err != nil {
 		return err
 	}
@@ -104,17 +108,22 @@ func (r *Teams) SaveTeam(ctx context.Context, trainer domain.TrainerID, t domain
 }
 
 // DeleteTeam implements ports.Teams.
-func (r *Teams) DeleteTeam(ctx context.Context, trainer domain.TrainerID, id domain.TeamID) error {
+func (r *Teams) DeleteTeam(ctx context.Context, trainer domain.TrainerID, id domain.TeamID, c domain.Change) error {
 	return inTx(ctx, r.db, trainer, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx, `DELETE FROM teams WHERE id = ? AND trainer_id = ?`, string(id), string(trainer))
+		var name string
+		err := tx.QueryRowContext(ctx, `DELETE FROM teams WHERE id = ? AND trainer_id = ? RETURNING name`, string(id), string(trainer)).Scan(&name)
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ErrTeamNotFound
+		}
 		if err != nil {
 			return fmt.Errorf("delete team: %w", err)
 		}
-		if n, err := res.RowsAffected(); err != nil {
-			return fmt.Errorf("delete team: %w", err)
-		} else if n == 0 {
-			return domain.ErrTeamNotFound
-		}
-		return nil
+		return insertChange(ctx, tx, c, teamDetail{TeamID: string(id), Name: name, Deleted: true})
 	})
+}
+
+type teamDetail struct {
+	TeamID  string `json:"teamId"`
+	Name    string `json:"name"`
+	Deleted bool   `json:"deleted,omitempty"`
 }

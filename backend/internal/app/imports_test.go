@@ -74,6 +74,8 @@ type importsFixture struct {
 	imports    *app.Imports
 	collection *app.Collection
 	store      *apptest.CollectionStore
+	ids        *apptest.SequentialIDs
+	clock      *apptest.FixedClock
 }
 
 func newImportsFixture() importsFixture {
@@ -84,6 +86,8 @@ func newImportsFixture() importsFixture {
 		imports:    app.NewImports(fakeParser{}, fakeTables{}, store, store, ids, clock),
 		collection: app.NewCollection(store, store, ids, clock),
 		store:      store,
+		ids:        ids,
+		clock:      clock,
 	}
 }
 
