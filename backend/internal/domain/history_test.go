@@ -49,3 +49,28 @@ func TestNewChange_DescribesThePokemonItTouched(t *testing.T) {
 		t.Fatal("a change without Pokémon lists none, not nil")
 	}
 }
+
+func TestSameSetup_ComparesEverySetting(t *testing.T) {
+	base := domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}, Species: []domain.SpeciesRule{{Species: "Pidgey", Minimum: 2}}}
+	changes := map[string]func(*domain.Setup){
+		"capacity":      func(s *domain.Setup) { s.Capacity = 400 },
+		"goals":         func(s *domain.Setup) { s.Goals = []domain.Goal{domain.GoalTrading} },
+		"in-game count": func(s *domain.Setup) { s.InGameCount = 300 },
+		"limit":         func(s *domain.Setup) { s.Limit = 90 },
+		"species rules": func(s *domain.Setup) { s.Species = nil },
+		"category rules": func(s *domain.Setup) {
+			s.Categories = []domain.CategoryRule{{Category: domain.CategoryLegendary, Minimum: 1}}
+		},
+	}
+
+	if !domain.SameSetup(base, base) {
+		t.Fatal("a setup differs from itself")
+	}
+	for name, change := range changes {
+		other := base
+		change(&other)
+		if domain.SameSetup(base, other) {
+			t.Errorf("a different %s counts as the same setup", name)
+		}
+	}
+}

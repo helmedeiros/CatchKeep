@@ -57,7 +57,7 @@ func TestKeep_TeamMembersAreProtected(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := apptest.NewTeams(f.store)
-	keep := app.NewKeep(apptest.NewSetups(), f.store, apptest.SpeciesCategories{}, store)
+	keep := app.NewKeep(apptest.NewSetups(), f.store, apptest.SpeciesCategories{}, store, f.ids, f.clock)
 	if err := keep.SaveSetup(t.Context(), ash, domain.Setup{Capacity: 300, Goals: []domain.Goal{domain.GoalCollecting}}); err != nil {
 		t.Fatal(err)
 	}

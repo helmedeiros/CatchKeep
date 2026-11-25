@@ -15,11 +15,13 @@ type Keep struct {
 	collection ports.CollectionReader
 	species    ports.Species
 	teams      ports.Teams
+	ids        ports.IDs
+	clock      ports.Clock
 }
 
 // NewKeep wires the keep-rule use cases.
-func NewKeep(setups ports.Setups, collection ports.CollectionReader, species ports.Species, teams ports.Teams) *Keep {
-	return &Keep{setups: setups, collection: collection, species: species, teams: teams}
+func NewKeep(setups ports.Setups, collection ports.CollectionReader, species ports.Species, teams ports.Teams, ids ports.IDs, clock ports.Clock) *Keep {
+	return &Keep{setups: setups, collection: collection, species: species, teams: teams, ids: ids, clock: clock}
 }
 
 // CapacityBands are the default minimums for each storage size.
@@ -37,37 +39,47 @@ func (k *Keep) SaveSetup(ctx context.Context, trainer domain.TrainerID, s domain
 	switch {
 	case err == nil:
 		s.Species, s.Categories = current.Species, current.Categories
-	case !errors.Is(err, domain.ErrSetupNotFound):
+		return k.save(ctx, trainer, &current, s, domain.ChangeSetup)
+	case errors.Is(err, domain.ErrSetupNotFound):
+		return k.save(ctx, trainer, nil, s, domain.ChangeSetup)
+	default:
 		return err
 	}
-	return k.save(ctx, trainer, s)
 }
 
 // SaveSpeciesRules replaces the trainer's species rules. It needs a setup.
 func (k *Keep) SaveSpeciesRules(ctx context.Context, trainer domain.TrainerID, rules []domain.SpeciesRule) error {
-	s, err := k.setups.GetSetup(ctx, trainer)
+	current, err := k.setups.GetSetup(ctx, trainer)
 	if err != nil {
 		return err
 	}
+	s := current
 	s.Species = rules
-	return k.save(ctx, trainer, s)
+	return k.save(ctx, trainer, &current, s, domain.ChangeRules)
 }
 
 // SaveCategoryRules replaces the trainer's category rules. It needs a setup.
 func (k *Keep) SaveCategoryRules(ctx context.Context, trainer domain.TrainerID, rules []domain.CategoryRule) error {
-	s, err := k.setups.GetSetup(ctx, trainer)
+	current, err := k.setups.GetSetup(ctx, trainer)
 	if err != nil {
 		return err
 	}
+	s := current
 	s.Categories = rules
-	return k.save(ctx, trainer, s)
+	return k.save(ctx, trainer, &current, s, domain.ChangeRules)
 }
 
-func (k *Keep) save(ctx context.Context, trainer domain.TrainerID, s domain.Setup) error {
+// save stores s over current (nil if there is none) and records it in the
+// history as kind; saving it unchanged changes nothing.
+func (k *Keep) save(ctx context.Context, trainer domain.TrainerID, current *domain.Setup, s domain.Setup, kind domain.ChangeKind) error {
 	if err := s.Validate(); err != nil {
 		return err
 	}
-	if err := k.setups.SaveSetup(ctx, trainer, s); err != nil {
+	if current != nil && domain.SameSetup(*current, s) {
+		return nil
+	}
+	change := domain.NewChange(k.ids.NewID(), trainer, kind, nil, k.clock.Now())
+	if err := k.setups.SaveSetup(ctx, trainer, s, change); err != nil {
 		return fmt.Errorf("save setup: %w", err)
 	}
 	return nil

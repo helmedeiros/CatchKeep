@@ -49,7 +49,7 @@ func TestRevision_EveryMutationThatCanChangeRecommendationsBumpsIt(t *testing.T)
 		}},
 		{"protect", func() error { return coll.SetProtected(ctx, "ash", "P1", true, protecting("ash", "C1")) }},
 		{"save setup", func() error {
-			return setups.SaveSetup(ctx, "ash", domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}})
+			return setups.SaveSetup(ctx, "ash", domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}}, setupChange("ash"))
 		}},
 		{"save team", func() error {
 			return teams.SaveTeam(ctx, "ash", domain.Team{ID: "T1", Name: "Raid", Members: []domain.PokemonID{"P1"}}, teamChange("ash"))

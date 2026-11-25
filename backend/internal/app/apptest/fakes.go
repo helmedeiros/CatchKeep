@@ -402,8 +402,9 @@ func (s *CollectionStore) ListPokemon(_ context.Context, trainer domain.TrainerI
 
 // Setups is an in-memory ports.Setups.
 type Setups struct {
-	mu     sync.Mutex
-	setups map[domain.TrainerID]domain.Setup
+	mu      sync.Mutex
+	setups  map[domain.TrainerID]domain.Setup
+	changes []domain.Change
 }
 
 // NewSetups returns an empty store.
@@ -421,11 +422,25 @@ func (s *Setups) GetSetup(_ context.Context, trainer domain.TrainerID) (domain.S
 }
 
 // SaveSetup implements ports.Setups.
-func (s *Setups) SaveSetup(_ context.Context, trainer domain.TrainerID, setup domain.Setup) error {
+func (s *Setups) SaveSetup(_ context.Context, trainer domain.TrainerID, setup domain.Setup, c domain.Change) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.setups[trainer] = setup
+	s.changes = append(s.changes, c)
 	return nil
+}
+
+// Changes returns the setup and rule changes recorded for trainer.
+func (s *Setups) Changes(trainer domain.TrainerID) []domain.Change {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.Change
+	for _, c := range s.changes {
+		if c.TrainerID == trainer {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // SpeciesCategories is a ports.Species fake naming each listed species'
