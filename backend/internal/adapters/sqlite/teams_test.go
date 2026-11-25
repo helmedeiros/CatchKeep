@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/helmedeiros/catchkeep/backend/internal/adapters/ids"
 	"github.com/helmedeiros/catchkeep/backend/internal/adapters/sqlite"
 	"github.com/helmedeiros/catchkeep/backend/internal/domain"
 )
@@ -25,10 +26,10 @@ func TestTeams_SaveListReplaceAndDelete(t *testing.T) {
 	teams := sqlite.NewTeams(store)
 
 	raid := domain.Team{ID: "T1", Name: "Raid", Members: []domain.PokemonID{"P2", "P1"}}
-	if err := teams.SaveTeam(t.Context(), "ash", raid); err != nil {
+	if err := teams.SaveTeam(t.Context(), "ash", raid, teamChange("ash")); err != nil {
 		t.Fatal(err)
 	}
-	if err := teams.SaveTeam(t.Context(), "ash", domain.Team{ID: "T2", Name: "Empty"}); err != nil {
+	if err := teams.SaveTeam(t.Context(), "ash", domain.Team{ID: "T2", Name: "Empty"}, teamChange("ash")); err != nil {
 		t.Fatal(err)
 	}
 	got, err := teams.ListTeams(t.Context(), "ash")
@@ -36,10 +37,10 @@ func TestTeams_SaveListReplaceAndDelete(t *testing.T) {
 		t.Fatalf("teams = %+v, %v; want both by name, members in order", got, err)
 	}
 
-	if err := teams.SaveTeam(t.Context(), "misty", domain.Team{ID: "T1", Name: "Stolen"}); !errors.Is(err, domain.ErrTeamNotFound) {
+	if err := teams.SaveTeam(t.Context(), "misty", domain.Team{ID: "T1", Name: "Stolen"}, teamChange("misty")); !errors.Is(err, domain.ErrTeamNotFound) {
 		t.Fatalf("misty overwriting ash's team: err = %v", err)
 	}
-	if err := teams.SaveTeam(t.Context(), "misty", domain.Team{ID: "T9", Name: "Mine", Members: []domain.PokemonID{"P1"}}); !errors.Is(err, domain.ErrPokemonNotFound) {
+	if err := teams.SaveTeam(t.Context(), "misty", domain.Team{ID: "T9", Name: "Mine", Members: []domain.PokemonID{"P1"}}, teamChange("misty")); !errors.Is(err, domain.ErrPokemonNotFound) {
 		t.Fatalf("misty adding ash's Pokémon: err = %v", err)
 	}
 	if mine, _ := teams.ListTeams(t.Context(), "misty"); len(mine) != 0 {
@@ -47,17 +48,31 @@ func TestTeams_SaveListReplaceAndDelete(t *testing.T) {
 	}
 
 	raid.Members = []domain.PokemonID{"P1"}
-	if err := teams.SaveTeam(t.Context(), "ash", raid); err != nil {
+	if err := teams.SaveTeam(t.Context(), "ash", raid, teamChange("ash")); err != nil {
 		t.Fatal(err)
 	}
-	if err := teams.DeleteTeam(t.Context(), "misty", "T1"); !errors.Is(err, domain.ErrTeamNotFound) {
+	if err := teams.DeleteTeam(t.Context(), "misty", "T1", teamChange("misty")); !errors.Is(err, domain.ErrTeamNotFound) {
 		t.Fatalf("misty deleting ash's team: err = %v", err)
 	}
-	if err := teams.DeleteTeam(t.Context(), "ash", "T2"); err != nil {
+	if err := teams.DeleteTeam(t.Context(), "ash", "T2", teamChange("ash")); err != nil {
 		t.Fatal(err)
 	}
 	got, _ = teams.ListTeams(t.Context(), "ash")
 	if len(got) != 1 || !slices.Equal(got[0].Members, []domain.PokemonID{"P1"}) {
 		t.Fatalf("teams = %+v", got)
 	}
+	var trainers, details string
+	if err := store.DB().QueryRowContext(t.Context(), `
+		SELECT group_concat(trainer_id), group_concat(detail, ' ') FROM (SELECT trainer_id, detail FROM history_events WHERE kind = 'team' ORDER BY rowid)`).Scan(&trainers, &details); err != nil {
+		t.Fatal(err)
+	}
+	want := `{"teamId":"T1","name":"Raid"} {"teamId":"T2","name":"Empty"} {"teamId":"T1","name":"Raid"} {"teamId":"T2","name":"Empty","deleted":true}`
+	if trainers != "ash,ash,ash,ash" || details != want {
+		t.Fatalf("history = %s %s; misty's refused attempts are not recorded", trainers, details)
+	}
+}
+
+// teamChange is a team change by trainer with an id of its own.
+func teamChange(trainer domain.TrainerID) domain.Change {
+	return domain.Change{ID: ids.NewULID().NewID(), TrainerID: trainer, Kind: domain.ChangeTeam, Pokemon: []domain.Transferred{}, At: at}
 }

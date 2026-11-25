@@ -17,7 +17,7 @@ func TestTeams_CreateRenameAndDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	list, _ := f.collection.List(t.Context(), ash)
-	teams := app.NewTeams(apptest.NewTeams(f.store), apptest.NewSequentialIDs())
+	teams := app.NewTeams(apptest.NewTeams(f.store), f.store, f.ids, f.clock)
 
 	raid, err := teams.Create(t.Context(), ash, "Raid", []domain.PokemonID{list[0].ID})
 	if err != nil {
@@ -62,12 +62,43 @@ func TestKeep_TeamMembersAreProtected(t *testing.T) {
 		t.Fatal(err)
 	}
 	list, _ := f.collection.List(t.Context(), ash)
-	if _, err := app.NewTeams(store, apptest.NewSequentialIDs()).Create(t.Context(), ash, "Pets", []domain.PokemonID{list[1].ID}); err != nil {
+	if _, err := app.NewTeams(store, f.store, f.ids, f.clock).Create(t.Context(), ash, "Pets", []domain.PokemonID{list[1].ID}); err != nil {
 		t.Fatal(err)
 	}
 
 	s, _ := keep.Summary(t.Context(), ash)
 	if s.Protected != 1 || s.Groups[0].KeptIDs[0] != list[1].ID {
 		t.Fatalf("summary = %+v; the team member is kept", s)
+	}
+}
+
+func TestTeams_RecordEachChangeInTheHistory(t *testing.T) {
+	f := newImportsFixture()
+	preview, _ := f.imports.Stage(t.Context(), ash, strings.NewReader("Pidgey,1,2,3,100\nRattata,4,5,6,200\n"))
+	if _, err := f.imports.Commit(t.Context(), ash, preview.ID); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := f.collection.List(t.Context(), ash)
+	teams := app.NewTeams(apptest.NewTeams(f.store), f.store, f.ids, f.clock)
+
+	raid, err := teams.Create(t.Context(), ash, "Raid", []domain.PokemonID{list[0].ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	both := []domain.PokemonID{list[0].ID, list[1].ID}
+	for range 2 {
+		if _, err := teams.Update(t.Context(), ash, raid.ID, "Raid", both); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := teams.Delete(t.Context(), ash, raid.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	changes := f.store.Changes(ash)
+	members := func(c domain.Change) int { return len(c.Pokemon) }
+	if len(changes) != 3 || changes[0].Kind != domain.ChangeTeam || members(changes[0]) != 1 || members(changes[1]) != 2 || members(changes[2]) != 2 ||
+		changes[2].At.IsZero() || changes[2].Pokemon[1].Species != list[1].Current().String(domain.FieldSpecies) {
+		t.Fatalf("history = %+v; want created, changed once (saving it unchanged is nothing) and deleted", changes)
 	}
 }

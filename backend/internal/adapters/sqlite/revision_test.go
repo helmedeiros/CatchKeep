@@ -52,9 +52,9 @@ func TestRevision_EveryMutationThatCanChangeRecommendationsBumpsIt(t *testing.T)
 			return setups.SaveSetup(ctx, "ash", domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}})
 		}},
 		{"save team", func() error {
-			return teams.SaveTeam(ctx, "ash", domain.Team{ID: "T1", Name: "Raid", Members: []domain.PokemonID{"P1"}})
+			return teams.SaveTeam(ctx, "ash", domain.Team{ID: "T1", Name: "Raid", Members: []domain.PokemonID{"P1"}}, teamChange("ash"))
 		}},
-		{"delete team", func() error { return teams.DeleteTeam(ctx, "ash", "T1") }},
+		{"delete team", func() error { return teams.DeleteTeam(ctx, "ash", "T1", teamChange("ash")) }},
 	}
 	for i, s := range steps {
 		if err := s.mutate(); err != nil {
