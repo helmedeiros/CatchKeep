@@ -58,3 +58,34 @@ func described(id PokemonID, s Snapshot) Transferred {
 	cp, hasCP := s.Int(FieldCP)
 	return Transferred{ID: id, Species: s.String(FieldSpecies), CP: cp, HasCP: hasCP}
 }
+
+// ChangeKind names a change a trainer makes by hand.
+type ChangeKind string
+
+// Changes kept in the history log.
+const (
+	ChangeProtection ChangeKind = "protection"
+	ChangeTeam       ChangeKind = "team"
+	ChangeRules      ChangeKind = "rules"
+	ChangeSetup      ChangeKind = "setup"
+)
+
+// Change records a change a trainer made by hand (spec §13 history log):
+// what kind, when, and the Pokémon it touched. The new values are saved
+// with it.
+type Change struct {
+	ID        string
+	TrainerID TrainerID
+	Kind      ChangeKind
+	Pokemon   []Transferred
+	At        time.Time
+}
+
+// NewChange describes a change of kind that touched pokemon.
+func NewChange(id string, trainer TrainerID, kind ChangeKind, pokemon []Pokemon, at time.Time) Change {
+	c := Change{ID: id, TrainerID: trainer, Kind: kind, Pokemon: []Transferred{}, At: at}
+	for _, p := range pokemon {
+		c.Pokemon = append(c.Pokemon, described(p.ID, p.Current()))
+	}
+	return c
+}

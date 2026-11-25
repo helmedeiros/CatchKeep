@@ -54,8 +54,9 @@ type CollectionWriter interface {
 	// Pokémon; it fails without changes if any Pokémon is not theirs.
 	AddObservations(ctx context.Context, trainer domain.TrainerID, updates []domain.PokemonUpdate) error
 	// SetProtected sets the trainer's manual protection of one of their
-	// active Pokémon, or returns domain.ErrPokemonNotFound.
-	SetProtected(ctx context.Context, trainer domain.TrainerID, id domain.PokemonID, protected bool) error
+	// active Pokémon and records c in the history, or returns
+	// domain.ErrPokemonNotFound.
+	SetProtected(ctx context.Context, trainer domain.TrainerID, id domain.PokemonID, protected bool, c domain.Change) error
 }
 
 // CollectionReader reads a trainer's Pokémon.

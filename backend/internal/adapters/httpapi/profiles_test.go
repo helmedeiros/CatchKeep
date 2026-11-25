@@ -40,7 +40,7 @@ func newAPI(t *testing.T) *apiClient {
 		Profiles:   app.NewProfiles(trainers, hasher, ulidLike{}, clock),
 		Sessions:   app.NewSessions(trainers, apptest.NewSessionStore(), hasher, apptest.NewSequentialTokens(), clock),
 		Imports:    app.NewImports(csvimport.NewPokeGenie(time.UTC), csvimport.Generic{}, collection, collection, ulidLike{}, clock),
-		Collection: app.NewCollection(collection, collection, clock),
+		Collection: app.NewCollection(collection, collection, ulidLike{}, clock),
 		Keep:       app.NewKeep(apptest.NewSetups(), collection, apptest.SpeciesCategories{"Mewtwo": domain.CategoryLegendary}, teams),
 		Teams:      app.NewTeams(teams, ulidLike{}),
 		HostNames:  func() []string { return []string{hostAddress} },

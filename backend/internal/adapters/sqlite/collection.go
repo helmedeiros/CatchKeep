@@ -254,7 +254,7 @@ func (c *Collection) Commit(ctx context.Context, b domain.ImportBatch, add []dom
 }
 
 // SetProtected implements ports.CollectionWriter.
-func (c *Collection) SetProtected(ctx context.Context, trainer domain.TrainerID, id domain.PokemonID, protected bool) error {
+func (c *Collection) SetProtected(ctx context.Context, trainer domain.TrainerID, id domain.PokemonID, protected bool, change domain.Change) error {
 	return inTx(ctx, c.db, trainer, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, `
 			UPDATE pokemon SET manual_protected = ?
@@ -267,7 +267,7 @@ func (c *Collection) SetProtected(ctx context.Context, trainer domain.TrainerID,
 		} else if n == 0 {
 			return domain.ErrPokemonNotFound
 		}
-		return nil
+		return insertChange(ctx, tx, change, protectionDetail{Protected: protected})
 	})
 }
 

@@ -82,7 +82,7 @@ func newImportsFixture() importsFixture {
 	ids := apptest.NewSequentialIDs()
 	return importsFixture{
 		imports:    app.NewImports(fakeParser{}, fakeTables{}, store, store, ids, clock),
-		collection: app.NewCollection(store, store, clock),
+		collection: app.NewCollection(store, store, ids, clock),
 		store:      store,
 	}
 }
