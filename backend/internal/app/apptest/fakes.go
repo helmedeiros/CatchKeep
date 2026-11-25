@@ -217,6 +217,7 @@ type CollectionStore struct {
 	gone      map[domain.PokemonID]domain.Pokemon
 	events    []domain.TransferEvent
 	imports   []domain.ImportEvent
+	changes   []domain.Change
 	revisions map[domain.TrainerID]int64
 }
 
@@ -358,7 +359,7 @@ func (s *CollectionStore) addObservations(trainer domain.TrainerID, updates []do
 }
 
 // SetProtected implements ports.CollectionWriter.
-func (s *CollectionStore) SetProtected(_ context.Context, trainer domain.TrainerID, id domain.PokemonID, protected bool) error {
+func (s *CollectionStore) SetProtected(_ context.Context, trainer domain.TrainerID, id domain.PokemonID, protected bool, c domain.Change) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	owned := slices.Clone(s.pokemon[trainer])
@@ -368,7 +369,21 @@ func (s *CollectionStore) SetProtected(_ context.Context, trainer domain.Trainer
 	}
 	owned[i].Protected = protected
 	s.pokemon[trainer] = owned
+	s.changes = append(s.changes, c)
 	return nil
+}
+
+// Changes returns the hand-made changes recorded for trainer.
+func (s *CollectionStore) Changes(trainer domain.TrainerID) []domain.Change {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.Change
+	for _, c := range s.changes {
+		if c.TrainerID == trainer {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // ListPokemon implements ports.CollectionReader.

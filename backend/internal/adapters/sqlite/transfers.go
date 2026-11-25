@@ -227,3 +227,24 @@ func insertImportEvent(ctx context.Context, tx *sql.Tx, e domain.ImportEvent) er
 	}
 	return nil
 }
+
+type protectionDetail struct {
+	Protected bool `json:"protected"`
+}
+
+// insertChange records a hand-made change with the values it saved.
+func insertChange(ctx context.Context, tx *sql.Tx, c domain.Change, detail any) error {
+	pokemon, err := json.Marshal(toTransferred(c.Pokemon))
+	if err != nil {
+		return fmt.Errorf("encode %s history: %w", c.Kind, err)
+	}
+	saved, err := json.Marshal(detail)
+	if err != nil {
+		return fmt.Errorf("encode %s history: %w", c.Kind, err)
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO history_events (id, trainer_id, kind, pokemon, detail, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		c.ID, string(c.TrainerID), string(c.Kind), string(pokemon), string(saved), formatTime(c.At)); err != nil {
+		return fmt.Errorf("insert %s history: %w", c.Kind, err)
+	}
+	return nil
+}

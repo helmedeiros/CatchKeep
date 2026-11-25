@@ -143,3 +143,24 @@ func TestKeep_ProtectedPokemonAreKept(t *testing.T) {
 		t.Fatalf("summary = %+v; the protected, weaker Pidgey is the one kept", s)
 	}
 }
+
+func TestProtect_RecordsTheChangeInTheHistory(t *testing.T) {
+	f := newImportsFixture()
+	preview, _ := f.imports.Stage(t.Context(), ash, strings.NewReader("Pidgey,1,2,3,100\n"))
+	if _, err := f.imports.Commit(t.Context(), ash, preview.ID); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := f.collection.List(t.Context(), ash)
+
+	for _, protected := range []bool{true, true, false} {
+		if err := f.collection.Protect(t.Context(), ash, list[0].ID, protected); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	changes := f.store.Changes(ash)
+	if len(changes) != 2 || changes[0].Kind != domain.ChangeProtection || changes[0].At.IsZero() ||
+		len(changes[0].Pokemon) != 1 || changes[0].Pokemon[0].Species != "Pidgey" || changes[0].ID == changes[1].ID {
+		t.Fatalf("history = %+v; protecting twice is one change, unprotecting another", changes)
+	}
+}

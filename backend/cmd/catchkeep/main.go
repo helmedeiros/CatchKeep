@@ -191,7 +191,7 @@ func newRootHandler(cfg serveConfig, store *sqlite.Store, listen net.Addr) http.
 		Profiles:   app.NewProfiles(trainers, hasher, ulids, clock),
 		Sessions:   app.NewSessions(trainers, sqlite.NewSessions(store), hasher, ids.Tokens{}, clock),
 		Imports:    app.NewImports(csvimport.NewPokeGenie(time.Local), csvimport.Generic{}, collection, collection, ulids, clock),
-		Collection: app.NewCollection(collection, collection, clock),
+		Collection: app.NewCollection(collection, collection, ulids, clock),
 		Keep:       app.NewKeep(sqlite.NewSetups(store), collection, refdata.NewSpecies(), teams),
 		Teams:      app.NewTeams(teams, ulids),
 		Addresses:  func() []string { return netaddr.URLs(listen, net.InterfaceAddrs) },

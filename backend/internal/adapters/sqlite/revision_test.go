@@ -47,7 +47,7 @@ func TestRevision_EveryMutationThatCanChangeRecommendationsBumpsIt(t *testing.T)
 		{"add observations", func() error {
 			return coll.AddObservations(ctx, "ash", []domain.PokemonUpdate{{PokemonID: "P1", Observations: obs}})
 		}},
-		{"protect", func() error { return coll.SetProtected(ctx, "ash", "P1", true) }},
+		{"protect", func() error { return coll.SetProtected(ctx, "ash", "P1", true, protecting("ash", "C1")) }},
 		{"save setup", func() error {
 			return setups.SaveSetup(ctx, "ash", domain.Setup{Capacity: 350, Goals: []domain.Goal{domain.GoalCollecting}})
 		}},
@@ -65,7 +65,7 @@ func TestRevision_EveryMutationThatCanChangeRecommendationsBumpsIt(t *testing.T)
 		}
 	}
 
-	if err := coll.SetProtected(ctx, "misty", "P1", false); err == nil {
+	if err := coll.SetProtected(ctx, "misty", "P1", false, protecting("misty", "C2")); err == nil {
 		t.Fatal("misty protected ash's Pokémon")
 	}
 	if a, m := revision("ash"), revision("misty"); a != int64(len(steps)) || m != 0 {

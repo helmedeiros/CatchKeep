@@ -300,12 +300,13 @@ func previewOf(b domain.ImportBatch) ImportPreview {
 type Collection struct {
 	reader ports.CollectionReader
 	writer ports.CollectionWriter
+	ids    ports.IDs
 	clock  ports.Clock
 }
 
 // NewCollection wires the collection use cases.
-func NewCollection(reader ports.CollectionReader, writer ports.CollectionWriter, clock ports.Clock) *Collection {
-	return &Collection{reader: reader, writer: writer, clock: clock}
+func NewCollection(reader ports.CollectionReader, writer ports.CollectionWriter, ids ports.IDs, clock ports.Clock) *Collection {
+	return &Collection{reader: reader, writer: writer, ids: ids, clock: clock}
 }
 
 // ConfirmAbsent records that none of the trainer's Pokémon of one species
@@ -348,9 +349,23 @@ func (c *Collection) Mark(ctx context.Context, trainer domain.TrainerID, id doma
 	return p, nil
 }
 
-// Protect sets or clears the trainer's manual protection of one Pokémon.
+// Protect sets or clears the trainer's manual protection of one Pokémon
+// and records it in the history; asking for what is already so changes
+// nothing.
 func (c *Collection) Protect(ctx context.Context, trainer domain.TrainerID, id domain.PokemonID, protected bool) error {
-	return c.writer.SetProtected(ctx, trainer, id, protected)
+	list, err := c.reader.ListPokemon(ctx, trainer)
+	if err != nil {
+		return err
+	}
+	i := slices.IndexFunc(list, func(p domain.Pokemon) bool { return p.ID == id })
+	if i < 0 {
+		return domain.ErrPokemonNotFound
+	}
+	if list[i].Protected == protected {
+		return nil
+	}
+	change := domain.NewChange(c.ids.NewID(), trainer, domain.ChangeProtection, list[i:i+1], c.clock.Now())
+	return c.writer.SetProtected(ctx, trainer, id, protected, change)
 }
 
 // List returns the trainer's Pokémon, highest CP first, unknown CP last.

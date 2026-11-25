@@ -246,21 +246,33 @@ func TestCollection_SetProtectedIsScopedToTheTrainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := coll.SetProtected(t.Context(), "misty", "P1", true); !errors.Is(err, domain.ErrPokemonNotFound) {
+	if err := coll.SetProtected(t.Context(), "misty", "P1", true, protecting("misty", "C0")); !errors.Is(err, domain.ErrPokemonNotFound) {
 		t.Fatalf("misty protecting ash's Pokémon: err = %v", err)
 	}
-	if err := coll.SetProtected(t.Context(), "ash", "P1", true); err != nil {
+	if err := coll.SetProtected(t.Context(), "ash", "P1", true, protecting("ash", "C1")); err != nil {
 		t.Fatal(err)
 	}
 	if list, _ := coll.ListPokemon(t.Context(), "ash"); !list[0].Protected {
 		t.Fatal("P1 is not protected")
 	}
-	if err := coll.SetProtected(t.Context(), "ash", "P1", false); err != nil {
+	if err := coll.SetProtected(t.Context(), "ash", "P1", false, protecting("ash", "C2")); err != nil {
 		t.Fatal(err)
 	}
 	if list, _ := coll.ListPokemon(t.Context(), "ash"); list[0].Protected {
 		t.Fatal("P1 is still protected")
 	}
+	var kinds, details string
+	if err := store.DB().QueryRowContext(t.Context(), `
+		SELECT group_concat(kind), group_concat(detail, ' ') FROM (SELECT kind, detail FROM history_events WHERE kind = 'protection' ORDER BY rowid)`).Scan(&kinds, &details); err != nil {
+		t.Fatal(err)
+	}
+	if kinds != "protection,protection" || details != `{"protected":true} {"protected":false}` {
+		t.Fatalf("history = %s %s; misty's refused attempt is not recorded", kinds, details)
+	}
+}
+
+func protecting(trainer domain.TrainerID, id string) domain.Change {
+	return domain.Change{ID: id, TrainerID: trainer, Kind: domain.ChangeProtection, Pokemon: []domain.Transferred{{ID: "P1", Species: "Pidgey"}}, At: at}
 }
 
 func TestImportBatches_KeepTheTableAndRememberMappingsPerTrainer(t *testing.T) {

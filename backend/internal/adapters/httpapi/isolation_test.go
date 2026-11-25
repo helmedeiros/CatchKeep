@@ -64,7 +64,7 @@ func newSQLiteAPI(t *testing.T) *apiClient {
 		Profiles:   app.NewProfiles(trainers, apptest.PlainHasher{}, ids.NewULID(), clock),
 		Sessions:   app.NewSessions(trainers, sqlite.NewSessions(store), apptest.PlainHasher{}, apptest.NewSequentialTokens(), clock),
 		Imports:    app.NewImports(csvimport.NewPokeGenie(time.UTC), csvimport.Generic{}, collection, collection, ids.NewULID(), clock),
-		Collection: app.NewCollection(collection, collection, clock),
+		Collection: app.NewCollection(collection, collection, ids.NewULID(), clock),
 		Keep:       app.NewKeep(sqlite.NewSetups(store), collection, refdata.NewSpecies(), teams),
 		Teams:      app.NewTeams(teams, ids.NewULID()),
 		HostNames:  func() []string { return []string{hostAddress} },

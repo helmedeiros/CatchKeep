@@ -33,3 +33,19 @@ func TestNewImportEvent_ListsWhatTheImportAddedAndChanged(t *testing.T) {
 		t.Fatalf("changed = %+v; only Pidgey changed, in CP and HP", e.Changed)
 	}
 }
+
+func TestNewChange_DescribesThePokemonItTouched(t *testing.T) {
+	at := time.Date(2026, 11, 25, 9, 0, 0, 0, time.UTC)
+
+	c := domain.NewChange("C1", "ash", domain.ChangeProtection, []domain.Pokemon{mon("P1", "species", "Pidgey", "cp", "120")}, at)
+
+	if c.ID != "C1" || c.TrainerID != "ash" || c.Kind != domain.ChangeProtection || !c.At.Equal(at) {
+		t.Fatalf("change = %+v", c)
+	}
+	if len(c.Pokemon) != 1 || c.Pokemon[0].ID != "P1" || c.Pokemon[0].Species != "Pidgey" || c.Pokemon[0].CP != 120 {
+		t.Fatalf("pokemon = %+v", c.Pokemon)
+	}
+	if none := domain.NewChange("C2", "ash", domain.ChangeSetup, nil, at); none.Pokemon == nil {
+		t.Fatal("a change without Pokémon lists none, not nil")
+	}
+}
