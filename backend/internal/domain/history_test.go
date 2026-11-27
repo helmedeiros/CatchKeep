@@ -86,3 +86,19 @@ func TestSnapshotStorage_TakesTheSetupAndTheKeepSplit(t *testing.T) {
 		t.Fatalf("snapshot = %+v, want %+v", got, want)
 	}
 }
+
+func TestPastImport_RebuildsTheEntryItWouldHaveMade(t *testing.T) {
+	at := time.Date(2026, 11, 15, 18, 0, 0, 0, time.UTC)
+	past := domain.PastImport{
+		BatchID: "B1", TrainerID: "ash", CommittedAt: at,
+		Existing: []domain.Pokemon{mon("P1", "species", "Pidgey", "cp", "120")},
+		Added:    []domain.Pokemon{mon("P2", "species", "Zubat", "cp", "80")},
+		Updates:  []domain.PokemonUpdate{{PokemonID: "P1", Observations: row(2, "species", "Pidgey", "cp", "300").Observations}},
+	}
+
+	e := past.Event("E1")
+
+	if !e.Backfilled || e.ID != "E1" || e.BatchID != "B1" || !e.At.Equal(at) || len(e.Added) != 1 || len(e.Changed) != 1 || e.Changed[0].CP != 300 {
+		t.Fatalf("event = %+v", e)
+	}
+}

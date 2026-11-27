@@ -40,3 +40,29 @@ func (h *Housekeeping) Sweep(ctx context.Context) (Swept, error) {
 	}
 	return Swept{Imports: imports, Sessions: sessions}, nil
 }
+
+// Backfill gives imports committed before the history log their entries.
+type Backfill struct {
+	past ports.PastImports
+	ids  ports.IDs
+}
+
+// NewBackfill wires the history backfill.
+func NewBackfill(past ports.PastImports, ids ports.IDs) *Backfill {
+	return &Backfill{past: past, ids: ids}
+}
+
+// Run records each import the history log is missing, once, and returns
+// how many it recorded.
+func (b *Backfill) Run(ctx context.Context) (int, error) {
+	past, err := b.past.UnrecordedImports(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("find past imports: %w", err)
+	}
+	for i, p := range past {
+		if err := b.past.RecordImport(ctx, p.Event(b.ids.NewID())); err != nil {
+			return i, fmt.Errorf("record past import: %w", err)
+		}
+	}
+	return len(past), nil
+}

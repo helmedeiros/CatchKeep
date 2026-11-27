@@ -41,3 +41,24 @@ func TestSweep_RemovesWeekOldImportsAndIdleSessions(t *testing.T) {
 		t.Fatalf("used session: %v, want kept", err)
 	}
 }
+
+func TestBackfill_RecordsEachPastImportOnce(t *testing.T) {
+	store := apptest.NewCollectionStore()
+	at := time.Date(2026, 11, 15, 18, 0, 0, 0, time.UTC)
+	store.AddPastImport(domain.PastImport{BatchID: "B1", TrainerID: ash, CommittedAt: at, Added: []domain.Pokemon{{ID: "P1"}}})
+	backfill := app.NewBackfill(store, apptest.NewSequentialIDs())
+
+	first, err := backfill.Run(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := backfill.Run(t.Context())
+	if err != nil || first != 1 || again != 0 {
+		t.Fatalf("recorded %d then %d (%v), want 1 then 0", first, again, err)
+	}
+
+	events := store.ImportEvents(ash)
+	if len(events) != 1 || !events[0].Backfilled || events[0].BatchID != "B1" || !events[0].At.Equal(at) {
+		t.Fatalf("history = %+v", events)
+	}
+}

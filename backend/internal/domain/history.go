@@ -14,6 +14,9 @@ type ImportEvent struct {
 	Added     []Transferred
 	Changed   []ChangedPokemon
 	At        time.Time
+	// Backfilled marks an import committed before the history log, whose
+	// entry was rebuilt later.
+	Backfilled bool
 }
 
 // ChangedPokemon is a Pokémon as an import left it, and the fields it
@@ -113,4 +116,23 @@ func SnapshotStorage(setup Setup, summary KeepSummary) StorageSnapshot {
 		HasSetup: true, Capacity: setup.Capacity, InGameCount: setup.InGameCount, Limit: setup.Limit,
 		Active: summary.Total, Kept: summary.Kept, PossibleTransfers: summary.Surplus, NeedsConfirmation: summary.NeedsConfirmation,
 	}
+}
+
+// PastImport is an import committed before the history log, as rebuilt
+// from what it saved: the trainer's Pokémon before it, those it added, and
+// the values it added to the others.
+type PastImport struct {
+	BatchID     string
+	TrainerID   TrainerID
+	CommittedAt time.Time
+	Existing    []Pokemon
+	Added       []Pokemon
+	Updates     []PokemonUpdate
+}
+
+// Event is the history entry the import would have made.
+func (p PastImport) Event(id string) ImportEvent {
+	e := NewImportEvent(id, p.TrainerID, p.BatchID, p.Existing, p.Added, p.Updates, p.CommittedAt)
+	e.Backfilled = true
+	return e
 }

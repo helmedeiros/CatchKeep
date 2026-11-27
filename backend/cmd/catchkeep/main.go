@@ -115,6 +115,7 @@ func serve(ctx context.Context, cfg serveConfig, ready func(addr string)) error 
 	tidyCtx, stopTidy := context.WithCancel(ctx)
 	var tidy sync.WaitGroup
 	tidy.Go(func() {
+		fillInHistory(tidyCtx, app.NewBackfill(sqlite.NewCollection(store), ids.NewULID()))
 		keepTidy(tidyCtx, app.NewHousekeeping(sqlite.NewCollection(store), sqlite.NewSessions(store), ids.SystemClock{}))
 	})
 	defer func() { stopTidy(); tidy.Wait() }()
@@ -140,6 +141,17 @@ func serve(ctx context.Context, cfg serveConfig, ready func(addr string)) error 
 		return fmt.Errorf("serve: %w", err)
 	}
 	return nil
+}
+
+// fillInHistory gives imports from before the history log their entries.
+func fillInHistory(ctx context.Context, b *app.Backfill) {
+	n, err := b.Run(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "filling in history failed", "error", err)
+	}
+	if n > 0 {
+		slog.InfoContext(ctx, "filled in history", "imports", n)
+	}
 }
 
 // sweepEvery is how often old imports and idle sessions are cleared out.
