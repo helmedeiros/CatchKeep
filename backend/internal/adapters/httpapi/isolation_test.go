@@ -63,8 +63,8 @@ func newSQLiteAPI(t *testing.T) *apiClient {
 	storage := app.NewStorage(keep, transfers)
 	return &apiClient{t: t, handler: httpapi.NewHandler(httpapi.Services{
 		Health:     app.NewHealth("test"),
-		Profiles:   app.NewProfiles(trainers, apptest.PlainHasher{}, ids.NewULID(), clock),
-		Sessions:   app.NewSessions(trainers, sqlite.NewSessions(store), apptest.PlainHasher{}, apptest.NewSequentialTokens(), clock),
+		Profiles:   app.NewProfiles(trainers, sqlite.NewSignInLog(store), apptest.PlainHasher{}, ids.NewULID(), clock),
+		Sessions:   app.NewSessions(trainers, sqlite.NewSessions(store), sqlite.NewSignInLog(store), apptest.PlainHasher{}, apptest.NewSequentialTokens(), clock),
 		Imports:    app.NewImports(csvimport.NewPokeGenie(time.UTC), csvimport.Generic{}, collection, collection, storage, ids.NewULID(), clock),
 		Collection: app.NewCollection(collection, collection, ids.NewULID(), clock),
 		Keep:       keep,

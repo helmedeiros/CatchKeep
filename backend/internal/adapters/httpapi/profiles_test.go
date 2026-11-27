@@ -35,10 +35,11 @@ func newAPI(t *testing.T) *apiClient {
 	hasher := apptest.PlainHasher{}
 	collection := apptest.NewCollectionStore()
 	teams := apptest.NewTeams(collection)
+	signIns := &apptest.SignInLog{}
 	return &apiClient{t: t, handler: httpapi.NewHandler(httpapi.Services{
 		Health:     app.NewHealth("test"),
-		Profiles:   app.NewProfiles(trainers, hasher, ulidLike{}, clock),
-		Sessions:   app.NewSessions(trainers, apptest.NewSessionStore(), hasher, apptest.NewSequentialTokens(), clock),
+		Profiles:   app.NewProfiles(trainers, signIns, hasher, ulidLike{}, clock),
+		Sessions:   app.NewSessions(trainers, apptest.NewSessionStore(), signIns, hasher, apptest.NewSequentialTokens(), clock),
 		Imports:    app.NewImports(csvimport.NewPokeGenie(time.UTC), csvimport.Generic{}, collection, collection, &apptest.StorageRecorder{}, ulidLike{}, clock),
 		Collection: app.NewCollection(collection, collection, ulidLike{}, clock),
 		Keep:       app.NewKeep(apptest.NewSetups(), collection, apptest.SpeciesCategories{"Mewtwo": domain.CategoryLegendary}, teams, ulidLike{}, clock),

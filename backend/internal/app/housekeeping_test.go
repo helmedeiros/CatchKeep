@@ -25,14 +25,20 @@ func TestSweep_RemovesWeekOldImportsAndIdleSessions(t *testing.T) {
 	idle := now.Add(-domain.SessionIdleTimeout - time.Second)
 	_ = sessions.Create(t.Context(), domain.Session{TokenHash: "idle", TrainerID: ash, LastSeenAt: idle})
 	_ = sessions.Create(t.Context(), domain.Session{TokenHash: "used", TrainerID: ash, LastSeenAt: recent})
+	log := &apptest.SignInLog{}
+	_ = log.Record(t.Context(), domain.SignInEntry{Kind: domain.SignedIn, At: now.Add(-domain.SignInLogLifetime - time.Second)})
+	_ = log.Record(t.Context(), domain.SignInEntry{Kind: domain.WrongPIN, At: recent})
 
-	swept, err := app.NewHousekeeping(store, sessions, apptest.NewFixedClock(now)).Sweep(t.Context())
+	swept, err := app.NewHousekeeping(store, sessions, log, apptest.NewFixedClock(now)).Sweep(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if swept != (app.Swept{Imports: 1, Sessions: 1}) {
-		t.Fatalf("swept = %+v, want 1 import and 1 session", swept)
+	if swept != (app.Swept{Imports: 1, Sessions: 1, SignIns: 1}) {
+		t.Fatalf("swept = %+v, want 1 import, 1 session and 1 sign-in entry", swept)
+	}
+	if kinds := log.Kinds(); len(kinds) != 1 || kinds[0] != domain.WrongPIN {
+		t.Fatalf("sign-in log = %v, want the recent entry kept", kinds)
 	}
 	if _, err := store.Get(t.Context(), ash, "old"); !errors.Is(err, domain.ErrImportNotFound) {
 		t.Fatalf("old import: err = %v, want removed", err)

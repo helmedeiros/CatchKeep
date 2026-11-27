@@ -17,6 +17,7 @@ import (
 type Sessions struct {
 	trainers ports.Trainers
 	sessions ports.Sessions
+	log      ports.SignInLog
 	hasher   ports.PINHasher
 	tokens   ports.Tokens
 	clock    ports.Clock
@@ -31,9 +32,9 @@ const maxDevices = 1024
 
 // NewSessions wires the sign-in use cases. PIN attempt history is kept in
 // memory, so a host restart clears lockouts.
-func NewSessions(trainers ports.Trainers, sessions ports.Sessions, hasher ports.PINHasher, tokens ports.Tokens, clock ports.Clock) *Sessions {
+func NewSessions(trainers ports.Trainers, sessions ports.Sessions, log ports.SignInLog, hasher ports.PINHasher, tokens ports.Tokens, clock ports.Clock) *Sessions {
 	return &Sessions{
-		trainers: trainers, sessions: sessions, hasher: hasher, tokens: tokens, clock: clock,
+		trainers: trainers, sessions: sessions, log: log, hasher: hasher, tokens: tokens, clock: clock,
 		attempts: map[domain.TrainerID]*domain.PINAttempts{},
 		devices:  map[string]*domain.DeviceAttempts{},
 	}
@@ -42,7 +43,8 @@ func NewSessions(trainers ports.Trainers, sessions ports.Sessions, hasher ports.
 // SignIn checks the PIN for the profile and, if right, starts a session and
 // returns its token. A wrong PIN and an unknown profile both return
 // domain.ErrWrongPIN; repeated failures for the profile, or from the device
-// on any profiles, return *domain.LockedOutError.
+// on any profiles, return *domain.LockedOutError. Sign-ins, wrong PINs and
+// the start of each pause go in the sign-in log.
 func (s *Sessions) SignIn(ctx context.Context, device string, id domain.TrainerID, pin string) (string, ProfileSummary, error) {
 	now := s.clock.Now()
 	if err := s.check(device, id, now); err != nil {
@@ -51,8 +53,7 @@ func (s *Sessions) SignIn(ctx context.Context, device string, id domain.TrainerI
 
 	trainer, err := s.trainers.Get(ctx, id)
 	if errors.Is(err, domain.ErrTrainerNotFound) {
-		s.fail(device, "", now)
-		return "", ProfileSummary{}, domain.ErrWrongPIN
+		return "", ProfileSummary{}, s.wrongPIN(ctx, device, "", now)
 	}
 	if err != nil {
 		return "", ProfileSummary{}, err
@@ -62,8 +63,7 @@ func (s *Sessions) SignIn(ctx context.Context, device string, id domain.TrainerI
 		return "", ProfileSummary{}, fmt.Errorf("verify PIN: %w", err)
 	}
 	if !ok {
-		s.fail(device, id, now)
-		return "", ProfileSummary{}, domain.ErrWrongPIN
+		return "", ProfileSummary{}, s.wrongPIN(ctx, device, id, now)
 	}
 	s.mu.Lock()
 	delete(s.attempts, id)
@@ -73,6 +73,9 @@ func (s *Sessions) SignIn(ctx context.Context, device string, id domain.TrainerI
 	session := domain.Session{TokenHash: hashToken(token), TrainerID: trainer.ID, CreatedAt: now, LastSeenAt: now}
 	if err := s.sessions.Create(ctx, session); err != nil {
 		return "", ProfileSummary{}, fmt.Errorf("create session: %w", err)
+	}
+	if err := s.record(ctx, domain.SignedIn, device, trainer.ID, now); err != nil {
+		return "", ProfileSummary{}, err
 	}
 	return token, ProfileSummary{ID: trainer.ID, DisplayName: trainer.DisplayName}, nil
 }
@@ -104,8 +107,8 @@ func (s *Sessions) Resolve(ctx context.Context, token string) (ProfileSummary, e
 }
 
 // ResetPIN gives the trainer a new PIN, ends all their sessions and lifts
-// any lockout. Only the host admin may call it.
-func (s *Sessions) ResetPIN(ctx context.Context, id domain.TrainerID, pin string) error {
+// any lockout; the sign-in log notes it. Only the host admin may call it.
+func (s *Sessions) ResetPIN(ctx context.Context, device string, id domain.TrainerID, pin string) error {
 	if err := domain.ValidatePIN(pin); err != nil {
 		return err
 	}
@@ -122,12 +125,34 @@ func (s *Sessions) ResetPIN(ctx context.Context, id domain.TrainerID, pin string
 	s.mu.Lock()
 	delete(s.attempts, id)
 	s.mu.Unlock()
-	return nil
+	return s.record(ctx, domain.PINReset, device, id, s.clock.Now())
 }
 
 // SignOut ends the session for token. Unknown tokens are ignored.
 func (s *Sessions) SignOut(ctx context.Context, token string) error {
 	return s.sessions.Delete(ctx, hashToken(token))
+}
+
+// wrongPIN counts a wrong PIN, notes it and any pause it starts in the
+// sign-in log, and returns domain.ErrWrongPIN.
+func (s *Sessions) wrongPIN(ctx context.Context, device string, id domain.TrainerID, now time.Time) error {
+	s.fail(device, id, now)
+	if err := s.record(ctx, domain.WrongPIN, device, id, now); err != nil {
+		return err
+	}
+	if s.check(device, id, now) != nil {
+		if err := s.record(ctx, domain.SignInPaused, device, id, now); err != nil {
+			return err
+		}
+	}
+	return domain.ErrWrongPIN
+}
+
+func (s *Sessions) record(ctx context.Context, kind domain.SignInKind, device string, id domain.TrainerID, now time.Time) error {
+	if err := s.log.Record(ctx, domain.SignInEntry{Kind: kind, TrainerID: id, Device: device, At: now}); err != nil {
+		return fmt.Errorf("sign-in log: %w", err)
+	}
+	return nil
 }
 
 // check refuses a device or profile that is paused at now.

@@ -121,6 +121,49 @@ func (c *FixedClock) Advance(d time.Duration) {
 	c.now = c.now.Add(d)
 }
 
+// SignInLog is an in-memory ports.SignInLog.
+type SignInLog struct {
+	mu      sync.Mutex
+	entries []domain.SignInEntry
+}
+
+// Record implements ports.SignInLog.
+func (l *SignInLog) Record(_ context.Context, e domain.SignInEntry) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.entries = append(l.entries, e)
+	return nil
+}
+
+// List implements ports.SignInLog.
+func (l *SignInLog) List(_ context.Context, limit int) ([]domain.SignInEntry, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	out := slices.Clone(l.entries)
+	slices.Reverse(out)
+	return out[:min(limit, len(out))], nil
+}
+
+// DeleteBefore implements ports.SignInLog.
+func (l *SignInLog) DeleteBefore(_ context.Context, cutoff time.Time) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	before := len(l.entries)
+	l.entries = slices.DeleteFunc(l.entries, func(e domain.SignInEntry) bool { return e.At.Before(cutoff) })
+	return before - len(l.entries), nil
+}
+
+// Kinds lists what was recorded, oldest first.
+func (l *SignInLog) Kinds() []domain.SignInKind {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	var out []domain.SignInKind
+	for _, e := range l.entries {
+		out = append(out, e.Kind)
+	}
+	return out
+}
+
 // SessionStore is an in-memory ports.Sessions.
 type SessionStore struct {
 	mu     sync.Mutex

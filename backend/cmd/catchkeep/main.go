@@ -116,7 +116,7 @@ func serve(ctx context.Context, cfg serveConfig, ready func(addr string)) error 
 	var tidy sync.WaitGroup
 	tidy.Go(func() {
 		fillInHistory(tidyCtx, app.NewBackfill(sqlite.NewCollection(store), ids.NewULID()))
-		keepTidy(tidyCtx, app.NewHousekeeping(sqlite.NewCollection(store), sqlite.NewSessions(store), ids.SystemClock{}))
+		keepTidy(tidyCtx, app.NewHousekeeping(sqlite.NewCollection(store), sqlite.NewSessions(store), sqlite.NewSignInLog(store), ids.SystemClock{}))
 	})
 	defer func() { stopTidy(); tidy.Wait() }()
 
@@ -166,7 +166,7 @@ func keepTidy(ctx context.Context, h *app.Housekeeping) {
 		if err != nil {
 			slog.ErrorContext(ctx, "clean-up failed", "error", err)
 		} else if swept != (app.Swept{}) {
-			slog.InfoContext(ctx, "cleaned up", "imports", swept.Imports, "sessions", swept.Sessions)
+			slog.InfoContext(ctx, "cleaned up", "imports", swept.Imports, "sessions", swept.Sessions, "sign-ins", swept.SignIns)
 		}
 		select {
 		case <-ctx.Done():
@@ -193,6 +193,7 @@ func newServer(ctx context.Context, h http.Handler) *http.Server {
 // bundle when a web directory is configured.
 func newRootHandler(cfg serveConfig, store *sqlite.Store, listen net.Addr) http.Handler {
 	trainers := sqlite.NewTrainers(store)
+	signIns := sqlite.NewSignInLog(store)
 	hasher := pinhash.NewArgon2()
 	clock := ids.SystemClock{}
 	ulids := ids.NewULID()
@@ -203,8 +204,8 @@ func newRootHandler(cfg serveConfig, store *sqlite.Store, listen net.Addr) http.
 	storage := app.NewStorage(keep, transfers)
 	api := httpapi.NewHandler(httpapi.Services{
 		Health:     app.NewHealth(buildinfo.Version()),
-		Profiles:   app.NewProfiles(trainers, hasher, ulids, clock),
-		Sessions:   app.NewSessions(trainers, sqlite.NewSessions(store), hasher, ids.Tokens{}, clock),
+		Profiles:   app.NewProfiles(trainers, signIns, hasher, ulids, clock),
+		Sessions:   app.NewSessions(trainers, sqlite.NewSessions(store), signIns, hasher, ids.Tokens{}, clock),
 		Imports:    app.NewImports(csvimport.NewPokeGenie(time.Local), csvimport.Generic{}, collection, collection, storage, ulids, clock),
 		Collection: app.NewCollection(collection, collection, ulids, clock),
 		Keep:       keep,

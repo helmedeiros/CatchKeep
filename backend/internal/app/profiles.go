@@ -20,18 +20,20 @@ type ProfileSummary struct {
 // Profiles creates and lists trainer profiles.
 type Profiles struct {
 	trainers ports.Trainers
+	log      ports.SignInLog
 	hasher   ports.PINHasher
 	ids      ports.IDs
 	clock    ports.Clock
 }
 
 // NewProfiles wires the profile use cases.
-func NewProfiles(trainers ports.Trainers, hasher ports.PINHasher, ids ports.IDs, clock ports.Clock) *Profiles {
-	return &Profiles{trainers: trainers, hasher: hasher, ids: ids, clock: clock}
+func NewProfiles(trainers ports.Trainers, log ports.SignInLog, hasher ports.PINHasher, ids ports.IDs, clock ports.Clock) *Profiles {
+	return &Profiles{trainers: trainers, log: log, hasher: hasher, ids: ids, clock: clock}
 }
 
-// Create validates the name and PIN and stores a new trainer with a hashed PIN.
-func (p *Profiles) Create(ctx context.Context, displayName, pin string) (ProfileSummary, error) {
+// Create validates the name and PIN, stores a new trainer with a hashed PIN
+// and notes it in the sign-in log with the device that asked.
+func (p *Profiles) Create(ctx context.Context, device, displayName, pin string) (ProfileSummary, error) {
 	name, err := domain.NewDisplayName(displayName)
 	if err != nil {
 		return ProfileSummary{}, err
@@ -46,6 +48,9 @@ func (p *Profiles) Create(ctx context.Context, displayName, pin string) (Profile
 	t := domain.Trainer{ID: domain.TrainerID(p.ids.NewID()), DisplayName: name, PINHash: hash, CreatedAt: p.clock.Now()}
 	if err := p.trainers.Create(ctx, t); err != nil {
 		return ProfileSummary{}, err
+	}
+	if err := p.log.Record(ctx, domain.SignInEntry{Kind: domain.ProfileCreated, TrainerID: t.ID, Device: device, At: t.CreatedAt}); err != nil {
+		return ProfileSummary{}, fmt.Errorf("sign-in log: %w", err)
 	}
 	return ProfileSummary{ID: t.ID, DisplayName: t.DisplayName}, nil
 }

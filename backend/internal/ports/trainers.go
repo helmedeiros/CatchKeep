@@ -51,6 +51,16 @@ type Sessions interface {
 	DeleteIdleSince(ctx context.Context, cutoff time.Time) (int, error)
 }
 
+// SignInLog keeps the sign-in log, apart from the history so backups
+// leave it out.
+type SignInLog interface {
+	Record(ctx context.Context, e domain.SignInEntry) error
+	// List returns up to limit entries, newest first.
+	List(ctx context.Context, limit int) ([]domain.SignInEntry, error)
+	// DeleteBefore removes entries older than cutoff and returns how many.
+	DeleteBefore(ctx context.Context, cutoff time.Time) (int, error)
+}
+
 // Tokens generates unguessable session tokens.
 type Tokens interface {
 	NewToken() string
