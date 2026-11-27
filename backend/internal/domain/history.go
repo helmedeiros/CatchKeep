@@ -95,3 +95,22 @@ func SameSetup(a, b Setup) bool {
 	return a.Capacity == b.Capacity && a.InGameCount == b.InGameCount && a.Limit == b.Limit &&
 		slices.Equal(a.Goals, b.Goals) && slices.Equal(a.Species, b.Species) && slices.Equal(a.Categories, b.Categories)
 }
+
+// StorageSnapshot is how full a trainer's storage was right after an import,
+// transfer or undo (spec §13 history log). Before the trainer has a setup
+// only Active is known.
+type StorageSnapshot struct {
+	HasSetup                     bool
+	Capacity, InGameCount, Limit int
+	// Active counts the Pokémon in CatchKeep; Kept, PossibleTransfers and
+	// NeedsConfirmation split them as the keep rules do.
+	Active, Kept, PossibleTransfers, NeedsConfirmation int
+}
+
+// SnapshotStorage is the storage of a trainer with setup and summary.
+func SnapshotStorage(setup Setup, summary KeepSummary) StorageSnapshot {
+	return StorageSnapshot{
+		HasSetup: true, Capacity: setup.Capacity, InGameCount: setup.InGameCount, Limit: setup.Limit,
+		Active: summary.Total, Kept: summary.Kept, PossibleTransfers: summary.Surplus, NeedsConfirmation: summary.NeedsConfirmation,
+	}
+}

@@ -15,13 +15,14 @@ type Transfers struct {
 	store      ports.Transfers
 	collection ports.CollectionReader
 	revisions  ports.Revisions
+	storage    StorageRecorder
 	ids        ports.IDs
 	clock      ports.Clock
 }
 
 // NewTransfers wires the transfer use cases.
-func NewTransfers(store ports.Transfers, collection ports.CollectionReader, revisions ports.Revisions, ids ports.IDs, clock ports.Clock) *Transfers {
-	return &Transfers{store: store, collection: collection, revisions: revisions, ids: ids, clock: clock}
+func NewTransfers(store ports.Transfers, collection ports.CollectionReader, revisions ports.Revisions, storage StorageRecorder, ids ports.IDs, clock ports.Clock) *Transfers {
+	return &Transfers{store: store, collection: collection, revisions: revisions, storage: storage, ids: ids, clock: clock}
 }
 
 // AnyRevision skips the stale-plan check, for single confirmations from
@@ -43,14 +44,22 @@ func (t *Transfers) Confirm(ctx context.Context, trainer domain.TrainerID, ids [
 	if err != nil {
 		return domain.TransferEvent{}, err
 	}
-	return t.store.Record(ctx, e, revision)
+	e, err = t.store.Record(ctx, e, revision)
+	if err == nil {
+		t.storage.RecordStorage(ctx, trainer, e.ID)
+	}
+	return e, err
 }
 
 // Undo puts the Pokémon of a transfer back in the collection. It cannot
 // bring back a Pokémon transferred in the game.
 func (t *Transfers) Undo(ctx context.Context, trainer domain.TrainerID, eventID string) (domain.TransferEvent, error) {
 	undo := domain.TransferEvent{ID: t.ids.NewID(), TrainerID: trainer, Kind: domain.TransferUndo, At: t.clock.Now()}
-	return t.store.Undo(ctx, trainer, eventID, undo)
+	undo, err := t.store.Undo(ctx, trainer, eventID, undo)
+	if err == nil {
+		t.storage.RecordStorage(ctx, trainer, undo.ID)
+	}
+	return undo, err
 }
 
 // History returns the latest transfers and undos, newest first.

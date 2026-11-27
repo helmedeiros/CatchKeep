@@ -58,18 +58,20 @@ func newSQLiteAPI(t *testing.T) *apiClient {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 	clock := apptest.NewFixedClock(time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC))
-	trainers, collection, teams := sqlite.NewTrainers(store), sqlite.NewCollection(store), sqlite.NewTeams(store)
+	trainers, collection, teams, transfers := sqlite.NewTrainers(store), sqlite.NewCollection(store), sqlite.NewTeams(store), sqlite.NewTransfers(store)
+	keep := app.NewKeep(sqlite.NewSetups(store), collection, refdata.NewSpecies(), teams, ids.NewULID(), clock)
+	storage := app.NewStorage(keep, transfers)
 	return &apiClient{t: t, handler: httpapi.NewHandler(httpapi.Services{
 		Health:     app.NewHealth("test"),
 		Profiles:   app.NewProfiles(trainers, apptest.PlainHasher{}, ids.NewULID(), clock),
 		Sessions:   app.NewSessions(trainers, sqlite.NewSessions(store), apptest.PlainHasher{}, apptest.NewSequentialTokens(), clock),
-		Imports:    app.NewImports(csvimport.NewPokeGenie(time.UTC), csvimport.Generic{}, collection, collection, ids.NewULID(), clock),
+		Imports:    app.NewImports(csvimport.NewPokeGenie(time.UTC), csvimport.Generic{}, collection, collection, storage, ids.NewULID(), clock),
 		Collection: app.NewCollection(collection, collection, ids.NewULID(), clock),
-		Keep:       app.NewKeep(sqlite.NewSetups(store), collection, refdata.NewSpecies(), teams, ids.NewULID(), clock),
+		Keep:       keep,
 		Teams:      app.NewTeams(teams, collection, ids.NewULID(), clock),
 		HostNames:  func() []string { return []string{hostAddress} },
 		Autostart:  app.NewAutostart(&apptest.Autostart{}),
-		Transfers:  app.NewTransfers(sqlite.NewTransfers(store), collection, collection, ids.NewULID(), clock),
+		Transfers:  app.NewTransfers(transfers, collection, collection, storage, ids.NewULID(), clock),
 	})}
 }
 

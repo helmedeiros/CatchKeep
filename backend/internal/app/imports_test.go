@@ -3,6 +3,7 @@ package app_test
 import (
 	"errors"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -74,6 +75,7 @@ type importsFixture struct {
 	imports    *app.Imports
 	collection *app.Collection
 	store      *apptest.CollectionStore
+	storage    *apptest.StorageRecorder
 	ids        *apptest.SequentialIDs
 	clock      *apptest.FixedClock
 }
@@ -82,10 +84,12 @@ func newImportsFixture() importsFixture {
 	store := apptest.NewCollectionStore()
 	clock := apptest.NewFixedClock(time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC))
 	ids := apptest.NewSequentialIDs()
+	storage := &apptest.StorageRecorder{}
 	return importsFixture{
-		imports:    app.NewImports(fakeParser{}, fakeTables{}, store, store, ids, clock),
+		imports:    app.NewImports(fakeParser{}, fakeTables{}, store, store, storage, ids, clock),
 		collection: app.NewCollection(store, store, ids, clock),
 		store:      store,
+		storage:    storage,
 		ids:        ids,
 		clock:      clock,
 	}
@@ -463,5 +467,8 @@ func TestCommit_RecordsTheImportInTheHistory(t *testing.T) {
 	events := f.store.ImportEvents(ash)
 	if len(events) != 1 || events[0].BatchID != preview.ID || len(events[0].Added) != 2 || events[0].At.IsZero() {
 		t.Fatalf("history = %+v, want one import adding 2", events)
+	}
+	if got := f.storage.Events(); !slices.Equal(got, []string{events[0].ID}) {
+		t.Fatalf("storage recorded after %v, want after the import", got)
 	}
 }

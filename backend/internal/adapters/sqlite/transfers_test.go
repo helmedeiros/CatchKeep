@@ -172,3 +172,41 @@ func TestTransfers_SurviveTheMoveToTheHistoryLog(t *testing.T) {
 		t.Fatal("the request id no longer finds its transfer")
 	}
 }
+
+func TestHistory_AttachesStorageToTheTrainersEvents(t *testing.T) {
+	store, _ := openTemp(t)
+	withTrainers(t, store, "ash", "misty")
+	withPokemon(t, store, "ash", "P1", "P2")
+	transfers := sqlite.NewTransfers(store)
+	ctx := t.Context()
+	if _, err := transfers.Record(ctx, event("E1", "r1", "P1"), -1); err != nil {
+		t.Fatal(err)
+	}
+	full := domain.StorageSnapshot{HasSetup: true, Capacity: 400, InGameCount: 399, Active: 1, Kept: 1}
+
+	if err := transfers.AttachStorage(ctx, "misty", "E1", full); err == nil {
+		t.Fatal("misty attached storage to ash's transfer")
+	}
+	for id, s := range map[string]domain.StorageSnapshot{"E1": full, "I-B-ash": {Active: 2}} {
+		if err := transfers.AttachStorage(ctx, "ash", id, s); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	detail := func(id string) string {
+		var d string
+		if err := store.DB().QueryRowContext(ctx, `SELECT detail FROM history_events WHERE id = ?`, id).Scan(&d); err != nil {
+			t.Fatal(err)
+		}
+		return d
+	}
+	if got, want := detail("E1"), `{"storage":{"hasSetup":true,"capacity":400,"inGameCount":399,"active":1,"kept":1}}`; got != want {
+		t.Fatalf("transfer detail = %s, want %s", got, want)
+	}
+	if got, want := detail("I-B-ash"), `{"batchId":"B-ash","changed":[],"storage":{"hasSetup":false,"active":2}}`; got != want {
+		t.Fatalf("import detail = %s, want %s; the import's own detail stays", got, want)
+	}
+	if list, err := transfers.ListTransfers(ctx, "ash", 10); err != nil || len(list) != 1 {
+		t.Fatalf("transfers = %+v, %v", list, err)
+	}
+}

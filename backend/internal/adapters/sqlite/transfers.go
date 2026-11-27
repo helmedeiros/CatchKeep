@@ -248,3 +248,38 @@ func insertChange(ctx context.Context, tx *sql.Tx, c domain.Change, detail any) 
 	}
 	return nil
 }
+
+var _ ports.History = (*Transfers)(nil)
+
+// storageDetail is the stored form of a domain.StorageSnapshot.
+type storageDetail struct {
+	HasSetup          bool `json:"hasSetup"`
+	Capacity          int  `json:"capacity,omitempty"`
+	InGameCount       int  `json:"inGameCount,omitempty"`
+	Limit             int  `json:"limit,omitempty"`
+	Active            int  `json:"active"`
+	Kept              int  `json:"kept,omitempty"`
+	PossibleTransfers int  `json:"possibleTransfers,omitempty"`
+	NeedsConfirmation int  `json:"needsConfirmation,omitempty"`
+}
+
+// AttachStorage implements ports.History, under "storage" in the event's
+// detail.
+func (r *Transfers) AttachStorage(ctx context.Context, trainer domain.TrainerID, eventID string, s domain.StorageSnapshot) error {
+	snapshot, err := json.Marshal(storageDetail(s))
+	if err != nil {
+		return fmt.Errorf("encode storage: %w", err)
+	}
+	res, err := r.db.ExecContext(ctx, `
+		UPDATE history_events SET detail = json_set(COALESCE(detail, '{}'), '$.storage', json(?))
+		WHERE id = ? AND trainer_id = ?`, string(snapshot), eventID, string(trainer))
+	if err != nil {
+		return fmt.Errorf("attach storage: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("attach storage: %w", err)
+	} else if n == 0 {
+		return fmt.Errorf("attach storage: no event %s", eventID)
+	}
+	return nil
+}
