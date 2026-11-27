@@ -292,6 +292,33 @@ func (e SetupGoals) Valid() bool {
 	}
 }
 
+// Defines values for SignInEntryKind.
+const (
+	Paused         SignInEntryKind = "paused"
+	PinReset       SignInEntryKind = "pin_reset"
+	ProfileCreated SignInEntryKind = "profile_created"
+	SignedIn       SignInEntryKind = "signed_in"
+	WrongPin       SignInEntryKind = "wrong_pin"
+)
+
+// Valid indicates whether the value is a known member of the SignInEntryKind enum.
+func (e SignInEntryKind) Valid() bool {
+	switch e {
+	case Paused:
+		return true
+	case PinReset:
+		return true
+	case ProfileCreated:
+		return true
+	case SignedIn:
+		return true
+	case WrongPin:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SpeciesCategory.
 const (
 	Legendary  SpeciesCategory = "legendary"
@@ -895,6 +922,31 @@ type SignIn struct {
 	ProfileId ProfileId `json:"profileId"`
 }
 
+// SignInEntry defines model for SignInEntry.
+type SignInEntry struct {
+	At time.Time `json:"at"`
+
+	// Device The network address of the device that asked.
+	Device string          `json:"device"`
+	Kind   SignInEntryKind `json:"kind"`
+
+	// ProfileId Stable profile identifier (ULID).
+	//
+	// Examples: 01JD2Z8Q4M8V7Y6X5W4T3S2R1P
+	ProfileId *ProfileId `json:"profileId,omitempty"`
+
+	// ProfileName The profile's name now; missing for a profile that does not exist.
+	ProfileName *string `json:"profileName,omitempty"`
+}
+
+// SignInEntryKind defines model for SignInEntry.Kind.
+type SignInEntryKind string
+
+// SignInLog defines model for SignInLog.
+type SignInLog struct {
+	Entries []SignInEntry `json:"entries"`
+}
+
 // SpeciesCategory defines model for SpeciesCategory.
 type SpeciesCategory string
 
@@ -1187,6 +1239,9 @@ type ServerInterface interface {
 	// SaveSetup Save storage capacity and goals in priority order.
 	// (PUT /setup)
 	SaveSetup(w http.ResponseWriter, r *http.Request)
+	// GetSignIns The latest sign-in log entries, newest first.
+	// (GET /sign-ins)
+	GetSignIns(w http.ResponseWriter, r *http.Request)
 	// GetSpeciesRules The trainer's per-species keep rules.
 	// (GET /species-rules)
 	GetSpeciesRules(w http.ResponseWriter, r *http.Request)
@@ -1716,6 +1771,20 @@ func (siw *ServerInterfaceWrapper) SaveSetup(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// GetSignIns operation middleware
+func (siw *ServerInterfaceWrapper) GetSignIns(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSignIns(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSpeciesRules operation middleware
 func (siw *ServerInterfaceWrapper) GetSpeciesRules(w http.ResponseWriter, r *http.Request) {
 
@@ -1988,6 +2057,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/host", wrapper.GetHost)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/autostart", wrapper.GetAutostart)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/autostart", wrapper.SetAutostart)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/sign-ins", wrapper.GetSignIns)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/profiles", wrapper.ListProfiles)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/profiles", wrapper.CreateProfile)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/profiles/{profileId}/pin", wrapper.ResetPin)
@@ -3833,6 +3903,58 @@ func (response SaveSetupdefaultJSONResponse) VisitSaveSetupResponse(w http.Respo
 	return err
 }
 
+type GetSignInsRequestObject struct {
+}
+
+type GetSignInsResponseObject interface {
+	VisitGetSignInsResponse(w http.ResponseWriter) error
+}
+
+type GetSignIns200JSONResponse SignInLog
+
+func (response GetSignIns200JSONResponse) VisitGetSignInsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSignIns403JSONResponse struct{ ErrorJSONResponse }
+
+func (response GetSignIns403JSONResponse) VisitGetSignInsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSignInsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetSignInsdefaultJSONResponse) VisitGetSignInsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetSpeciesRulesRequestObject struct {
 }
 
@@ -4529,6 +4651,9 @@ type StrictServerInterface interface {
 	// SaveSetup Save storage capacity and goals in priority order.
 	// (PUT /setup)
 	SaveSetup(ctx context.Context, request SaveSetupRequestObject) (SaveSetupResponseObject, error)
+	// GetSignIns The latest sign-in log entries, newest first.
+	// (GET /sign-ins)
+	GetSignIns(ctx context.Context, request GetSignInsRequestObject) (GetSignInsResponseObject, error)
 	// GetSpeciesRules The trainer's per-species keep rules.
 	// (GET /species-rules)
 	GetSpeciesRules(ctx context.Context, request GetSpeciesRulesRequestObject) (GetSpeciesRulesResponseObject, error)
@@ -5330,6 +5455,30 @@ func (sh *strictHandler) SaveSetup(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SaveSetupResponseObject); ok {
 		if err := validResponse.VisitSaveSetupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSignIns operation middleware
+func (sh *strictHandler) GetSignIns(w http.ResponseWriter, r *http.Request) {
+	var request GetSignInsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSignIns(ctx, request.(GetSignInsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSignIns")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSignInsResponseObject); ok {
+		if err := validResponse.VisitGetSignInsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

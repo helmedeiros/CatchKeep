@@ -208,3 +208,35 @@ func hashToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
 }
+
+// signInLogLength is how many sign-in log entries the host sees.
+const signInLogLength = 200
+
+// SignInRecord is a sign-in log entry with the profile's name now, "" for
+// a profile that does not exist.
+type SignInRecord struct {
+	domain.SignInEntry
+	ProfileName string
+}
+
+// SignIns returns the latest sign-in log entries, newest first. Only the
+// host admin may call it.
+func (s *Sessions) SignIns(ctx context.Context) ([]SignInRecord, error) {
+	entries, err := s.log.List(ctx, signInLogLength)
+	if err != nil {
+		return nil, err
+	}
+	trainers, err := s.trainers.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	names := make(map[domain.TrainerID]string, len(trainers))
+	for _, t := range trainers {
+		names[t.ID] = t.DisplayName
+	}
+	out := make([]SignInRecord, len(entries))
+	for i, e := range entries {
+		out[i] = SignInRecord{SignInEntry: e, ProfileName: names[e.TrainerID]}
+	}
+	return out, nil
+}

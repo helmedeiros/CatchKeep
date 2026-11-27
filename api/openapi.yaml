@@ -97,6 +97,26 @@ paths:
                 $ref: "#/components/schemas/Error"
         default:
           $ref: "#/components/responses/Error"
+  /sign-ins:
+    get:
+      tags: [profiles]
+      operationId: getSignIns
+      summary: The latest sign-in log entries, newest first.
+      description: >-
+        Sign-ins, wrong PINs, pauses, new profiles and PIN resets from the
+        last 90 days, at most 200. Only the computer running CatchKeep may
+        ask.
+      responses:
+        "200":
+          description: The latest entries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignInLog"
+        "403":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
   /profiles:
     get:
       tags: [profiles]
@@ -1005,6 +1025,34 @@ components:
       properties:
         enabled:
           type: boolean
+    SignInLog:
+      type: object
+      additionalProperties: false
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/SignInEntry"
+    SignInEntry:
+      type: object
+      additionalProperties: false
+      required: [kind, device, at]
+      properties:
+        kind:
+          type: string
+          enum: [signed_in, wrong_pin, paused, profile_created, pin_reset]
+        profileId:
+          $ref: "#/components/schemas/ProfileId"
+        profileName:
+          type: string
+          description: The profile's name now; missing for a profile that does not exist.
+        device:
+          type: string
+          description: The network address of the device that asked.
+        at:
+          type: string
+          format: date-time
     HostInfo:
       type: object
       additionalProperties: false

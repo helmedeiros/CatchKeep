@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -285,4 +286,26 @@ func TestAutostart_OnlyTheHostTurnsItOnAndOff(t *testing.T) {
 		t.Fatalf("state = %+v", got)
 	}
 	wantStatus(t, unsupported.do(http.MethodPut, "/api/v1/autostart", `{"enabled":true}`), http.StatusConflict)
+}
+
+func TestSignIns_OnlyTheHostSeesTheLog(t *testing.T) {
+	device := signedIn(t)
+	id := decode[[]struct{ ID string }](t, device.do(http.MethodGet, "/api/v1/profiles", "").Body.Bytes())[0].ID
+	device.onOtherDevice()
+	wantStatus(t, device.do(http.MethodPost, "/api/v1/session", `{"profileId":"`+id+`","pin":"0000"}`), http.StatusUnauthorized)
+	wantStatus(t, device.do(http.MethodGet, "/api/v1/sign-ins", ""), http.StatusForbidden)
+
+	host := &apiClient{t: t, handler: device.handler}
+	rec := host.do(http.MethodGet, "/api/v1/sign-ins", "")
+	wantStatus(t, rec, http.StatusOK)
+
+	type entry struct{ Kind, ProfileName, Device string }
+	got := decode[struct{ Entries []entry }](t, rec.Body.Bytes()).Entries
+	want := []entry{{"wrong_pin", "Ash", "192.168.1.20"}, {"signed_in", "Ash", "127.0.0.1"}, {"profile_created", "Ash", "127.0.0.1"}}
+	if !slices.Equal(got, want) {
+		t.Fatalf("log = %+v, want %+v", got, want)
+	}
+	if strings.Contains(rec.Body.String(), "2468") || strings.Contains(rec.Body.String(), "0000") {
+		t.Fatalf("the log shows a PIN: %s", rec.Body)
+	}
 }

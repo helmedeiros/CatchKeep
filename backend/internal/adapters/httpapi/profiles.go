@@ -218,3 +218,23 @@ func (s *server) SetAutostart(ctx context.Context, req SetAutostartRequestObject
 	}
 	return SetAutostart200JSONResponse{Supported: state.Supported, Enabled: state.Enabled}, nil
 }
+
+func (s *server) GetSignIns(ctx context.Context, _ GetSignInsRequestObject) (GetSignInsResponseObject, error) {
+	if !isAdmin(ctx) {
+		return GetSignIns403JSONResponse{ErrorJSONResponse(adminOnly())}, nil
+	}
+	records, err := s.services.Sessions.SignIns(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := GetSignIns200JSONResponse{Entries: make([]SignInEntry, 0, len(records))}
+	for _, r := range records {
+		e := SignInEntry{Kind: SignInEntryKind(r.Kind), Device: r.Device, At: r.At}
+		if r.ProfileName != "" {
+			id, name := r.TrainerID, r.ProfileName
+			e.ProfileId, e.ProfileName = (*ProfileId)(&id), &name
+		}
+		out.Entries = append(out.Entries, e)
+	}
+	return out, nil
+}

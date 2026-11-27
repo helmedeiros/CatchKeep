@@ -62,6 +62,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sign-ins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The latest sign-in log entries, newest first.
+         * @description Sign-ins, wrong PINs, pauses, new profiles and PIN resets from the last 90 days, at most 200. Only the computer running CatchKeep may ask.
+         */
+        get: operations["getSignIns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles": {
         parameters: {
             query?: never;
@@ -556,6 +576,20 @@ export interface components {
         };
         AutostartInput: {
             enabled: boolean;
+        };
+        SignInLog: {
+            entries: components["schemas"]["SignInEntry"][];
+        };
+        SignInEntry: {
+            /** @enum {string} */
+            kind: "signed_in" | "wrong_pin" | "paused" | "profile_created" | "pin_reset";
+            profileId?: components["schemas"]["ProfileId"];
+            /** @description The profile's name now; missing for a profile that does not exist. */
+            profileName?: string;
+            /** @description The network address of the device that asked. */
+            device: string;
+            /** Format: date-time */
+            at: string;
         };
         HostInfo: {
             /** @description This request comes from the computer running CatchKeep, which may create profiles and reset PINs. */
@@ -1079,6 +1113,28 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            default: components["responses"]["Error"];
+        };
+    };
+    getSignIns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The latest entries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignInLog"];
+                };
+            };
+            403: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };
     };
