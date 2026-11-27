@@ -219,6 +219,7 @@ type CollectionStore struct {
 	imports   []domain.ImportEvent
 	changes   []domain.Change
 	storage   map[string]domain.StorageSnapshot
+	past      []domain.PastImport
 	revisions map[domain.TrainerID]int64
 }
 
@@ -372,6 +373,34 @@ func (s *CollectionStore) SetProtected(_ context.Context, trainer domain.Trainer
 	owned[i].Protected = protected
 	s.pokemon[trainer] = owned
 	s.changes = append(s.changes, c)
+	return nil
+}
+
+// AddPastImport adds an import committed before the history log.
+func (s *CollectionStore) AddPastImport(p domain.PastImport) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.past = append(s.past, p)
+}
+
+// UnrecordedImports implements ports.PastImports.
+func (s *CollectionStore) UnrecordedImports(context.Context) ([]domain.PastImport, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.PastImport
+	for _, p := range s.past {
+		if !slices.ContainsFunc(s.imports, func(e domain.ImportEvent) bool { return e.BatchID == p.BatchID }) {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+// RecordImport implements ports.PastImports.
+func (s *CollectionStore) RecordImport(_ context.Context, e domain.ImportEvent) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.imports = append(s.imports, e)
 	return nil
 }
 

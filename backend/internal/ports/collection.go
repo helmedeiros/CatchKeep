@@ -23,6 +23,15 @@ type TableParser interface {
 	ParseTable(t domain.Table, m domain.ColumnMapping, observedAt time.Time) domain.ParsedExport
 }
 
+// PastImports finds imports committed before the history log.
+type PastImports interface {
+	// UnrecordedImports returns every committed import without a history
+	// entry, oldest first.
+	UnrecordedImports(ctx context.Context) ([]domain.PastImport, error)
+	// RecordImport adds e to the history log.
+	RecordImport(ctx context.Context, e domain.ImportEvent) error
+}
+
 // ImportBatches persists staged and committed imports.
 type ImportBatches interface {
 	Save(ctx context.Context, b domain.ImportBatch) error

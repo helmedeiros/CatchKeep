@@ -199,8 +199,9 @@ func scanEvent(s scanner) (domain.TransferEvent, error) {
 }
 
 type importDetail struct {
-	BatchID string    `json:"batchId"`
-	Changed []changed `json:"changed"`
+	BatchID    string    `json:"batchId"`
+	Changed    []changed `json:"changed"`
+	Backfilled bool      `json:"backfilled,omitempty"`
 }
 
 type changed struct {
@@ -213,7 +214,7 @@ func insertImportEvent(ctx context.Context, tx *sql.Tx, e domain.ImportEvent) er
 	if err != nil {
 		return fmt.Errorf("encode import history: %w", err)
 	}
-	d := importDetail{BatchID: e.BatchID, Changed: []changed{}}
+	d := importDetail{BatchID: e.BatchID, Changed: []changed{}, Backfilled: e.Backfilled}
 	for _, c := range e.Changed {
 		d.Changed = append(d.Changed, changed{transferred: toTransferred([]domain.Transferred{c.Transferred})[0], Fields: c.Fields})
 	}
