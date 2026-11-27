@@ -3,6 +3,7 @@ package app_test
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 type sessionsFixture struct {
 	sessions *app.Sessions
+	log      *apptest.SignInLog
 	clock    *apptest.FixedClock
 	ash      app.ProfileSummary
 }
@@ -21,13 +23,14 @@ func newSessionsFixture(t *testing.T) sessionsFixture {
 	t.Helper()
 	trainers := apptest.NewTrainers()
 	clock := apptest.NewFixedClock(time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC))
-	profiles := app.NewProfiles(trainers, apptest.PlainHasher{}, apptest.NewSequentialIDs(), clock)
-	ash, err := profiles.Create(t.Context(), "Ash", "2468")
+	log := &apptest.SignInLog{}
+	profiles := app.NewProfiles(trainers, log, apptest.PlainHasher{}, apptest.NewSequentialIDs(), clock)
+	ash, err := profiles.Create(t.Context(), "laptop", "Ash", "2468")
 	if err != nil {
 		t.Fatal(err)
 	}
-	sessions := app.NewSessions(trainers, apptest.NewSessionStore(), apptest.PlainHasher{}, apptest.NewSequentialTokens(), clock)
-	return sessionsFixture{sessions: sessions, clock: clock, ash: ash}
+	sessions := app.NewSessions(trainers, apptest.NewSessionStore(), log, apptest.PlainHasher{}, apptest.NewSequentialTokens(), clock)
+	return sessionsFixture{sessions: sessions, log: log, clock: clock, ash: ash}
 }
 
 func TestSignIn_WithTheRightPINStartsASession(t *testing.T) {
@@ -141,13 +144,13 @@ func TestResetPIN_SetsTheNewPINSignsOutEverywhereAndLiftsALockout(t *testing.T) 
 		_, _, _ = f.sessions.SignIn(t.Context(), "phone", f.ash.ID, "1111")
 	}
 
-	if err := f.sessions.ResetPIN(t.Context(), f.ash.ID, "12"); !errors.Is(err, domain.ErrInvalidPIN) {
+	if err := f.sessions.ResetPIN(t.Context(), "laptop", f.ash.ID, "12"); !errors.Is(err, domain.ErrInvalidPIN) {
 		t.Fatalf("short PIN: err = %v", err)
 	}
-	if err := f.sessions.ResetPIN(t.Context(), "ghost", "1357"); !errors.Is(err, domain.ErrTrainerNotFound) {
+	if err := f.sessions.ResetPIN(t.Context(), "laptop", "ghost", "1357"); !errors.Is(err, domain.ErrTrainerNotFound) {
 		t.Fatalf("unknown profile: err = %v", err)
 	}
-	if err := f.sessions.ResetPIN(t.Context(), f.ash.ID, "1357"); err != nil {
+	if err := f.sessions.ResetPIN(t.Context(), "laptop", f.ash.ID, "1357"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -209,5 +212,39 @@ func TestSignIn_ADevicesOldMistakesExpire(t *testing.T) {
 
 	if _, _, err := f.sessions.SignIn(t.Context(), "laptop", f.ash.ID, "2468"); err != nil {
 		t.Fatalf("err = %v, want mistakes older than 15 minutes forgotten", err)
+	}
+}
+
+func TestSignInLog_NotesSignInsWrongPINsPausesAndResets(t *testing.T) {
+	f := newSessionsFixture(t)
+
+	if _, _, err := f.sessions.SignIn(t.Context(), "phone", "ghost", "2468"); !errors.Is(err, domain.ErrWrongPIN) {
+		t.Fatal(err)
+	}
+	for range 5 {
+		_, _, _ = f.sessions.SignIn(t.Context(), "phone", f.ash.ID, "0000")
+	}
+	_, _, _ = f.sessions.SignIn(t.Context(), "phone", f.ash.ID, "2468")
+	if err := f.sessions.ResetPIN(t.Context(), "laptop", f.ash.ID, "1357"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := f.sessions.SignIn(t.Context(), "phone", f.ash.ID, "1357"); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []domain.SignInKind{
+		domain.ProfileCreated, domain.WrongPIN,
+		domain.WrongPIN, domain.WrongPIN, domain.WrongPIN, domain.WrongPIN, domain.WrongPIN, domain.SignInPaused,
+		domain.PINReset, domain.SignedIn,
+	}
+	if got := f.log.Kinds(); !slices.Equal(got, want) {
+		t.Fatalf("log = %v, want %v; refused attempts during a pause are not noted", got, want)
+	}
+	entries, _ := f.log.List(t.Context(), 20)
+	if last := entries[len(entries)-2]; last.TrainerID != "" || last.Device != "phone" {
+		t.Fatalf("unknown profile entry = %+v, want no profile, the phone", last)
+	}
+	if e := entries[0]; e.TrainerID != f.ash.ID || e.Device != "phone" || e.At.IsZero() {
+		t.Fatalf("sign-in entry = %+v", e)
 	}
 }

@@ -12,22 +12,24 @@ import (
 type Housekeeping struct {
 	batches  ports.ImportBatches
 	sessions ports.Sessions
+	log      ports.SignInLog
 	clock    ports.Clock
 }
 
 // NewHousekeeping wires the clean-up.
-func NewHousekeeping(batches ports.ImportBatches, sessions ports.Sessions, clock ports.Clock) *Housekeeping {
-	return &Housekeeping{batches: batches, sessions: sessions, clock: clock}
+func NewHousekeeping(batches ports.ImportBatches, sessions ports.Sessions, log ports.SignInLog, clock ports.Clock) *Housekeeping {
+	return &Housekeeping{batches: batches, sessions: sessions, log: log, clock: clock}
 }
 
 // Swept counts what a sweep removed.
 type Swept struct {
 	Imports  int
 	Sessions int
+	SignIns  int
 }
 
-// Sweep removes unfinished imports older than a week and sessions idle
-// past their timeout (spec SEC-03).
+// Sweep removes unfinished imports older than a week, sessions idle past
+// their timeout (spec SEC-03) and sign-in log entries past 90 days.
 func (h *Housekeeping) Sweep(ctx context.Context) (Swept, error) {
 	now := h.clock.Now()
 	imports, err := h.batches.DeleteStagedBefore(ctx, now.Add(-domain.StagedImportLifetime))
@@ -38,7 +40,11 @@ func (h *Housekeeping) Sweep(ctx context.Context) (Swept, error) {
 	if err != nil {
 		return Swept{Imports: imports}, fmt.Errorf("sweep sessions: %w", err)
 	}
-	return Swept{Imports: imports, Sessions: sessions}, nil
+	signIns, err := h.log.DeleteBefore(ctx, now.Add(-domain.SignInLogLifetime))
+	if err != nil {
+		return Swept{Imports: imports, Sessions: sessions}, fmt.Errorf("sweep sign-in log: %w", err)
+	}
+	return Swept{Imports: imports, Sessions: sessions, SignIns: signIns}, nil
 }
 
 // Backfill gives imports committed before the history log their entries.

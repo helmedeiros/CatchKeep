@@ -83,7 +83,7 @@ func (s *server) ResetPin(ctx context.Context, req ResetPinRequestObject) (Reset
 	if !isAdmin(ctx) {
 		return ResetPin403JSONResponse{ErrorJSONResponse(adminOnly())}, nil
 	}
-	err := s.services.Sessions.ResetPIN(ctx, domain.TrainerID(req.ProfileId), req.Body.Pin)
+	err := s.services.Sessions.ResetPIN(ctx, device(ctx), domain.TrainerID(req.ProfileId), req.Body.Pin)
 	switch {
 	case errors.Is(err, domain.ErrInvalidPIN):
 		return ResetPin422JSONResponse(errorBody(codeValidationFailed, err.Error())), nil
@@ -135,7 +135,7 @@ func (s *server) CreateProfile(ctx context.Context, req CreateProfileRequestObje
 	if !isAdmin(ctx) {
 		return CreateProfile403JSONResponse{ErrorJSONResponse(adminOnly())}, nil
 	}
-	p, err := s.services.Profiles.Create(ctx, req.Body.DisplayName, req.Body.Pin)
+	p, err := s.services.Profiles.Create(ctx, device(ctx), req.Body.DisplayName, req.Body.Pin)
 	switch {
 	case errors.Is(err, domain.ErrInvalidDisplayName), errors.Is(err, domain.ErrInvalidPIN):
 		return CreateProfile422JSONResponse(errorBody(codeValidationFailed, err.Error())), nil

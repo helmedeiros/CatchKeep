@@ -12,13 +12,13 @@ import (
 
 func newProfiles() (*app.Profiles, *apptest.Trainers) {
 	trainers := apptest.NewTrainers()
-	return app.NewProfiles(trainers, apptest.PlainHasher{}, apptest.NewSequentialIDs(), apptest.NewFixedClock(time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC))), trainers
+	return app.NewProfiles(trainers, &apptest.SignInLog{}, apptest.PlainHasher{}, apptest.NewSequentialIDs(), apptest.NewFixedClock(time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC))), trainers
 }
 
 func TestCreateProfile_StoresTrainerWithHashedPIN(t *testing.T) {
 	profiles, trainers := newProfiles()
 
-	got, err := profiles.Create(t.Context(), " Ash ", "2468")
+	got, err := profiles.Create(t.Context(), "laptop", " Ash ", "2468")
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -38,21 +38,21 @@ func TestCreateProfile_StoresTrainerWithHashedPIN(t *testing.T) {
 func TestCreateProfile_RejectsInvalidInput(t *testing.T) {
 	profiles, _ := newProfiles()
 
-	if _, err := profiles.Create(t.Context(), "", "2468"); !errors.Is(err, domain.ErrInvalidDisplayName) {
+	if _, err := profiles.Create(t.Context(), "laptop", "", "2468"); !errors.Is(err, domain.ErrInvalidDisplayName) {
 		t.Fatalf("empty name: err = %v", err)
 	}
-	if _, err := profiles.Create(t.Context(), "Ash", "12"); !errors.Is(err, domain.ErrInvalidPIN) {
+	if _, err := profiles.Create(t.Context(), "laptop", "Ash", "12"); !errors.Is(err, domain.ErrInvalidPIN) {
 		t.Fatalf("short PIN: err = %v", err)
 	}
 }
 
 func TestCreateProfile_RejectsDuplicateNameIgnoringCase(t *testing.T) {
 	profiles, _ := newProfiles()
-	if _, err := profiles.Create(t.Context(), "Ash", "2468"); err != nil {
+	if _, err := profiles.Create(t.Context(), "laptop", "Ash", "2468"); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := profiles.Create(t.Context(), "ash", "1357"); !errors.Is(err, domain.ErrDisplayNameTaken) {
+	if _, err := profiles.Create(t.Context(), "laptop", "ash", "1357"); !errors.Is(err, domain.ErrDisplayNameTaken) {
 		t.Fatalf("duplicate: err = %v, want ErrDisplayNameTaken", err)
 	}
 }
@@ -60,7 +60,7 @@ func TestCreateProfile_RejectsDuplicateNameIgnoringCase(t *testing.T) {
 func TestListProfiles_ReturnsAllProfilesSortedByName(t *testing.T) {
 	profiles, _ := newProfiles()
 	for _, name := range []string{"misty", "Brock", "Ash"} {
-		if _, err := profiles.Create(t.Context(), name, "2468"); err != nil {
+		if _, err := profiles.Create(t.Context(), "laptop", name, "2468"); err != nil {
 			t.Fatal(err)
 		}
 	}
