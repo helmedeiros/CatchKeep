@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +18,7 @@ func TestTransfers_ConfirmUndoAndHistory(t *testing.T) {
 	if _, err := f.imports.Commit(t.Context(), ash, preview.ID); err != nil {
 		t.Fatal(err)
 	}
-	transfers := app.NewTransfers(f.store, f.store, f.store, apptest.NewSequentialIDs(), apptest.NewFixedClock(time.Date(2026, 11, 21, 9, 0, 0, 0, time.UTC)))
+	transfers := app.NewTransfers(f.store, f.store, f.store, f.storage, apptest.NewSequentialIDs(), apptest.NewFixedClock(time.Date(2026, 11, 21, 9, 0, 0, 0, time.UTC)))
 	list, _ := f.collection.List(t.Context(), ash)
 	ids := []domain.PokemonID{list[1].ID, list[2].ID}
 	rev, _ := transfers.Revision(t.Context(), ash)
@@ -50,5 +51,8 @@ func TestTransfers_ConfirmUndoAndHistory(t *testing.T) {
 	history, _ := transfers.History(t.Context(), ash)
 	if len(history) != 2 || history[0].Kind != domain.TransferUndo {
 		t.Fatalf("history = %+v", history)
+	}
+	if got := f.storage.Events()[1:]; !slices.Equal(got, []string{e.ID, undo.ID}) {
+		t.Fatalf("storage recorded after %v, want after the transfer and the undo only", got)
 	}
 }

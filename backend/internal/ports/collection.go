@@ -83,6 +83,13 @@ type Transfers interface {
 	ListTransfers(ctx context.Context, trainer domain.TrainerID, limit int) ([]domain.TransferEvent, error)
 }
 
+// History adds to the history log.
+type History interface {
+	// AttachStorage saves how full storage was after one of the trainer's
+	// events.
+	AttachStorage(ctx context.Context, trainer domain.TrainerID, eventID string, s domain.StorageSnapshot) error
+}
+
 // Revisions reads a trainer's revision (spec §5.1).
 type Revisions interface {
 	Revision(ctx context.Context, trainer domain.TrainerID) (int64, error)

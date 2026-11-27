@@ -218,6 +218,7 @@ type CollectionStore struct {
 	events    []domain.TransferEvent
 	imports   []domain.ImportEvent
 	changes   []domain.Change
+	storage   map[string]domain.StorageSnapshot
 	revisions map[domain.TrainerID]int64
 }
 
@@ -227,6 +228,7 @@ func NewCollectionStore() *CollectionStore {
 		batches: map[string]domain.ImportBatch{}, pokemon: map[domain.TrainerID][]domain.Pokemon{},
 		mappings: map[string]domain.ColumnMapping{},
 		gone:     map[domain.PokemonID]domain.Pokemon{}, revisions: map[domain.TrainerID]int64{},
+		storage: map[string]domain.StorageSnapshot{},
 	}
 }
 
@@ -371,6 +373,41 @@ func (s *CollectionStore) SetProtected(_ context.Context, trainer domain.Trainer
 	s.pokemon[trainer] = owned
 	s.changes = append(s.changes, c)
 	return nil
+}
+
+// AttachStorage implements ports.History.
+func (s *CollectionStore) AttachStorage(_ context.Context, _ domain.TrainerID, eventID string, snapshot domain.StorageSnapshot) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.storage[eventID] = snapshot
+	return nil
+}
+
+// Storage returns the snapshot attached to an event.
+func (s *CollectionStore) Storage(eventID string) domain.StorageSnapshot {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.storage[eventID]
+}
+
+// StorageRecorder is an app.StorageRecorder that notes the events.
+type StorageRecorder struct {
+	mu     sync.Mutex
+	events []string
+}
+
+// RecordStorage implements app.StorageRecorder.
+func (r *StorageRecorder) RecordStorage(_ context.Context, _ domain.TrainerID, eventID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = append(r.events, eventID)
+}
+
+// Events returns the events storage was recorded after.
+func (r *StorageRecorder) Events() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.events)
 }
 
 // record keeps a change made through another fake sharing this store.

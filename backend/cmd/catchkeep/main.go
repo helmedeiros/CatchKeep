@@ -186,18 +186,21 @@ func newRootHandler(cfg serveConfig, store *sqlite.Store, listen net.Addr) http.
 	ulids := ids.NewULID()
 	collection := sqlite.NewCollection(store)
 	teams := sqlite.NewTeams(store)
+	transfers := sqlite.NewTransfers(store)
+	keep := app.NewKeep(sqlite.NewSetups(store), collection, refdata.NewSpecies(), teams, ulids, clock)
+	storage := app.NewStorage(keep, transfers)
 	api := httpapi.NewHandler(httpapi.Services{
 		Health:     app.NewHealth(buildinfo.Version()),
 		Profiles:   app.NewProfiles(trainers, hasher, ulids, clock),
 		Sessions:   app.NewSessions(trainers, sqlite.NewSessions(store), hasher, ids.Tokens{}, clock),
-		Imports:    app.NewImports(csvimport.NewPokeGenie(time.Local), csvimport.Generic{}, collection, collection, ulids, clock),
+		Imports:    app.NewImports(csvimport.NewPokeGenie(time.Local), csvimport.Generic{}, collection, collection, storage, ulids, clock),
 		Collection: app.NewCollection(collection, collection, ulids, clock),
-		Keep:       app.NewKeep(sqlite.NewSetups(store), collection, refdata.NewSpecies(), teams, ulids, clock),
+		Keep:       keep,
 		Teams:      app.NewTeams(teams, collection, ulids, clock),
 		Addresses:  func() []string { return netaddr.URLs(listen, net.InterfaceAddrs) },
 		HostNames:  func() []string { return netaddr.HostNames(listen, net.InterfaceAddrs, hostname()) },
 		Autostart:  app.NewAutostart(loginItem(cfg)),
-		Transfers:  app.NewTransfers(sqlite.NewTransfers(store), collection, collection, ulids, clock),
+		Transfers:  app.NewTransfers(transfers, collection, collection, storage, ulids, clock),
 	})
 	if cfg.webDir == "" {
 		return api

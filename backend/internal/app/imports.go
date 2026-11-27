@@ -59,13 +59,14 @@ type Imports struct {
 	tables     ports.TableParser
 	batches    ports.ImportBatches
 	collection ports.CollectionReader
+	storage    StorageRecorder
 	ids        ports.IDs
 	clock      ports.Clock
 }
 
 // NewImports wires the import use cases.
-func NewImports(parser ports.ExportParser, tables ports.TableParser, batches ports.ImportBatches, collection ports.CollectionReader, ids ports.IDs, clock ports.Clock) *Imports {
-	return &Imports{parser: parser, tables: tables, batches: batches, collection: collection, ids: ids, clock: clock}
+func NewImports(parser ports.ExportParser, tables ports.TableParser, batches ports.ImportBatches, collection ports.CollectionReader, storage StorageRecorder, ids ports.IDs, clock ports.Clock) *Imports {
+	return &Imports{parser: parser, tables: tables, batches: batches, collection: collection, storage: storage, ids: ids, clock: clock}
 }
 
 // Stage reads an export and stores it for review. The collection is
@@ -236,6 +237,7 @@ func (u *Imports) Commit(ctx context.Context, trainer domain.TrainerID, id strin
 	if err := u.batches.Commit(ctx, batch, add, review.Update, event); err != nil {
 		return ImportPreview{}, fmt.Errorf("commit import: %w", err)
 	}
+	u.storage.RecordStorage(ctx, trainer, event.ID)
 	p := previewOf(batch)
 	p.Missing = review.Missing
 	return p, nil

@@ -74,3 +74,15 @@ func TestSameSetup_ComparesEverySetting(t *testing.T) {
 		}
 	}
 }
+
+func TestSnapshotStorage_TakesTheSetupAndTheKeepSplit(t *testing.T) {
+	setup := domain.Setup{Capacity: 400, InGameCount: 380, Limit: 90}
+	summary := domain.KeepSummary{Total: 370, Kept: 300, Surplus: 60, NeedsConfirmation: 10}
+
+	got := domain.SnapshotStorage(setup, summary)
+
+	want := domain.StorageSnapshot{HasSetup: true, Capacity: 400, InGameCount: 380, Limit: 90, Active: 370, Kept: 300, PossibleTransfers: 60, NeedsConfirmation: 10}
+	if got != want {
+		t.Fatalf("snapshot = %+v, want %+v", got, want)
+	}
+}
