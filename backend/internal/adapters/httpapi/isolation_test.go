@@ -24,7 +24,7 @@ import (
 var sharedRoutes = []string{
 	"GET /health", "GET /host", "GET /autostart", "PUT /autostart",
 	"GET /profiles", "POST /profiles", "PUT /profiles/{profileId}/pin",
-	"POST /session", "DELETE /session", "GET /me",
+	"POST /session", "DELETE /session", "GET /me", "GET /sign-ins",
 }
 
 // trainerReads are the routes that show a trainer their own data.
