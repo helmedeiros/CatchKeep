@@ -3,6 +3,7 @@ import { Home } from "./home/Home";
 import { HostStatus } from "./host/HostStatus";
 import { OtherDevices } from "./host/OtherDevices";
 import { StartAtLogin } from "./host/StartAtLogin";
+import { SignInLog } from "./host/SignInLog";
 import { SignedOut } from "./session/SignedOut";
 import { useMe } from "./session/useSession";
 import { card } from "./ui/styles";
@@ -37,6 +38,7 @@ function Session() {
         <HostStatus />
         <OtherDevices />
         <StartAtLogin />
+        <SignInLog />
       </section>
     </>
   );

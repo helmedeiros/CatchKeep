@@ -10,6 +10,7 @@ import { type Pokemon, useCollection } from "../collection/useCollection";
 import { HostStatus } from "../host/HostStatus";
 import { OtherDevices } from "../host/OtherDevices";
 import { StartAtLogin } from "../host/StartAtLogin";
+import { SignInLog } from "../host/SignInLog";
 import { KeepCard } from "../keep/KeepCard";
 import { MakeRoom } from "../plan/MakeRoom";
 import { NextStep } from "./NextStep";
@@ -179,6 +180,7 @@ function More({
         <HostStatus />
         <OtherDevices />
         <StartAtLogin />
+        <SignInLog />
       </section>
       <button
         type="button"
